@@ -12,8 +12,20 @@
         actionRequiredCount: (count) => `Action required (${count})`,
       };
 
+  const LOGIN_AUTO_KEY = "moolias-action-required-after-login";
   let explicitQueryHandled = false;
+  let autoLoginHandled = false;
   let poolSourcePromise = null;
+
+  document.addEventListener("click", (event) => {
+    const loginLink = event.target.closest?.('a[href="/login"]');
+    if (!loginLink) return;
+    try {
+      sessionStorage.setItem(LOGIN_AUTO_KEY, "1");
+    } catch (error) {
+      console.debug("sessionStorage is unavailable", error);
+    }
+  });
 
   const ensureAliasAction = () => {
     const filters = document.querySelector(".status-filters");
@@ -98,16 +110,10 @@
     const renderPromise = api.open();
     const dialog = document.querySelector("dialog[data-action-required-dialog]");
 
-    // review.js creates the dialog and its loading state synchronously before it
-    // starts fetching the detailed data. Show that state immediately so the
-    // click always feels responsive instead of waiting on network requests.
     if (dialog && !dialog.open) dialog.showModal();
 
     await Promise.all([poolPromise, renderPromise]);
 
-    // The pool source and the first dialog render are loaded in parallel. If
-    // the dialog happened to finish first, refresh it once with the now local
-    // pool data instead of delaying the initial opening.
     const hasUsedPoolItem = Boolean(document.querySelector(".pool-item.pool-item-used"));
     if (hasUsedPoolItem && dialog && !dialog.querySelector(".action-required-pool-form")) {
       await api.open();
@@ -136,20 +142,38 @@
     window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
   };
 
+  const handleFreshLogin = async (api, summary) => {
+    if (autoLoginHandled || !api?.open) return;
+    let requested = false;
+    try {
+      requested = sessionStorage.getItem(LOGIN_AUTO_KEY) === "1";
+      if (requested) sessionStorage.removeItem(LOGIN_AUTO_KEY);
+    } catch (error) {
+      console.debug("sessionStorage is unavailable", error);
+    }
+    if (!requested) return;
+    autoLoginHandled = true;
+    if ((summary?.total || 0) > 0) await openActionRequired();
+  };
+
   const refresh = async () => {
     const aliasAction = ensureAliasAction();
     bindActionButtons();
     const api = window.MooliasActionRequired;
     if (!api) return;
 
-    if (aliasAction && api.summary) {
-      const summary = await api.summary();
-      aliasAction.textContent = summary.total > 0
-        ? text.actionRequiredCount(summary.total)
-        : text.actionRequired;
-      aliasAction.classList.toggle("has-action-required", summary.total > 0);
+    let summary = null;
+    if (api.summary) {
+      summary = await api.summary();
+      if (aliasAction) {
+        aliasAction.textContent = summary.total > 0
+          ? text.actionRequiredCount(summary.total)
+          : text.actionRequired;
+        aliasAction.classList.toggle("has-action-required", summary.total > 0);
+      }
     }
 
+    await handleFreshLogin(api, summary);
     await handleExplicitQuery(api);
   };
 
