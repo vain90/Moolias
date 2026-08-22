@@ -14,9 +14,11 @@ from moolias.aliases import (
 from moolias.i18n import LANGUAGE_COOKIE, detect_language
 from moolias.mailcow import MailcowError
 from moolias.security import require_user, validate_csrf
+from moolias.usage import mailbox_stats_state
 
 router = APIRouter()
 router.include_router(alias_table_router)
+SENDER_DECISIONS = {"expected", "unexpected", "clear"}
 
 
 def _language(request: Request) -> str:
@@ -102,6 +104,59 @@ async def assign_offline_pool_alias(
         )
     except MailcowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return RedirectResponse("/offline-pool", status_code=303)
+
+
+@router.post("/offline-pool/{alias_id}/sender-expectation")
+async def update_offline_sender_expectation(
+    request: Request,
+    alias_id: int,
+    sender_key: str = Form(...),
+    decision: str = Form(...),
+    csrf_token: str = Form(...),
+):
+    validate_csrf(request, csrf_token)
+    user, alias = await _owned_alias(request, alias_id)
+    if not alias.is_reserved:
+        raise HTTPException(status_code=409, detail="Sender review is only available here")
+    if decision not in SENDER_DECISIONS:
+        raise HTTPException(status_code=400, detail="Unknown sender review decision")
+
+    settings = request.app.state.settings
+    stats_store = getattr(request.app.state, "stats_store", None)
+    if not settings.usage_stats or stats_store is None:
+        raise HTTPException(status_code=409, detail="Usage statistics are disabled")
+
+    sender_key = sender_key.strip().lower()
+    if not sender_key or len(sender_key) > 320:
+        raise HTTPException(status_code=400, detail="Invalid sender key")
+
+    try:
+        state = await mailbox_stats_state(settings, request.app.state.mailcow, user)
+    except MailcowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if not state.sender_detail_enabled:
+        raise HTTPException(
+            status_code=409,
+            detail="Sender statistics are not enabled for this mailbox",
+        )
+
+    stored = await stats_store.sender_usage(user, [alias.address])
+    sender_entries = stored.get(alias.address.lower(), [])
+    if not any(entry.sender_key == sender_key for entry in sender_entries):
+        raise HTTPException(status_code=404, detail="Sender statistic does not exist")
+
+    expected = {
+        "expected": True,
+        "unexpected": False,
+        "clear": None,
+    }[decision]
+    await stats_store.set_sender_expectation(
+        user,
+        alias.address,
+        sender_key,
+        expected,
+    )
     return RedirectResponse("/offline-pool", status_code=303)
 
 
