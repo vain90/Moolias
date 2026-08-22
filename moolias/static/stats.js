@@ -117,7 +117,7 @@
     form.append("csrf_token", csrf);
     if (ignored) form.append("ignored", "true");
 
-    const isOfflineAlias = row?.matches(".pool-item");
+    const isOfflineAlias = row?.matches(".pool-item, .offline-pool-row");
     const endpoint = isOfflineAlias
       ? `/offline-pool/${encodeURIComponent(id)}/unexpected-monitoring`
       : `/aliases/${encodeURIComponent(id)}/unexpected-monitoring`;
@@ -171,7 +171,7 @@
       const summary = details.querySelector(":scope > summary");
       if (!summary) return;
 
-      const ownerRow = details.closest(".alias-row, .pool-item");
+      const ownerRow = details.closest(".alias-row, .pool-item, .offline-pool-row");
       const ignored = Boolean(ownerRow && isUnexpectedIgnored(ownerRow));
       const rawUnexpected = Boolean(summary.querySelector(".sender-stats-alert"));
       const hasUnexpected = rawUnexpected && !ignored;
