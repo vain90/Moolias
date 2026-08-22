@@ -34,6 +34,19 @@
   color: var(--accent-strong);
 }
 
+[data-copy] {
+  transition: background-color .28s ease, border-color .28s ease, color .28s ease;
+}
+
 .copy-success {
+  border-color: #a9dfc1 !important;
+  background: #eaf7f0 !important;
+  color: #177a4d !important;
   font-weight: 850;
+}
+
+:root[data-theme="dark"] .copy-success {
+  border-color: #2b6d4c !important;
+  background: #163424 !important;
+  color: #78d6a5 !important;
 }
