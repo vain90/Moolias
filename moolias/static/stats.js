@@ -5,7 +5,7 @@
       senderTitle: "Absender",
       close: "Schließen",
       ignoreUnexpected: "Unerwartete Absender für diesen Alias ignorieren",
-      ignoreUnexpectedHint: "Absender und Statistiken bleiben sichtbar, aber dieser Alias wird nicht mehr als unerwartet gemeldet und zählt nicht im roten Filter.",
+      ignoreUnexpectedHint: "Wird nicht mehr als unerwartet markiert. Absender und Statistiken bleiben sichtbar.",
       ignoreUnexpectedMuted: "Prüfung aus",
       ignoreUnexpectedFailed: "Die Einstellung für unerwartete Absender konnte nicht gespeichert werden.",
     },
@@ -13,7 +13,7 @@
       senderTitle: "Senders",
       close: "Close",
       ignoreUnexpected: "Ignore unexpected senders for this alias",
-      ignoreUnexpectedHint: "Sender details and statistics stay visible, but this alias is no longer flagged as unexpected and is excluded from the red filter.",
+      ignoreUnexpectedHint: "No longer flagged as unexpected. Sender details and statistics stay visible.",
       ignoreUnexpectedMuted: "Review off",
       ignoreUnexpectedFailed: "The unexpected-sender setting could not be saved.",
     },
@@ -73,9 +73,11 @@
 
   const rowAlias = (row) => {
     const checkbox = row?.querySelector("[data-alias-select]");
-    const address = checkbox?.dataset.address?.trim().toLowerCase() || "";
+    const address = checkbox?.dataset.address?.trim().toLowerCase()
+      || row?.dataset.aliasAddress?.trim().toLowerCase()
+      || "";
     return {
-      id: checkbox?.value || "",
+      id: checkbox?.value || row?.dataset.aliasId || "",
       address,
     };
   };
@@ -86,7 +88,7 @@
   };
 
   const loadReviewSettings = async () => {
-    if (!document.querySelector(".status-filters")) return;
+    if (!document.querySelector(".status-filters, .sender-stats")) return;
     try {
       const response = await fetch("/aliases/review-settings", {
         credentials: "same-origin",
@@ -115,7 +117,11 @@
     form.append("csrf_token", csrf);
     if (ignored) form.append("ignored", "true");
 
-    const response = await fetch(`/aliases/${encodeURIComponent(id)}/unexpected-monitoring`, {
+    const isOfflineAlias = row?.matches(".pool-item");
+    const endpoint = isOfflineAlias
+      ? `/offline-pool/${encodeURIComponent(id)}/unexpected-monitoring`
+      : `/aliases/${encodeURIComponent(id)}/unexpected-monitoring`;
+    const response = await fetch(endpoint, {
       method: "POST",
       body: form,
       credentials: "same-origin",
@@ -165,7 +171,7 @@
       const summary = details.querySelector(":scope > summary");
       if (!summary) return;
 
-      const ownerRow = details.closest(".alias-row");
+      const ownerRow = details.closest(".alias-row, .pool-item");
       const ignored = Boolean(ownerRow && isUnexpectedIgnored(ownerRow));
       const rawUnexpected = Boolean(summary.querySelector(".sender-stats-alert"));
       const hasUnexpected = rawUnexpected && !ignored;
