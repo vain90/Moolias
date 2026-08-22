@@ -40,7 +40,7 @@
       <label>
         <span>{% if language == 'de' %}Sortieren nach{% else %}Sort by{% endif %}</span>
         <select name="sort" data-auto-submit>
-          <option value="attention" {% if sort_mode == 'attention' %}selected{% endif %}>{% if language == 'de' %}Unerwartete zuerst{% else %}Unexpected first{% endif %}</option>
+          <option value="attention" {% if sort_mode == 'attention' %}selected{% endif %}>{% if language == 'de' %}Zu prüfen zuerst{% else %}Review first{% endif %}</option>
           <option value="last_used" {% if sort_mode == 'last_used' %}selected{% endif %}>{% if language == 'de' %}Zuletzt benutzt{% else %}Last used{% endif %}</option>
           <option value="most_used" {% if sort_mode == 'usage' or sort_mode == 'most_used' %}selected{% endif %}>{% if language == 'de' %}Am meisten benutzt{% else %}Most used{% endif %}</option>
         </select>
@@ -60,7 +60,7 @@
       <a class="filter-pill {% if status_filter == 'all' %}current{% endif %}" href="/aliases?status=all&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.filter_all }} <span>{{ status_counts.all }}</span></a>
       <a class="filter-pill {% if status_filter == 'active' %}current{% endif %}" href="/aliases?status=active&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.filter_active }} <span>{{ status_counts.active }}</span></a>
       <a class="filter-pill {% if status_filter == 'disabled' %}current{% endif %}" href="/aliases?status=disabled&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.filter_disabled }} <span>{{ status_counts.disabled }}</span></a>
-      <a class="filter-pill unexpected-filter-pill {% if status_filter == 'unexpected' %}current{% endif %} {% if status_counts.unexpected %}has-unexpected{% endif %}" href="/aliases?status=unexpected&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}" data-unexpected-filter>{{ t.sender_state_unexpected }} <span>{{ status_counts.unexpected }}</span></a>
+      <a class="filter-pill unexpected-filter-pill {% if status_filter == 'unexpected' %}current{% endif %} {% if status_counts.unexpected %}has-unexpected{% endif %}" href="/aliases?status=unexpected&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}" data-unexpected-filter>{% if language == 'de' %}Prüfen{% else %}Review{% endif %} <span>{{ status_counts.unexpected }}</span></a>
     </nav>
     <p class="muted alias-result-summary" data-assigned-summary>{{ t.assigned_summary.format(filtered=filtered_total, total=assigned_total) }}</p>
   </div>
@@ -147,7 +147,7 @@
           </div>
 
           <div class="alias-cell-status">
-            {% if alias.address|lower in unexpected_aliases %}<span class="status warning">{% if language == 'de' %}Auffällig{% else %}Review{% endif %}</span>{% else %}<span class="status {{ 'on' if alias.active else 'off' }}">{{ t.status_active if alias.active else t.status_inactive }}</span>{% endif %}
+            {% if alias.address|lower in unexpected_aliases %}<span class="status warning">{% if language == 'de' %}Prüfen{% else %}Review{% endif %}</span>{% else %}<span class="status {{ 'on' if alias.active else 'off' }}">{{ t.status_active if alias.active else t.status_inactive }}</span>{% endif %}
             {% if alias.sogo_visible %}<span class="mini-meta">SOGo</span>{% endif %}
           </div>
 
