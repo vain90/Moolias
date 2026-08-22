@@ -180,7 +180,7 @@
   const start = () => {
     ensureAliasAction();
     bindActionButtons();
-    refresh();
+    if (document.body.classList.contains("app-body")) refresh();
 
     const observer = new MutationObserver(() => {
       ensureAliasAction();
