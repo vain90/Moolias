@@ -37,23 +37,38 @@
     {% else %}<p class="empty">{% if language == 'de' %}Noch keine Nutzung erfasst.{% else %}No usage has been recorded yet.{% endif %}</p>{% endif %}
   </div>
 
-  <div class="card statistics-card">
-    <div class="section-head"><div><h2>{% if language == 'de' %}Zu prüfen{% else %}Needs review{% endif %}</h2><p class="muted">{% if language == 'de' %}Aliase mit mindestens einem nicht automatisch erkannten Absender.{% else %}Aliases with at least one sender that was not recognized automatically.{% endif %}</p></div></div>
-    <div class="review-stat-summary">
-      <strong>{{ unexpected_aliases|length }}</strong>
-      <span>{% if language == 'de' %}Aliase benötigen deine Prüfung{% else %}aliases need your review{% endif %}</span>
+  {% set used_aliases = assigned_total - stats_summary.never_used %}
+  <div class="card statistics-card usage-profile-card">
+    <div class="section-head"><div><h2>{% if language == 'de' %}Nutzungsstatus{% else %}Usage status{% endif %}</h2><p class="muted">{% if language == 'de' %}Wie viele deiner Alias-Adressen tatsächlich schon verwendet wurden.{% else %}How many of your alias addresses have actually been used.{% endif %}</p></div></div>
+    <div class="usage-profile-summary">
+      <strong>{{ used_aliases }} / {{ assigned_total }}</strong>
+      <span>{% if language == 'de' %}Aliase mindestens einmal benutzt{% else %}aliases used at least once{% endif %}</span>
     </div>
-    {% if unexpected_aliases %}
-    <a class="button compact" href="/aliases?status=unexpected">{% if language == 'de' %}Jetzt prüfen{% else %}Review now{% endif %}</a>
-    {% else %}
-    <p class="muted">{% if language == 'de' %}Aktuell ist nichts zu prüfen.{% else %}There is currently nothing to review.{% endif %}</p>
-    {% endif %}
+    <meter class="usage-profile-meter" min="0" max="{{ assigned_total if assigned_total else 1 }}" value="{{ used_aliases }}">{{ used_aliases }}</meter>
+    <div class="usage-profile-grid">
+      <div><span>{% if language == 'de' %}Noch nie benutzt{% else %}Never used{% endif %}</span><strong>{{ stats_summary.never_used }}</strong></div>
+      <div><span>{% if language == 'de' %}Aktiv{% else %}Active{% endif %}</span><strong>{{ active_total }}</strong></div>
+      <div><span>{% if language == 'de' %}Letzte Aktivität{% else %}Last activity{% endif %}</span><strong>{% if stats_summary.last_activity %}<time data-local-timestamp="{{ stats_summary.last_activity }}">{{ stats_summary.last_activity }}</time>{% else %}–{% endif %}</strong></div>
+    </div>
   </div>
 </section>
 
+{% if statistics_detail_toggle_available %}
+<div class="statistics-detail-toolbar top-gap">
+  <div>
+    <strong>{% if language == 'de' %}Quellen und Ziele darstellen als{% else %}Show sources and destinations as{% endif %}</strong>
+    <span>{% if language == 'de' %}Im Full-Modus kannst du zwischen zusammengefassten Domains und einzelnen Adressen wechseln.{% else %}In Full mode you can switch between aggregated domains and individual addresses.{% endif %}</span>
+  </div>
+  <div class="statistics-detail-switch" role="group" aria-label="{% if language == 'de' %}Detailgrad{% else %}Detail level{% endif %}">
+    <a href="/statistics?detail=domain" class="{% if statistics_detail == 'domain' %}current{% endif %}" {% if statistics_detail == 'domain' %}aria-current="page"{% endif %}>{% if language == 'de' %}Domains{% else %}Domains{% endif %}</a>
+    <a href="/statistics?detail=address" class="{% if statistics_detail == 'address' %}current{% endif %}" {% if statistics_detail == 'address' %}aria-current="page"{% endif %}>{% if language == 'de' %}Einzelne Adressen{% else %}Individual addresses{% endif %}</a>
+  </div>
+</div>
+{% endif %}
+
 <section class="statistics-layout top-gap">
   <div class="card statistics-card">
-    <div class="section-head"><div><h2>{% if language == 'de' %}Aktivste Quellen{% else %}Most active sources{% endif %}</h2><p class="muted">{% if language == 'de' %}Woher die meisten eingehenden Nachrichten stammen.{% else %}Where most incoming messages originate.{% endif %}</p></div></div>
+    <div class="section-head"><div><h2>{% if language == 'de' %}Aktivste Quellen{% else %}Most active sources{% endif %}</h2><p class="muted">{% if statistics_detail == 'address' %}{% if language == 'de' %}Einzelne Absenderadressen mit den meisten eingehenden Nachrichten.{% else %}Individual sender addresses with the most incoming messages.{% endif %}{% else %}{% if language == 'de' %}Absender-Domains mit den meisten eingehenden Nachrichten.{% else %}Sender domains with the most incoming messages.{% endif %}{% endif %}</p></div></div>
     {% if top_sources %}
     <div class="source-list">
       {% for source, count in top_sources %}<div class="source-row"><span class="service-badge tone-neutral">@</span><code>{{ source }}</code><strong>{{ count }}</strong></div>{% endfor %}
@@ -63,7 +78,7 @@
   </div>
 
   <div class="card statistics-card">
-    <div class="section-head"><div><h2>{% if language == 'de' %}Aktivste Ziele{% else %}Most active destinations{% endif %}</h2><p class="muted">{% if language == 'de' %}Wohin über deine Aliase am häufigsten gesendet wurde.{% else %}Where messages sent through your aliases went most often.{% endif %}</p></div></div>
+    <div class="section-head"><div><h2>{% if language == 'de' %}Aktivste Ziele{% else %}Most active destinations{% endif %}</h2><p class="muted">{% if statistics_detail == 'address' %}{% if language == 'de' %}Einzelne Zieladressen, an die über deine Aliase am häufigsten gesendet wurde.{% else %}Individual destination addresses most often reached through your aliases.{% endif %}{% else %}{% if language == 'de' %}Ziel-Domains, an die über deine Aliase am häufigsten gesendet wurde.{% else %}Destination domains most often reached through your aliases.{% endif %}{% endif %}</p></div></div>
     {% if destination_stats_error %}
     <p class="empty">{% if language == 'de' %}Die Ziele konnten gerade nicht aus der Mailcow-Historie geladen werden.{% else %}Destinations could not currently be loaded from Mailcow history.{% endif %}</p>
     {% elif not destination_mode_available %}
