@@ -103,6 +103,8 @@
   const labelKeyOverrides = new Map([
     ["bookingcom", "booking"],
     ["xtwitter", "x"],
+    ["generisch", "generic"],
+    ["generic", "generic"],
   ]);
   const specialLogoHints = new Map([
     ["dm", ["dm", "drogeriemarkt"]],
@@ -152,7 +154,7 @@
 
   const renderServiceBadge = (badge, key, glyph) => {
     if (!badge) return;
-    const fallback = glyph || badge.dataset.serviceIconGlyph || badge.textContent.trim() || "?";
+    const fallback = glyph || badge.dataset.serviceIconGlyph || badge.textContent.trim() || "AL";
     badge.dataset.serviceIconGlyph = fallback;
     badge.dataset.serviceIconKey = key || "generic";
     badge.replaceChildren();
@@ -189,7 +191,7 @@
       if (!button || button.textContent.trim() !== copiedLabel) return;
       button.textContent = "✓";
       button.classList.add("copy-success");
-      window.setTimeout(() => button.classList.remove("copy-success"), 1200);
+      window.setTimeout(() => button.classList.remove("copy-success"), 850);
     });
   });
   copyFeedbackObserver.observe(document.body, {
@@ -206,7 +208,7 @@
     if (cells.length < 6) return;
 
     const params = new URLSearchParams(window.location.search);
-    let activeSort = params.get("sort") || "last_used";
+    let activeSort = params.get("sort") || "attention";
     if (activeSort === "most_used") activeSort = "usage";
     const activeDirection = params.get("direction") === "asc" ? "asc" : "desc";
     const definitions = [
@@ -258,7 +260,7 @@
     if (!document.querySelector("link[data-alias-enhancements-styles]")) {
       const stylesheet = document.createElement("link");
       stylesheet.rel = "stylesheet";
-      stylesheet.href = "/static/alias-enhancements.css?v=20260822-1";
+      stylesheet.href = "/static/alias-enhancements.css?v=20260822-2";
       stylesheet.dataset.aliasEnhancementsStyles = "";
       document.head.append(stylesheet);
     }
@@ -268,6 +270,7 @@
 
   const openDrawer = (section = null) => {
     if (!drawer) return;
+    sidebar?.classList.remove("open");
     drawer.classList.add("open");
     drawer.setAttribute("aria-hidden", "false");
     if (backdrop) backdrop.hidden = false;
@@ -384,7 +387,7 @@
       .forEach((className) => badge.classList.remove(className));
     badge.classList.add(`tone-${icon.tone || "neutral"}`);
     badge.title = icon.label || "";
-    renderServiceBadge(badge, icon.key, icon.glyph || "?");
+    renderServiceBadge(badge, icon.key, icon.glyph || "AL");
   };
 
   document.querySelectorAll("[data-alias-icon-select]").forEach((select) => {
@@ -421,14 +424,14 @@
     if (!document.querySelector("link[data-service-icon-picker-styles]")) {
       const stylesheet = document.createElement("link");
       stylesheet.rel = "stylesheet";
-      stylesheet.href = "/static/service-icon-picker.css?v=20260822-2";
+      stylesheet.href = "/static/service-icon-picker.css?v=20260822-3";
       stylesheet.dataset.serviceIconPickerStyles = "";
       document.head.append(stylesheet);
     }
 
     if (!document.querySelector("script[data-service-icon-picker-script]")) {
       const script = document.createElement("script");
-      script.src = "/static/service-icon-picker.js?v=20260822-2";
+      script.src = "/static/service-icon-picker.js?v=20260822-3";
       script.dataset.serviceIconPickerScript = "";
       document.body.append(script);
     }
