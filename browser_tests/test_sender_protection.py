@@ -98,7 +98,10 @@ def test_sender_protection_lives_in_settings_and_updates_overview(
     expect(page.locator("[data-primary-protection-state]")).to_have_text("Not protected")
     card = page.locator("[data-primary-protection-card]")
     expect(card).to_have_class(re.compile(r"\bprotection-unprotected\b"))
-    assert card.evaluate("element => getComputedStyle(element).backgroundColor") == "rgb(255, 248, 247)"
+    background = card.evaluate(
+        "element => getComputedStyle(element).backgroundColor"
+    )
+    assert background == "rgb(255, 248, 247)"
     expect(page.locator("[data-primary-protection-action]")).to_be_visible()
     assert requests == [{"blocked": True}, {"blocked": False}]
 
