@@ -31,7 +31,6 @@
         replace: "Alias ersetzen",
         disable: "Alias deaktivieren",
         enable: "Alias aktivieren",
-        noName: "Alias",
       }
     : {
         title: "Choose alias logo",
@@ -44,7 +43,6 @@
         replace: "Replace alias",
         disable: "Disable alias",
         enable: "Enable alias",
-        noName: "Alias",
       };
 
   const optionSource = selects[0];
@@ -255,7 +253,7 @@
   const polishEditPanel = (select) => {
     const panel = select.closest(".edit-panel");
     const iconPreference = select.closest(".icon-preference");
-    if (!panel || !iconPreference || panel.querySelector(".alias-edit-identity")) return;
+    if (!panel || !iconPreference || panel.querySelector(".alias-edit-purpose-row")) return;
 
     iconPreference.querySelector(".hint")?.remove();
     const iconLabel = iconPreference.querySelector(".service-icon-picker-label");
@@ -263,28 +261,17 @@
 
     const aliasRow = panel.closest(".alias-row");
     const aliasCheckbox = aliasRow?.querySelector("[data-alias-select]");
-    const description = panel.querySelector('form[action$="/metadata"] input[name="description"]');
-    replaceLabelText(description?.closest("label"), text.aliasPurpose);
+    const metadataForm = panel.querySelector('form[action$="/metadata"]');
+    const description = metadataForm?.querySelector('input[name="description"]');
+    const purposeLabel = description?.closest("label");
+    replaceLabelText(purposeLabel, text.aliasPurpose);
 
-    const identity = document.createElement("div");
-    identity.className = "alias-edit-identity";
-    const name = document.createElement("div");
-    name.className = "alias-edit-current-name";
-    const nameStrong = document.createElement("strong");
-    const address = document.createElement("code");
-    const currentAddress = aliasCheckbox?.dataset.address || "";
-    const syncName = () => {
-      nameStrong.textContent = description?.value.trim()
-        || aliasCheckbox?.dataset.description?.trim()
-        || currentAddress
-        || text.noName;
-    };
-    syncName();
-    address.textContent = currentAddress;
-    name.append(nameStrong, address);
-    identity.append(iconPreference, name);
-    panel.prepend(identity);
-    description?.addEventListener("input", syncName);
+    if (metadataForm && purposeLabel) {
+      const purposeRow = document.createElement("div");
+      purposeRow.className = "alias-edit-purpose-row";
+      purposeLabel.insertAdjacentElement("beforebegin", purposeRow);
+      purposeRow.append(iconPreference, purposeLabel);
+    }
 
     const replaceButton = panel.querySelector("[data-replace-alias]");
     const toggleForm = panel.querySelector(".alias-toggle-action");
@@ -301,6 +288,7 @@
 
     if (toggleButton) {
       toggleButton.textContent = active ? text.disable : text.enable;
+      toggleButton.classList.toggle("danger", active);
     }
   };
 
