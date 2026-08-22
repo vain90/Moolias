@@ -5,6 +5,7 @@ import re
 from playwright.sync_api import Page, expect
 
 UNUSED_POOL = "feder-hafen-27@example.org"
+ARCHIVE = "archive-r8@example.org"
 
 
 def _login(page: Page, base_url: str) -> None:
@@ -44,6 +45,26 @@ def test_offline_pool_controls_stay_aligned_and_marker_hidden(
 
     delete_background = delete.evaluate("element => getComputedStyle(element).backgroundColor")
     assert delete_background not in {"rgba(0, 0, 0, 0)", "transparent"}
+
+
+def test_alias_usage_evidence_links_to_aliases_without_proven_usage(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+    page.goto(f"{base_url}/statistics")
+
+    usage_card = page.locator(".usage-profile-card")
+    expect(usage_card).to_be_visible()
+    expect(usage_card).to_contain_text("Alias usage")
+    expect(usage_card).to_contain_text("2 / 3")
+    expect(usage_card).to_contain_text("No usage proven")
+    expect(usage_card).to_contain_text("Rspamd history")
+
+    usage_card.locator('a[href="/aliases?status=unused"]').click()
+    expect(page).to_have_url(re.compile(r"/aliases\?status=unused$"))
+    expect(page.locator(".alias-list .alias-row")).to_have_count(1)
+    expect(page.locator(".alias-list .alias-row")).to_contain_text(ARCHIVE)
 
 
 def test_full_statistics_switch_between_addresses_and_domains(
