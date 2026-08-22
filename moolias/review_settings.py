@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import sqlite3
 from pathlib import Path
 
@@ -20,6 +21,34 @@ from moolias.usage import mailbox_stats_state
 
 router = APIRouter()
 router.include_router(sender_protection_router)
+
+_NAME_PREFIXES = {
+    "dr",
+    "dr.",
+    "prof",
+    "prof.",
+    "professor",
+    "herr",
+    "frau",
+    "mr",
+    "mr.",
+    "mrs",
+    "mrs.",
+    "ms",
+    "ms.",
+}
+
+
+def _mailbox_first_name(mailbox: dict, fallback: str) -> str:
+    full_name = re.sub(r"\s+", " ", str(mailbox.get("name") or "").strip())
+    if not full_name:
+        return fallback
+
+    candidate = full_name.split(",", 1)[1].strip() if "," in full_name else full_name
+    parts = candidate.split()
+    while parts and parts[0].casefold() in _NAME_PREFIXES:
+        parts.pop(0)
+    return parts[0].strip(" ,") if parts else fallback
 
 
 class AliasReviewSettingsStore:
@@ -108,6 +137,16 @@ def _store(request: Request) -> AliasReviewSettingsStore | None:
     if stats_store is None:
         return None
     return AliasReviewSettingsStore(stats_store.path)
+
+
+@router.get("/account/profile")
+async def get_account_profile(request: Request):
+    user = require_user(request)
+    try:
+        mailbox = await request.app.state.mailcow.get_mailbox(user)
+    except MailcowError as exc:
+        raise HTTPException(status_code=502, detail="Mailbox profile is unavailable") from exc
+    return {"display_name": _mailbox_first_name(mailbox, user)}
 
 
 @router.get("/aliases/review-settings")
