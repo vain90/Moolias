@@ -87,10 +87,53 @@ def test_requested_services_are_detected() -> None:
         assert icon.has_logo is has_logo
 
 
+def test_real_alias_descriptions_gain_expanded_logos() -> None:
+    examples = {
+        "Amex": "americanexpress",
+        "Buhl - WISO Steuer": "buhl",
+        "Cursor (Coding App)": "cursor",
+        "DJI": "dji",
+        "Frelancer": "freelancer",
+        "galaxus.eu": "galaxus",
+        "HelloFresh": "hellofresh",
+        "Iberia1": "iberia",
+        "Kleinanzeigen": "kleinanzeigen",
+        "Komoot": "komoot",
+        "Meta - Instagram und Facebook": "meta",
+        "otto.de - Onlinehändler": "otto",
+        "Payback": "payback",
+        "Philips Hue": "philipshue",
+        "trip.com": "tripcom",
+        "unRAID": "unraid",
+        "UPS": "ups",
+        "Volkswagen - WeConnect etc.": "volkswagen",
+        "Western Union": "westernunion",
+    }
+
+    for description, expected_key in examples.items():
+        icon = detect_service_icon("random-alias@example.org", description)
+        assert icon.key == expected_key
+        assert icon.has_logo is True
+
+
+def test_standalone_miles_and_more_keeps_generic_fallback() -> None:
+    icon = detect_service_icon("miles@example.org", "Miles & More")
+
+    assert icon.key == "generic"
+    assert icon.glyph == "MM"
+
+
+def test_lufthansa_miles_and_more_still_detects_lufthansa() -> None:
+    icon = detect_service_icon("random@example.org", "Lufthansa - Miles&More")
+
+    assert icon.key == "lufthansa"
+    assert icon.has_logo is True
+
+
 def test_generated_sprite_contains_every_expanded_logo(tmp_path: Path) -> None:
     output = build_service_icon_sprite(tmp_path / "service-icons.generated.svg")
     sprite = output.read_text(encoding="utf-8")
 
-    assert len(EXTRA_SERVICE_ICON_KEYS) >= 50
+    assert len(EXTRA_SERVICE_ICON_KEYS) >= 70
     for key in EXTRA_SERVICE_ICON_KEYS:
         assert f'id="service-{key}"' in sprite
