@@ -4,7 +4,7 @@
   const german = (document.documentElement.lang || "").toLowerCase().startsWith("de");
   const fieldLabel = german ? "Alias Name / Zweck" : "Alias name / purpose";
 
-  document.querySelectorAll("[data-open-assign-dialog]").forEach((button) => {
+  document.querySelectorAll(".offline-pool-row [data-open-assign-dialog]").forEach((button) => {
     const aliasId = button.dataset.openAssignDialog;
     if (!aliasId) return;
 
