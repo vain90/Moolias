@@ -4,18 +4,18 @@
     de: {
       senderTitle: "Absender",
       close: "Schließen",
-      ignoreUnexpected: "Unerwartete Absender für diesen Alias ignorieren",
-      ignoreUnexpectedHint: "Wird nicht mehr als unerwartet markiert. Absender und Statistiken bleiben sichtbar.",
+      ignoreUnexpected: "Prüfung für diesen Alias ignorieren",
+      ignoreUnexpectedHint: "Wird nicht mehr als zu prüfen markiert. Absender und Statistiken bleiben sichtbar.",
       ignoreUnexpectedMuted: "Prüfung aus",
-      ignoreUnexpectedFailed: "Die Einstellung für unerwartete Absender konnte nicht gespeichert werden.",
+      ignoreUnexpectedFailed: "Die Einstellung für die Absenderprüfung konnte nicht gespeichert werden.",
     },
     en: {
       senderTitle: "Senders",
       close: "Close",
-      ignoreUnexpected: "Ignore unexpected senders for this alias",
-      ignoreUnexpectedHint: "No longer flagged as unexpected. Sender details and statistics stay visible.",
+      ignoreUnexpected: "Ignore sender review for this alias",
+      ignoreUnexpectedHint: "No longer flagged for review. Sender details and statistics stay visible.",
       ignoreUnexpectedMuted: "Review off",
-      ignoreUnexpectedFailed: "The unexpected-sender setting could not be saved.",
+      ignoreUnexpectedFailed: "The sender review setting could not be saved.",
     },
   }[language];
 
@@ -154,7 +154,7 @@
         await saveUnexpectedIgnored(ownerRow, checkbox.checked);
         window.location.reload();
       } catch (error) {
-        console.error("Could not save unexpected sender setting", error);
+        console.error("Could not save sender review setting", error);
         checkbox.checked = !checkbox.checked;
         checkbox.disabled = false;
         await window.MooliasDialog.error(text.ignoreUnexpectedFailed);
