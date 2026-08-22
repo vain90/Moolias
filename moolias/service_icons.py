@@ -248,12 +248,15 @@ def detect_service_icon(address: str, description: str = "") -> ServiceIcon:
                 continue
             if f" {folded_normalized} " in padded:
                 return icon
-            if " " not in folded_normalized and len(folded_normalized) >= 4:
-                if any(
+            if (
+                " " not in folded_normalized
+                and len(folded_normalized) >= 4
+                and any(
                     re.fullmatch(rf"{re.escape(folded_normalized)}\d+", token)
                     for token in tokens
-                ):
-                    return icon
+                )
+            ):
+                return icon
     return _generic_icon(address, description)
 
 
