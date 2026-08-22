@@ -41,6 +41,7 @@ async def aliases_page(
 
     assigned_all = list(state["assigned_all"])
     unexpected_aliases = state["unexpected_aliases"]
+    no_usage_evidence = state["no_usage_evidence"]
     usage_stats = state["usage_stats"]
 
     if status_filter == "active":
@@ -52,6 +53,12 @@ async def aliases_page(
             alias
             for alias in assigned_all
             if alias.address.lower() in unexpected_aliases
+        ]
+    elif status_filter == "unused":
+        filtered = [
+            alias
+            for alias in assigned_all
+            if alias.address.lower() in no_usage_evidence
         ]
     else:
         filtered = assigned_all
@@ -125,6 +132,7 @@ async def aliases_page(
         "active": sum(alias.active for alias in assigned_all),
         "disabled": sum(not alias.active for alias in assigned_all),
         "unexpected": len(unexpected_aliases),
+        "unused": len(no_usage_evidence),
     }
 
     state.update(
