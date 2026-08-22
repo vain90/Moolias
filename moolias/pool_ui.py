@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, HTTPException, Request, status
+from collections import Counter
+
+from fastapi import APIRouter, Form, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from moolias.alias_table_ui import router as alias_table_router
@@ -63,7 +65,10 @@ async def _create_unique_reserved(request: Request, user: str, attempts: int = 1
 
 
 @router.get("/statistics", response_class=HTMLResponse)
-async def statistics_page(request: Request):
+async def statistics_page(
+    request: Request,
+    detail: str = Query(default="domain"),
+):
     # Imported lazily to keep the existing router inclusion order free of cycles.
     from moolias.ui import TEMPLATES, _load_ui_state, _template_context
 
@@ -71,19 +76,39 @@ async def statistics_page(request: Request):
     destinations: list[dict[str, int | str]] = []
     destination_stats_error = False
     destination_mode_available = False
+    detail_toggle_available = False
     stats_state = state.get("stats_state")
+    detail = detail if detail in {"domain", "address"} else "domain"
 
     if state.get("usage_stats_visible") and stats_state is not None:
         mode = stats_state.effective
+        detail_toggle_available = mode is StatsMode.FULL
+        if not detail_toggle_available:
+            detail = "domain"
+
+        if detail_toggle_available and detail == "address":
+            source_counts: Counter[str] = Counter()
+            for rows in state.get("sender_stats", {}).values():
+                for row in rows:
+                    label = str(row.get("label") or row.get("domain") or "").strip().lower()
+                    if label:
+                        source_counts[label] += int(row.get("received_count") or 0)
+            state["top_sources"] = source_counts.most_common(8)
+
         destination_mode_available = mode in {StatsMode.DOMAIN, StatsMode.FULL}
         if destination_mode_available:
+            destination_view_mode = (
+                StatsMode.FULL
+                if mode is StatsMode.FULL and detail == "address"
+                else StatsMode.DOMAIN
+            )
             try:
                 destinations = await top_outgoing_destinations(
                     request.app.state.settings,
                     request.app.state.mailcow,
                     state["user"],
                     state["assigned_all"],
-                    mode,
+                    destination_view_mode,
                 )
             except MailcowError:
                 destination_stats_error = True
@@ -93,6 +118,8 @@ async def statistics_page(request: Request):
             "top_destinations": destinations,
             "destination_mode_available": destination_mode_available,
             "destination_stats_error": destination_stats_error,
+            "statistics_detail": detail,
+            "statistics_detail_toggle_available": detail_toggle_available,
         }
     )
     return TEMPLATES.TemplateResponse(
