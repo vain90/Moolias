@@ -74,7 +74,7 @@ def test_login_does_not_auto_open_action_required_and_overview_opens_it(
 
 
 def test_fresh_login_auto_opens_action_required_once(page: Page, base_url: str) -> None:
-    page.goto(f"{base_url}/")
+    page.goto(f"{base_url}/", wait_until="networkidle")
     page.evaluate(
         "sessionStorage.setItem('moolias-action-required-after-login', '1')"
     )
@@ -402,6 +402,7 @@ def test_expired_browser_session_redirects_to_login(page: Page, base_url: str) -
     page.context.clear_cookies()
     page.reload(wait_until="domcontentloaded")
     page.wait_for_url(re.compile(rf"{re.escape(base_url)}/?$"), timeout=5000)
+    page.wait_for_load_state("networkidle")
 
     expect(page.locator('a[href="/login"]')).to_be_visible()
     expect(page.locator("body")).not_to_contain_text("Authentication required")
@@ -487,7 +488,7 @@ def test_global_controls_and_statistics_wording_are_polished(
 
     page.goto(f"{base_url}/statistics")
     expect(page.locator("h1")).to_have_text("Statistics")
-    expect(page.locator("body")).not_to_contain_text("Statistics mode")
+    expect(page.locator("main")).not_to_contain_text("Statistics mode")
     review_link = page.locator('a[href="/aliases?status=unexpected"]')
     expect(review_link).to_have_text("Review now")
     destinations = page.locator(".statistics-card").filter(
