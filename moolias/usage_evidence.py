@@ -175,21 +175,30 @@ class UsageEvidenceStore:
                 """,
                 params,
             ).fetchall()
-            usage_rows = connection.execute(
-                f"""
-                SELECT
-                    alias,
-                    received_count,
-                    sent_count,
-                    last_received_at,
-                    last_sent_at
-                FROM alias_usage
-                WHERE mailbox = ?
-                    AND alias IN ({placeholders})
-                    AND (received_count > 0 OR sent_count > 0)
-                """,
-                params,
-            ).fetchall()
+            alias_usage_exists = connection.execute(
+                """
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table' AND name = 'alias_usage'
+                """
+            ).fetchone()
+            usage_rows = []
+            if alias_usage_exists is not None:
+                usage_rows = connection.execute(
+                    f"""
+                    SELECT
+                        alias,
+                        received_count,
+                        sent_count,
+                        last_received_at,
+                        last_sent_at
+                    FROM alias_usage
+                    WHERE mailbox = ?
+                        AND alias IN ({placeholders})
+                        AND (received_count > 0 OR sent_count > 0)
+                    """,
+                    params,
+                ).fetchall()
 
         evidence = {
             str(row["alias"]).lower(): AliasUsageEvidence(
