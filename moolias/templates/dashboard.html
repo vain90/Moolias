@@ -40,8 +40,9 @@
       <label>
         <span>{% if language == 'de' %}Sortieren nach{% else %}Sort by{% endif %}</span>
         <select name="sort" data-auto-submit>
+          <option value="attention" {% if sort_mode == 'attention' %}selected{% endif %}>{% if language == 'de' %}Unerwartete zuerst{% else %}Unexpected first{% endif %}</option>
           <option value="last_used" {% if sort_mode == 'last_used' %}selected{% endif %}>{% if language == 'de' %}Zuletzt benutzt{% else %}Last used{% endif %}</option>
-          <option value="most_used" {% if sort_mode == 'most_used' %}selected{% endif %}>{% if language == 'de' %}Am meisten benutzt{% else %}Most used{% endif %}</option>
+          <option value="most_used" {% if sort_mode == 'usage' or sort_mode == 'most_used' %}selected{% endif %}>{% if language == 'de' %}Am meisten benutzt{% else %}Most used{% endif %}</option>
         </select>
       </label>
       <label class="sort-direction-label">
@@ -104,7 +105,7 @@
           </label>
 
           <div class="alias-cell-identity">
-            <span class="service-badge tone-{{ icon.tone if icon else 'neutral' }}" data-service-icon-for="{{ alias.id }}" title="{{ icon.label if icon else '' }}">{{ icon.glyph if icon else '?' }}</span>
+            <span class="service-badge tone-{{ icon.tone if icon else 'neutral' }}" data-service-icon-for="{{ alias.id }}" title="{{ icon.label if icon else '' }}">{{ icon.glyph if icon else 'AL' }}</span>
             <div class="alias-info">
               <strong>{{ alias.description or t.no_purpose }}</strong>
               <code>{{ alias.address }}</code>
