@@ -7,6 +7,31 @@
   const accountPopover = document.querySelector("[data-account-popover]");
   const sidebar = document.querySelector("[data-app-sidebar]");
 
+  const loadAccountDisplayName = async () => {
+    if (!accountButton) return;
+    const label = accountButton.querySelector(".account-email");
+    const avatar = accountButton.querySelector(".account-avatar");
+    if (!label) return;
+    const mailbox = label.textContent.trim();
+    try {
+      const response = await fetch("/account/profile", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      const displayName = String(payload.display_name || "").trim();
+      if (!displayName || displayName === mailbox) return;
+      label.textContent = displayName;
+      accountButton.title = mailbox;
+      if (avatar) avatar.textContent = displayName.slice(0, 1).toUpperCase();
+    } catch (error) {
+      console.debug("Could not load mailbox display name", error);
+    }
+  };
+
+  loadAccountDisplayName();
+
   const bundledLogoKeys = new Set([
     "apple",
     "booking",
