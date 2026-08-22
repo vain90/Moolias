@@ -5,4 +5,3 @@ __pycache__/
 .ruff_cache/
 *.pyc
 .DS_Store
-moolias/static/service-icons.generated.svg
