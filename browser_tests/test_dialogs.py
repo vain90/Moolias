@@ -15,7 +15,7 @@ def _login(page: Page, base_url: str) -> None:
 
 
 def _pool_item(page: Page, address: str):
-    return page.locator(".pool-item").filter(has_text=address)
+    return page.locator(".offline-pool-row").filter(has_text=address)
 
 
 def test_destructive_confirmation_is_internal_and_cancellable(page: Page, base_url: str) -> None:
