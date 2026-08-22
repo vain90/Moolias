@@ -4,42 +4,25 @@
   border-top: 0 !important;
 }
 
-.alias-edit-identity {
+.alias-edit-purpose-row {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
-  align-items: center;
+  align-items: end;
   gap: 11px;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--line);
 }
 
-.alias-edit-identity .icon-preference {
+.alias-edit-purpose-row .icon-preference {
   min-width: 44px;
+  align-self: end;
 }
 
-.alias-edit-current-name {
+.alias-edit-purpose-row > label {
   min-width: 0;
-  display: grid;
-  gap: 3px;
+  margin: 0;
 }
 
-.alias-edit-current-name strong,
-.alias-edit-current-name code {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.alias-edit-current-name strong {
-  font-size: 13px;
-  line-height: 1.25;
-}
-
-.alias-edit-current-name code {
-  color: var(--muted);
-  font-size: 10.5px;
+.alias-edit-purpose-row > label input {
+  width: 100%;
 }
 
 .service-icon-picker-label {
