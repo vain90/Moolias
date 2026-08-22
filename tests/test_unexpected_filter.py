@@ -173,7 +173,7 @@ async def _seed_sender_state(store) -> None:
 
 def _unexpected_count(html: str) -> int:
     match = re.search(
-        r'data-unexpected-filter[^>]*>\s*Unexpected\s*<span>(\d+)</span>',
+        r'data-unexpected-filter[^>]*>\s*Review\s*<span>(\d+)</span>',
         html,
         flags=re.DOTALL,
     )
