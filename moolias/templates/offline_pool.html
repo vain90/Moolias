@@ -37,7 +37,13 @@
     {% set pool_stats = usage_stats.get(alias.address|lower, {}) if usage_stats_visible else {} %}
     {% set pool_used = alias.is_reserved_used or (pool_stats and ((pool_stats.received_count or 0) or (pool_stats.sent_count or 0))) %}
     {% set pool_senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
-    <article class="pool-item {% if pool_used %}pool-item-used{% endif %}" {% if pool_used %}data-used-pool-item{% endif %}>
+    {% set pool_unexpected_count = pool_senders|selectattr('expected', 'equalto', false)|list|length %}
+    <article
+      class="pool-item {% if pool_used %}pool-item-used{% endif %}"
+      data-alias-id="{{ alias.id }}"
+      data-alias-address="{{ alias.address }}"
+      {% if pool_used %}data-used-pool-item{% endif %}
+    >
       <div class="pool-address-cell">
         <span class="service-badge tone-neutral" aria-hidden="true">@</span>
         <div class="alias-info">
@@ -50,14 +56,37 @@
               {% if pool_stats.last_used_at %}<span>{{ t.usage_last_used }} <time data-local-timestamp="{{ pool_stats.last_used_at }}">{{ pool_stats.last_used_at }}</time></span>{% endif %}
             {% endif %}
           </div>
-          {% if pool_senders %}
+          {% if stats_state and stats_state.sender_detail_enabled %}
           <details class="sender-stats">
-            <summary class="sender-stats-trigger">{{ t.sender_stats_title }} <span class="sender-stats-count">{{ pool_senders|length }}</span></summary>
+            <summary class="sender-stats-trigger">
+              {{ t.sender_stats_title }}{% if pool_senders %} <span class="sender-stats-count">{{ pool_senders|length }}</span>{% endif %}{% if pool_unexpected_count %} <span class="sender-stats-alert">{{ pool_unexpected_count }} {{ t.sender_stats_unexpected_short }}</span>{% endif %}
+            </summary>
+            {% if pool_senders %}
             <div class="sender-stats-list">
               {% for sender in pool_senders %}
-              <div class="sender-stats-row"><div class="sender-stats-identity"><code>{{ sender.label }}</code></div><span class="sender-message-count">{{ sender.received_count }}</span></div>
+              <div class="sender-stats-row {{ 'expected' if sender.expected else 'unexpected' }}">
+                <div class="sender-stats-identity">
+                  <code>{{ sender.label }}</code>
+                  <span class="sender-review-state">
+                    {% if sender.review_source == 'manual' %}{{ t.sender_state_confirmed }}
+                    {% elif sender.review_source == 'automatic' %}{{ t.sender_state_automatic }}{% if sender.match_token %} · {{ sender.match_token }}{% endif %}
+                    {% elif sender.review_source == 'manual-unexpected' %}{{ t.sender_state_manual_unexpected }}
+                    {% else %}{{ t.sender_state_unexpected }}{% endif %}
+                  </span>
+                </div>
+                <span class="sender-message-count">{{ sender.received_count }}</span>
+                <form method="post" action="/offline-pool/{{ alias.id }}/sender-expectation" class="sender-review-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="sender_key" value="{{ sender.sender_key }}">
+                  {% if sender.review_source == 'manual' or sender.review_source == 'manual-unexpected' %}<input type="hidden" name="decision" value="clear"><button class="button compact ghost" type="submit">{{ t.sender_action_clear }}</button>
+                  {% elif sender.expected %}<input type="hidden" name="decision" value="unexpected"><button class="button compact ghost" type="submit">{{ t.sender_action_unexpected }}</button>
+                  {% else %}<input type="hidden" name="decision" value="expected"><button class="button compact" type="submit">{{ t.sender_action_expected }}</button>{% endif %}
+                </form>
+              </div>
               {% endfor %}
             </div>
+            <p class="sender-stats-footnote">{{ t.sender_stats_all }}</p>
+            {% else %}<p class="sender-stats-empty">{{ t.sender_stats_empty }}</p>{% endif %}
           </details>
           {% endif %}
         </div>
