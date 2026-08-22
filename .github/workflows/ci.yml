@@ -21,6 +21,8 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: pip install -e '.[dev]'
+      - name: Generate service icon sprite for validation
+        run: python -m moolias.service_icon_assets
       - run: ruff check .
       - run: pytest -q
       - run: node --check moolias/static/dialogs.js
@@ -53,6 +55,8 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: pip install -e '.[dev]'
+      - name: Generate service icon sprite for browser tests
+        run: python -m moolias.service_icon_assets
       - run: python -m playwright install --with-deps chromium
       - name: Run browser E2E tests
         run: >-
