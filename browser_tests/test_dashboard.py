@@ -490,6 +490,7 @@ def test_global_controls_and_statistics_wording_are_polished(
     expect(page.locator("body")).not_to_contain_text("Statistics mode")
     review_link = page.locator('a[href="/aliases?status=unexpected"]')
     expect(review_link).to_have_text("Review now")
-    expect(page.locator(".statistics-card").filter(has_text="Most active destinations")).to_contain_text(
-        "customer@example.net"
+    destinations = page.locator(".statistics-card").filter(
+        has_text="Most active destinations"
     )
+    expect(destinations).to_contain_text("customer@example.net")
