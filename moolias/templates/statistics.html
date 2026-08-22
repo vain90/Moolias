@@ -15,7 +15,7 @@
   <div class="metric-card static-card"><span class="metric-icon green" aria-hidden="true">✓</span><strong>{{ stats_summary.recognized_senders }}</strong><span>{% if language == 'de' %}Erkannt{% else %}Recognized{% endif %}</span><small>{% if language == 'de' %}Absender{% else %}Senders{% endif %}</small></div>
   <div class="metric-card static-card"><span class="metric-icon amber" aria-hidden="true">?</span><strong>{{ stats_summary.unrecognized_senders }}</strong><span>{% if language == 'de' %}Nicht erkannt{% else %}Not recognized{% endif %}</span><small>{% if language == 'de' %}Absender{% else %}Senders{% endif %}{% if unexpected_aliases %} · <a class="metric-inline-link" href="/aliases?status=unexpected">{% if language == 'de' %}Jetzt prüfen{% else %}Review now{% endif %}</a>{% endif %}</small></div>
   <div class="metric-card static-card"><span class="metric-icon violet" aria-hidden="true">◎</span><strong>{% if stats_summary.recognition_rate is not none %}{{ stats_summary.recognition_rate }}%{% else %}–{% endif %}</strong><span>{% if language == 'de' %}Erkennungsquote{% else %}Recognition rate{% endif %}</span><small>{% if language == 'de' %}Nachrichten{% else %}Messages{% endif %}</small></div>
-  <div class="metric-card static-card"><span class="metric-icon neutral" aria-hidden="true">○</span><strong>{{ stats_summary.never_used }}</strong><span>{% if language == 'de' %}Noch nie benutzt{% else %}Never used{% endif %}</span><small>{% if language == 'de' %}Aliase{% else %}Aliases{% endif %}</small></div>
+  <div class="metric-card static-card"><span class="metric-icon neutral" aria-hidden="true">○</span><strong>{{ stats_summary.no_usage_evidence }}</strong><span>{% if language == 'de' %}Keine Nutzung{% else %}No usage{% endif %}</span><small>{% if language == 'de' %}nachgewiesen{% else %}evidence{% endif %}</small></div>
 </section>
 
 <section class="statistics-layout top-gap">
@@ -37,19 +37,30 @@
     {% else %}<p class="empty">{% if language == 'de' %}Noch keine Nutzung erfasst.{% else %}No usage has been recorded yet.{% endif %}</p>{% endif %}
   </div>
 
-  {% set used_aliases = assigned_total - stats_summary.never_used %}
   <div class="card statistics-card usage-profile-card">
-    <div class="section-head"><div><h2>{% if language == 'de' %}Nutzungsstatus{% else %}Usage status{% endif %}</h2><p class="muted">{% if language == 'de' %}Wie viele deiner Alias-Adressen tatsächlich schon verwendet wurden.{% else %}How many of your alias addresses have actually been used.{% endif %}</p></div></div>
+    <div class="section-head"><div><h2>{% if language == 'de' %}Alias-Nutzung{% else %}Alias usage{% endif %}</h2><p class="muted">{% if language == 'de' %}Für wie viele deiner Alias-Adressen eine Nutzung nachgewiesen werden konnte.{% else %}For how many of your alias addresses usage could be proven.{% endif %}</p></div></div>
     <div class="usage-profile-summary">
-      <strong>{{ used_aliases }} / {{ assigned_total }}</strong>
-      <span>{% if language == 'de' %}Aliase mindestens einmal benutzt{% else %}aliases used at least once{% endif %}</span>
+      <strong>{{ stats_summary.known_used }} / {{ assigned_total }}</strong>
+      <span>{% if language == 'de' %}Aliase mit nachgewiesener Nutzung{% else %}aliases with proven usage{% endif %}</span>
     </div>
-    <meter class="usage-profile-meter" min="0" max="{{ assigned_total if assigned_total else 1 }}" value="{{ used_aliases }}">{{ used_aliases }}</meter>
+    <meter class="usage-profile-meter" min="0" max="{{ assigned_total if assigned_total else 1 }}" value="{{ stats_summary.known_used }}">{{ stats_summary.known_used }}</meter>
     <div class="usage-profile-grid">
-      <div><span>{% if language == 'de' %}Noch nie benutzt{% else %}Never used{% endif %}</span><strong>{{ stats_summary.never_used }}</strong></div>
+      <div><span>{% if language == 'de' %}Keine Nutzung nachgewiesen{% else %}No usage proven{% endif %}</span><strong>{{ stats_summary.no_usage_evidence }}</strong></div>
       <div><span>{% if language == 'de' %}Aktiv{% else %}Active{% endif %}</span><strong>{{ active_total }}</strong></div>
-      <div><span>{% if language == 'de' %}Letzte Aktivität{% else %}Last activity{% endif %}</span><strong>{% if stats_summary.last_activity %}<time data-local-timestamp="{{ stats_summary.last_activity }}">{{ stats_summary.last_activity }}</time>{% else %}–{% endif %}</strong></div>
+      <div><span>{% if language == 'de' %}Letzte bekannte Nutzung{% else %}Last known usage{% endif %}</span><strong>{% if stats_summary.last_activity %}<time data-local-timestamp="{{ stats_summary.last_activity }}">{{ stats_summary.last_activity }}</time>{% else %}–{% endif %}</strong></div>
     </div>
+    {% if stats_summary.no_usage_evidence %}
+    <a class="button compact usage-evidence-link" href="/aliases?status=unused">{% if language == 'de' %}Aliase ohne Nutzung anzeigen{% else %}Show aliases without usage{% endif %}</a>
+    {% endif %}
+    {% if usage_backfill %}
+      {% if usage_backfill.oldest_history_at %}
+      <p class="hint usage-backfill-note">{% if language == 'de' %}Die verfügbare Rspamd-Historie wurde einmalig bis <time data-local-timestamp="{{ usage_backfill.oldest_history_at }}">{{ usage_backfill.oldest_history_at }}</time> rückwirkend geprüft. Ältere Nutzung kann nicht ausgeschlossen werden.{% else %}The available Rspamd history was checked back to <time data-local-timestamp="{{ usage_backfill.oldest_history_at }}">{{ usage_backfill.oldest_history_at }}</time>. Older usage cannot be ruled out.{% endif %}</p>
+      {% else %}
+      <p class="hint usage-backfill-note">{% if language == 'de' %}Die verfügbare Rspamd-Historie wurde einmalig geprüft. Es waren keine älteren Einträge verfügbar.{% else %}The available Rspamd history was checked once. No older entries were available.{% endif %}</p>
+      {% endif %}
+    {% else %}
+    <p class="hint usage-backfill-note">{% if language == 'de' %}Die rückwirkende Prüfung der verfügbaren Rspamd-Historie wird automatisch beim nächsten Statistiklauf durchgeführt.{% else %}The available Rspamd history will be checked automatically during the next statistics collection run.{% endif %}</p>
+    {% endif %}
   </div>
 </section>
 
