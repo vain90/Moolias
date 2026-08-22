@@ -41,7 +41,91 @@
 }
 
 .alias-edit-action .alias-toggle-action > button {
+  width: 100%;
   min-height: 36px;
+}
+
+.alias-edit-action .alias-toggle-action > button.danger {
+  border-color: #fda29b;
+  background: #fff1f0;
+  color: #b42318;
+}
+
+.alias-edit-action .alias-toggle-action > button.danger:hover {
+  border-color: #f04438;
+  background: #fee4e2;
+}
+
+.settings-form button[type="submit"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.settings-form button[type="submit"]:hover {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.settings-state.protection-protected,
+.settings-state.protection-external {
+  color: var(--accent-strong);
+}
+
+.settings-state.protection-unprotected {
+  color: #b42318;
+}
+
+.settings-state.protection-unavailable {
+  color: #b54708;
+}
+
+.settings-state.protection-disabled {
+  color: var(--muted);
+}
+
+.sender-protection-agent-help {
+  margin-top: 7px !important;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.sender-protection-agent-help a {
+  color: var(--accent-strong);
+  font-weight: 700;
+  text-underline-offset: 2px;
+}
+
+.metric-card.protection-unprotected {
+  border-color: #fda29b;
+  background: #fff8f7;
+}
+
+.metric-card.protection-unprotected .metric-icon {
+  color: #b42318;
+  background: #fee4e2;
+}
+
+.metric-card.protection-unprotected > strong {
+  color: #b42318;
+}
+
+.metric-card.protection-unavailable {
+  border-color: #fedf89;
+  background: #fffcf5;
+}
+
+.metric-card.protection-disabled {
+  border-color: var(--line);
+  background: var(--panel-2);
+}
+
+.status.sogo {
+  color: #175cd3;
+  background: #eff8ff;
 }
 
 .pool-assign-action {
@@ -71,9 +155,43 @@
   margin: 2px 0;
 }
 
+.pool-table-head,
+.pool-table-row {
+  grid-template-columns: minmax(320px, 1fr) 120px 90px 142px 190px;
+}
+
+.pool-table-row .pool-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.pool-table-row .pool-actions form {
+  margin: 0;
+}
+
+.pool-table-row .pool-assign-button {
+  min-height: 31px;
+  padding-inline: 10px;
+}
+
+@media (max-width: 1160px) {
+  .pool-table-head,
+  .pool-table-row {
+    grid-template-columns: minmax(280px, 1fr) 110px 80px 128px 180px;
+  }
+}
+
 @media (max-width: 980px) {
   .app-sidebar.open {
     z-index: 95;
+  }
+
+  .pool-table-head,
+  .pool-table-row {
+    min-width: 900px;
   }
 }
 
@@ -104,4 +222,34 @@
 :root[data-theme="dark"] .alias-edit-action .alias-replace-action:hover {
   border-color: #d6941d;
   background: #443311;
+}
+
+:root[data-theme="dark"] .alias-edit-action .alias-toggle-action > button.danger {
+  border-color: #7a2e2a;
+  background: #3a1f1e;
+  color: #fda29b;
+}
+
+:root[data-theme="dark"] .metric-card.protection-unprotected {
+  border-color: #7a2e2a;
+  background: #2b1b1b;
+}
+
+:root[data-theme="dark"] .metric-card.protection-unprotected .metric-icon {
+  color: #fda29b;
+  background: #3a1f1e;
+}
+
+:root[data-theme="dark"] .metric-card.protection-unprotected > strong {
+  color: #fda29b;
+}
+
+:root[data-theme="dark"] .metric-card.protection-unavailable {
+  border-color: #725b26;
+  background: #302812;
+}
+
+:root[data-theme="dark"] .status.sogo {
+  color: #84adff;
+  background: #172b4d;
 }
