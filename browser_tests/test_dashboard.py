@@ -6,6 +6,7 @@ from playwright.sync_api import Page, expect
 
 AMAZON = "amazon-k7@example.org"
 GITHUB = "github-m4@example.org"
+ARCHIVE = "archive-r8@example.org"
 UNUSED_POOL = "feder-hafen-27@example.org"
 USED_POOL = "mond-segel-42@example.org"
 
@@ -232,6 +233,26 @@ def test_used_offline_alias_stays_protected_and_pool_export_excludes_it(
     assert USED_POOL not in exported
 
 
+def test_offline_sender_review_uses_same_overlay_as_assigned_alias(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+
+    assigned_dialog = _open_sender_dialog(page, _alias_row(page, AMAZON))
+    assigned_classes = assigned_dialog.get_attribute("class")
+    expect(assigned_dialog.locator(".sender-review-settings")).to_be_visible()
+    assigned_dialog.locator(".dialog-close").click()
+
+    page.goto(f"{base_url}/offline-pool")
+    offline_dialog = _open_sender_dialog(page, _pool_item(page, USED_POOL))
+    assert offline_dialog.get_attribute("class") == assigned_classes
+    expect(offline_dialog.locator(".sender-review-settings")).to_be_visible()
+    expect(offline_dialog.locator(".sender-review-form")).to_be_visible()
+    expect(offline_dialog).to_contain_text("booking@example.net")
+    expect(offline_dialog).to_contain_text("No longer flagged as unexpected")
+
+
 def test_action_required_assigns_used_offline_alias(page: Page, base_url: str) -> None:
     _login(page, base_url)
     dialog = _open_action_required(page, base_url)
@@ -250,6 +271,57 @@ def test_action_required_assigns_used_offline_alias(page: Page, base_url: str) -
 
     page.goto(f"{base_url}/offline-pool")
     expect(_pool_item(page, USED_POOL)).to_have_count(0)
+
+
+def test_default_alias_sort_puts_unexpected_sender_first(page: Page, base_url: str) -> None:
+    _login(page, base_url)
+
+    first = page.locator(".alias-list .alias-row [data-alias-select]").first
+    expect(first).to_have_attribute("data-address", AMAZON)
+
+
+def test_generic_alias_badge_uses_initials_instead_of_question_mark(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+
+    badge = _alias_row(page, ARCHIVE).locator("[data-service-icon-for]")
+    expect(badge).to_have_text("AR")
+    expect(badge).not_to_have_text("?")
+
+
+def test_alias_edit_panel_starts_with_logo_and_alias_name(page: Page, base_url: str) -> None:
+    _login(page, base_url)
+
+    edit = _alias_row(page, AMAZON).locator("details.alias-edit-action")
+    edit.locator("summary").click()
+    identity = edit.locator(".alias-edit-identity")
+    expect(identity).to_be_visible(timeout=5000)
+    expect(identity.locator("[data-icon-picker-trigger]")).to_be_visible()
+    expect(identity.locator(".alias-edit-current-name strong")).to_have_text("Amazon")
+    expect(identity.locator(".alias-edit-current-name code")).to_have_text(AMAZON)
+
+
+def test_copy_button_turns_green_then_returns_to_copy_icon(page: Page, base_url: str) -> None:
+    _login(page, base_url)
+    page.context.grant_permissions(
+        ["clipboard-read", "clipboard-write"],
+        origin=base_url,
+    )
+
+    button = _alias_row(page, AMAZON).locator(".alias-copy-action")
+    original = button.text_content()
+    before = button.evaluate("element => getComputedStyle(element).backgroundColor")
+    button.click()
+    expect(button).to_have_text("✓")
+    expect(button).to_have_class(re.compile(r"copy-success"))
+    during = button.evaluate("element => getComputedStyle(element).backgroundColor")
+    assert during != before
+
+    page.wait_for_timeout(1300)
+    expect(button).not_to_have_class(re.compile(r"copy-success"))
+    expect(button).to_have_text(original or "⧉")
 
 
 def test_overview_links_to_split_management_pages(page: Page, base_url: str) -> None:
@@ -296,6 +368,21 @@ def test_mobile_action_required_and_alias_actions_stay_inside_viewport(
     edit.locator("summary").click()
     expect(edit.locator(".alias-toggle-action button")).to_be_visible()
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+
+
+def test_mobile_sidebar_stays_above_blurred_backdrop(page: Page, base_url: str) -> None:
+    page.set_viewport_size({"width": 760, "height": 844})
+    _login(page, base_url)
+
+    page.locator("[data-mobile-nav]").click()
+    sidebar = page.locator("[data-app-sidebar]")
+    backdrop = page.locator("[data-drawer-backdrop]")
+    expect(sidebar).to_have_class(re.compile(r"\bopen\b"))
+    expect(backdrop).to_be_visible()
+
+    sidebar_z = sidebar.evaluate("element => Number(getComputedStyle(element).zIndex)")
+    backdrop_z = backdrop.evaluate("element => Number(getComputedStyle(element).zIndex)")
+    assert sidebar_z > backdrop_z
 
 
 def test_offline_pool_uses_neutral_create_buttons_and_inline_assignment(
