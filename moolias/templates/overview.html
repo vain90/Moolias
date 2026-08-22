@@ -3,7 +3,7 @@
 {% block content %}
 <header class="page-heading">
   <div>
-    <h1>{% if language == 'de' %}Willkommen zurück{% else %}Welcome back{% endif %}</h1>
+    <h1>{% if language == 'de' %}Willkommen zurück{% else %}Welcome back{% endif %}<span data-welcome-name></span></h1>
     <p class="muted">{% if language == 'de' %}Hier ist dein aktueller Überblick über Moolias.{% else %}Here is your current Moolias overview.{% endif %}</p>
   </div>
 </header>
@@ -127,7 +127,7 @@
       {% endif %}
 
       {% if action_required.unexpected %}
-      <a class="action-item" href="/aliases?status=unexpected"><span class="action-icon amber" aria-hidden="true">!</span><span><strong>{{ action_required.unexpected }} {% if language == 'de' %}Aliase mit unerwarteten Absendern{% else %}aliases with unexpected senders{% endif %}</strong><small>{% if language == 'de' %}Prüfe die nicht automatisch erkannten Absender.{% else %}Review senders that were not detected automatically.{% endif %}</small></span><span aria-hidden="true">›</span></a>
+      <a class="action-item" href="/aliases?status=unexpected"><span class="action-icon amber" aria-hidden="true">!</span><span><strong>{{ action_required.unexpected }} {% if language == 'de' %}Aliase prüfen{% else %}aliases with unexpected senders{% endif %}</strong><small>{% if language == 'de' %}Prüfe die nicht automatisch erkannten Absender.{% else %}Review senders that were not detected automatically.{% endif %}</small></span><span aria-hidden="true">›</span></a>
       {% endif %}
 
       {% if action_required.unused_90 %}
@@ -147,4 +147,5 @@
     <button class="button ghost action-details-button" type="button" data-action-required-open>{% if language == 'de' %}Alle Details anzeigen{% else %}Show all details{% endif %}</button>
   </aside>
 </div>
+<script src="/static/welcome-name.js?v=20260822-1" defer></script>
 {% endblock %}
