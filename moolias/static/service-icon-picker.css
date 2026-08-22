@@ -4,6 +4,44 @@
   border-top: 0 !important;
 }
 
+.alias-edit-identity {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.alias-edit-identity .icon-preference {
+  min-width: 44px;
+}
+
+.alias-edit-current-name {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.alias-edit-current-name strong,
+.alias-edit-current-name code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alias-edit-current-name strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.alias-edit-current-name code {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
 .service-icon-picker-label {
   display: grid;
   gap: 5px;
@@ -18,7 +56,7 @@
   height: 44px;
   display: grid;
   place-items: center;
-  margin: 2px 0 13px;
+  margin: 0;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
