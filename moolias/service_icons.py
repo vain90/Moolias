@@ -182,7 +182,7 @@ SERVICE_ICONS: tuple[ServiceIcon, ...] = (
     _icon("whatsapp", "WhatsApp", "W", "green", ("whatsapp", "whats app")),
     _icon("wise", "Wise", "W", "green", ("wise", "transferwise")),
     _icon("wordpress", "WordPress", "W", "blue", ("wordpress", "word press")),
-    _icon("x", "X / Twitter", "X", "dark", ("twitter", "xcom"), True),
+    _icon("x", "X / Twitter", "X", "dark", ("twitter", "x.com", "xcom"), True),
     _icon("yelp", "Yelp", "Y", "red", ("yelp",)),
     _icon("youtube", "YouTube", "Y", "red", ("youtube", "you tube")),
     _icon("zalando", "Zalando", "Z", "orange", ("zalando",), True),
@@ -227,9 +227,9 @@ def icon_by_key(key: str | None) -> ServiceIcon:
 def detect_service_icon(address: str, description: str = "") -> ServiceIcon:
     local_part = address.partition("@")[0]
     haystack = f"{description} {local_part}".casefold()
-    normalized = re.sub(r"[^a-z0-9]+", " ", haystack)
+    normalized = re.sub(r"[^a-z0-9]+", " ", haystack).strip()
     tokens = set(normalized.split())
-    compact = normalized.replace(" ", "")
+    padded = f" {normalized} "
 
     # Composite labels such as "Meta - Instagram und Facebook" should resolve
     # to the umbrella brand named first instead of whichever child service
@@ -239,13 +239,21 @@ def detect_service_icon(address: str, description: str = "") -> ServiceIcon:
 
     for icon in SERVICE_ICONS:
         for keyword in icon.keywords:
-            folded = keyword.casefold()
-            folded_normalized = re.sub(r"[^a-z0-9]+", " ", folded).strip()
-            folded_compact = folded_normalized.replace(" ", "")
-            if folded_normalized in tokens:
+            folded_normalized = re.sub(
+                r"[^a-z0-9]+",
+                " ",
+                keyword.casefold(),
+            ).strip()
+            if not folded_normalized:
+                continue
+            if f" {folded_normalized} " in padded:
                 return icon
-            if len(folded_compact) >= 4 and folded_compact in compact:
-                return icon
+            if " " not in folded_normalized and len(folded_normalized) >= 4:
+                if any(
+                    re.fullmatch(rf"{re.escape(folded_normalized)}\d+", token)
+                    for token in tokens
+                ):
+                    return icon
     return _generic_icon(address, description)
 
 
