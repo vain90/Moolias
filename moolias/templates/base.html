@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="/static/sender-protection.css">
   <link rel="stylesheet" href="/static/mobile.css">
   <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/shell.css">
   <script src="/static/dialogs.js" defer></script>
   <script src="/static/app.js" defer></script>
   <script src="/static/stats.js" defer></script>
@@ -31,46 +32,220 @@
   <script src="/static/review-behavior.js" defer></script>
   <script src="/static/stats-mode.js" defer></script>
   <script src="/static/sender-protection.js" defer></script>
+  <script src="/static/shell.js" defer></script>
 </head>
 <body
+  class="{% if user is defined %}app-body{% else %}public-body{% endif %}"
   data-copied-label="{{ t.copied }}"
   data-stats-effective="{% if stats_confirmation_mode is defined and stats_confirmation_mode %}{{ stats_confirmation_mode }}{% elif stats_state is defined and stats_state %}{{ stats_state.effective.value }}{% endif %}"
   data-stats-domain="{% if stats_state is defined and stats_state and stats_state.domain_default %}{{ stats_state.domain_default.value }}{% else %}off{% endif %}"
+  {% if csrf_token is defined %}data-csrf-token="{{ csrf_token }}"{% endif %}
 >
-  <nav class="language-switch" aria-label="{{ t.language }}">
-    <a
-      class="language-link {% if language == 'de' %}current{% endif %}"
-      href="/language/de?next={{ return_to|urlencode }}"
-      {% if language == 'de' %}aria-current="true"{% endif %}
-    >DE</a>
-    <span aria-hidden="true">·</span>
-    <a
-      class="language-link {% if language == 'en' %}current{% endif %}"
-      href="/language/en?next={{ return_to|urlencode }}"
-      {% if language == 'en' %}aria-current="true"{% endif %}
-    >EN</a>
-    <span class="top-control-divider" aria-hidden="true"></span>
-    <label class="theme-control">
-      <select
-        class="theme-select"
-        data-theme-select
-        aria-label="{% if language == 'de' %}Darstellung{% else %}Appearance{% endif %}"
-        title="{% if language == 'de' %}Darstellung{% else %}Appearance{% endif %}"
-      >
-        <option value="system">System</option>
-        <option value="light">{% if language == 'de' %}Hell{% else %}Light{% endif %}</option>
-        <option value="dark">{% if language == 'de' %}Dunkel{% else %}Dark{% endif %}</option>
-      </select>
-    </label>
-    <span class="top-control-divider" aria-hidden="true"></span>
-    <button
-      class="help-trigger"
-      type="button"
-      aria-label="{{ t.help_open }}"
-      title="{{ t.help_open }}"
-      data-open-help-dialog
-    >?</button>
-  </nav>
+{% if user is defined %}
+  <div class="app-frame">
+    <aside class="app-sidebar" data-app-sidebar>
+      <a class="brand" href="/overview" aria-label="Moolias Übersicht">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 38" role="img">
+            <path d="M16 2.5 28 7v9.7c0 8.6-5.1 15.2-12 18.8C9.1 31.9 4 25.3 4 16.7V7l12-4.5Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <strong>Moolias</strong>
+          <small>Alias Management</small>
+        </span>
+      </a>
+
+      <nav class="side-nav" aria-label="{% if language == 'de' %}Hauptnavigation{% else %}Main navigation{% endif %}">
+        <a class="side-nav-link {% if active_nav == 'overview' %}current{% endif %}" href="/overview" {% if active_nav == 'overview' %}aria-current="page"{% endif %}>
+          <span class="nav-icon" aria-hidden="true">⌂</span>
+          <span>{% if language == 'de' %}Übersicht{% else %}Overview{% endif %}</span>
+        </a>
+        <a class="side-nav-link {% if active_nav == 'aliases' %}current{% endif %}" href="/aliases" {% if active_nav == 'aliases' %}aria-current="page"{% endif %}>
+          <span class="nav-icon" aria-hidden="true">@</span>
+          <span>{% if language == 'de' %}Aliase{% else %}Aliases{% endif %}</span>
+        </a>
+        <a class="side-nav-link {% if active_nav == 'pool' %}current{% endif %}" href="/offline-pool" {% if active_nav == 'pool' %}aria-current="page"{% endif %}>
+          <span class="nav-icon" aria-hidden="true">▣</span>
+          <span>{% if language == 'de' %}Offline-Pool{% else %}Offline pool{% endif %}</span>
+        </a>
+        <a class="side-nav-link {% if active_nav == 'statistics' %}current{% endif %}" href="/statistics" {% if active_nav == 'statistics' %}aria-current="page"{% endif %}>
+          <span class="nav-icon" aria-hidden="true">▥</span>
+          <span>{% if language == 'de' %}Statistiken{% else %}Statistics{% endif %}</span>
+        </a>
+      </nav>
+
+      <div class="account-area">
+        <div class="account-popover" data-account-popover hidden>
+          {% if mailcow_quota is defined and mailcow_quota.limit > 0 %}
+          <div class="account-quota">
+            <div class="account-quota-head">
+              <span>{% if language == 'de' %}Mailcow-Aliase{% else %}Mailcow aliases{% endif %}</span>
+              <strong>{{ mailcow_quota.used }} / {{ mailcow_quota.limit }}</strong>
+            </div>
+            <div class="quota-track" aria-hidden="true">
+              <span style="width: {{ [100, (mailcow_quota.used * 100 / mailcow_quota.limit)|round(1)]|min }}%"></span>
+            </div>
+            <small>
+              {% if language == 'de' %}
+                {{ mailcow_quota.own }} davon gehören zu diesem Moolias-Konto.
+              {% else %}
+                {{ mailcow_quota.own }} belong to this Moolias account.
+              {% endif %}
+            </small>
+          </div>
+          {% elif mailcow_quota is defined %}
+          <div class="account-quota">
+            <div class="account-quota-head">
+              <span>{% if language == 'de' %}Moolias-Aliase{% else %}Moolias aliases{% endif %}</span>
+              <strong>{{ mailcow_quota.own }}</strong>
+            </div>
+            <small>
+              {% if language == 'de' %}Mailcow liefert für diese Domain kein Alias-Limit.{% else %}Mailcow does not expose an alias limit for this domain.{% endif %}
+            </small>
+          </div>
+          {% endif %}
+          <form method="post" action="/logout" class="account-logout">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit">
+              <span aria-hidden="true">↪</span>
+              <span>{{ t.sign_out }}</span>
+            </button>
+          </form>
+        </div>
+        <button class="account-button" type="button" data-account-button aria-expanded="false">
+          <span class="account-avatar">{{ user[:1]|upper }}</span>
+          <span class="account-email">{{ user }}</span>
+          <span class="account-chevron" aria-hidden="true">⌄</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="app-workspace">
+      <header class="app-header">
+        <button class="mobile-nav-trigger" type="button" data-mobile-nav aria-label="Navigation">☰</button>
+        <nav class="language-switch app-language" aria-label="{{ t.language }}">
+          <a
+            class="language-link {% if language == 'de' %}current{% endif %}"
+            href="/language/de?next={{ return_to|urlencode }}"
+            {% if language == 'de' %}aria-current="true"{% endif %}
+          >DE</a>
+          <span aria-hidden="true">·</span>
+          <a
+            class="language-link {% if language == 'en' %}current{% endif %}"
+            href="/language/en?next={{ return_to|urlencode }}"
+            {% if language == 'en' %}aria-current="true"{% endif %}
+          >EN</a>
+        </nav>
+        <div class="header-actions">
+          <button class="header-icon-button" type="button" data-open-settings aria-label="{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}" title="{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}">⚙</button>
+          <button class="header-icon-button help-trigger" type="button" data-open-help-dialog aria-label="{{ t.help_open }}" title="{{ t.help_open }}">?</button>
+        </div>
+      </header>
+
+      <main class="shell app-main">{% block content %}{% endblock %}</main>
+      <footer class="footer app-footer">Moolias {{ version }}</footer>
+    </div>
+  </div>
+
+  <div class="drawer-backdrop" data-drawer-backdrop hidden></div>
+  <aside class="settings-drawer" data-settings-drawer aria-hidden="true" aria-label="{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}">
+    <div class="settings-drawer-head">
+      <div>
+        <h2>{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}</h2>
+        <p class="muted">{% if language == 'de' %}Darstellung, Statistiken und Schutz an einem Ort.{% else %}Appearance, statistics and protection in one place.{% endif %}</p>
+      </div>
+      <button class="drawer-close" type="button" data-close-settings aria-label="{{ t.close }}">×</button>
+    </div>
+
+    <div class="settings-drawer-content">
+      <section class="settings-section appearance-settings">
+        <div class="settings-section-number">1</div>
+        <div class="settings-section-body">
+          <h3>{% if language == 'de' %}Erscheinungsbild{% else %}Appearance{% endif %}</h3>
+          <p class="muted">{% if language == 'de' %}Wähle, wie Moolias angezeigt werden soll.{% else %}Choose how Moolias should look.{% endif %}</p>
+          <div class="theme-segments" role="group" aria-label="{% if language == 'de' %}Erscheinungsbild{% else %}Appearance{% endif %}">
+            <button type="button" data-theme-choice="light"><span aria-hidden="true">☀</span> {% if language == 'de' %}Hell{% else %}Light{% endif %}</button>
+            <button type="button" data-theme-choice="dark"><span aria-hidden="true">☾</span> {% if language == 'de' %}Dunkel{% else %}Dark{% endif %}</button>
+            <button type="button" data-theme-choice="system"><span aria-hidden="true">▣</span> System</button>
+          </div>
+          <label class="sr-only">
+            {% if language == 'de' %}Erscheinungsbild{% else %}Appearance{% endif %}
+            <select data-theme-select>
+              <option value="system">System</option>
+              <option value="light">{% if language == 'de' %}Hell{% else %}Light{% endif %}</option>
+              <option value="dark">{% if language == 'de' %}Dunkel{% else %}Dark{% endif %}</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-section settings-usage-section usage-settings" aria-label="{{ t.usage_settings_title }}">
+        <div class="settings-section-number">2</div>
+        <div class="settings-section-body">
+          <h3>{{ t.usage_settings_title }}</h3>
+          {% if not stats_available %}
+            <p class="muted">{{ t.usage_settings_unavailable }}</p>
+          {% elif stats_error or not stats_state %}
+            <p class="muted">{{ t.usage_settings_unavailable }}</p>
+          {% else %}
+            <p class="muted">
+              {% if stats_state.conflict %}
+                {{ t.usage_mode_conflict }}
+              {% elif stats_state.effective.value == 'off' %}
+                {{ t.usage_mode_off_hint }}
+              {% elif stats_state.effective.value == 'basic' %}
+                {{ t.usage_mode_basic_hint }}
+              {% elif stats_state.effective.value == 'domain' %}
+                {{ t.usage_mode_domain_hint }}
+              {% else %}
+                {{ t.usage_mode_full_hint }}
+              {% endif %}
+            </p>
+            <form method="post" action="/aliases/stats-mode" class="settings-form usage-mode-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="return_to" value="{{ return_to }}">
+              <label>
+                <span>{{ t.usage_choose_mode }}</span>
+                <select name="mode" aria-label="{{ t.usage_choose_mode }}">
+                  {% if stats_mode_selection == 'conflict' %}<option value="" selected disabled>{{ t.usage_fix_conflict }}</option>{% endif %}
+                  <option value="inherit" {% if stats_mode_selection == 'inherit' %}selected{% endif %}>{{ t.usage_mode_inherit }}</option>
+                  <option value="off" {% if stats_mode_selection == 'off' %}selected{% endif %}>{{ t.usage_mode_off }}</option>
+                  <option value="basic" {% if stats_mode_selection == 'basic' %}selected{% endif %}>{{ t.usage_mode_basic }}</option>
+                  <option value="domain" {% if stats_mode_selection == 'domain' %}selected{% endif %}>{{ t.usage_mode_domain }}</option>
+                  <option value="full" {% if stats_mode_selection == 'full' %}selected{% endif %}>{{ t.usage_mode_full }}</option>
+                </select>
+              </label>
+              <button class="button compact" type="submit">{{ t.save }}</button>
+            </form>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="settings-section sender-protection-settings" data-sender-protection-settings hidden>
+        <div class="settings-section-number">3</div>
+        <div class="settings-section-body">
+          <div class="setting-toggle-head">
+            <div>
+              <h3>{% if language == 'de' %}Primäradresse schützen{% else %}Protect primary address{% endif %}</h3>
+              <p class="muted">{% if language == 'de' %}Verhindert, dass deine eigentliche Mailbox-Adresse als Absender verwendet wird. Der Empfang bleibt unverändert.{% else %}Prevents your real mailbox address from being used as a sender. Receiving remains unchanged.{% endif %}</p>
+            </div>
+            <label class="switch-control">
+              <input type="checkbox" role="switch" data-sender-protection-toggle aria-label="{% if language == 'de' %}Primäradresse schützen{% else %}Protect primary address{% endif %}">
+              <span aria-hidden="true"></span>
+            </label>
+          </div>
+          <p class="settings-state" data-sender-protection-state></p>
+          <p class="hint" data-sender-protection-message aria-live="polite"></p>
+        </div>
+      </section>
+    </div>
+
+    <div class="settings-drawer-foot">
+      <span aria-hidden="true">ⓘ</span>
+      <span>{% if language == 'de' %}Darstellung und Schutz werden automatisch gespeichert. Statistikmodi werden über „Speichern“ übernommen.{% else %}Appearance and protection are saved automatically. Statistics modes are applied with Save.{% endif %}</span>
+    </div>
+  </aside>
 
   <dialog class="help-dialog" data-help-dialog>
     <div class="dialog-head">
@@ -78,39 +253,24 @@
         <h2>{{ t.help_title }}</h2>
         <p class="muted">{{ t.help_intro }}</p>
       </div>
-      <button
-        class="dialog-close"
-        type="button"
-        aria-label="{{ t.close }}"
-        title="{{ t.close }}"
-        data-close-help-dialog
-      >×</button>
+      <button class="dialog-close" type="button" aria-label="{{ t.close }}" title="{{ t.close }}" data-close-help-dialog>×</button>
     </div>
     <div class="help-content">
-      <section>
-        <h3>{{ t.help_aliases_title }}</h3>
-        <p>{{ t.help_aliases_body }}</p>
-      </section>
-      <section>
-        <h3>{{ t.help_leaks_title }}</h3>
-        <p>{{ t.help_leaks_body }}</p>
-      </section>
-      <section>
-        <h3>{{ t.help_offline_title }}</h3>
-        <p>{{ t.help_offline_body }}</p>
-      </section>
-      <section>
-        <h3>{{ t.help_sogo_title }}</h3>
-        <p>{{ t.help_sogo_body }}</p>
-      </section>
-      <section>
-        <h3>{{ t.help_storage_title }}</h3>
-        <p>{{ t.help_storage_body }}</p>
-      </section>
+      <section><h3>{{ t.help_aliases_title }}</h3><p>{{ t.help_aliases_body }}</p></section>
+      <section><h3>{{ t.help_leaks_title }}</h3><p>{{ t.help_leaks_body }}</p></section>
+      <section><h3>{{ t.help_offline_title }}</h3><p>{{ t.help_offline_body }}</p></section>
+      <section><h3>{{ t.help_sogo_title }}</h3><p>{{ t.help_sogo_body }}</p></section>
+      <section><h3>{{ t.help_storage_title }}</h3><p>{{ t.help_storage_body }}</p></section>
     </div>
   </dialog>
-
-  <main class="shell">{% block content %}{% endblock %}</main>
-  <footer class="footer">Moolias {{ version }}</footer>
+{% else %}
+  <nav class="language-switch public-language" aria-label="{{ t.language }}">
+    <a class="language-link {% if language == 'de' %}current{% endif %}" href="/language/de?next={{ return_to|urlencode }}">DE</a>
+    <span aria-hidden="true">·</span>
+    <a class="language-link {% if language == 'en' %}current{% endif %}" href="/language/en?next={{ return_to|urlencode }}">EN</a>
+  </nav>
+  <main class="shell public-shell">{% block public_content %}{% endblock %}</main>
+  <footer class="footer public-footer">Moolias {{ version }}</footer>
+{% endif %}
 </body>
 </html>

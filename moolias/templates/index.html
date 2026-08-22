@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Moolias{% endblock %}
-{% block content %}
+{% block public_content %}
 <section class="hero card">
   {% if request.query_params.get("error") == "access-denied" %}
     {% if language == "de" %}

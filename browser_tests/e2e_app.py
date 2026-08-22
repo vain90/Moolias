@@ -107,7 +107,13 @@ class FakeMailcow:
         }
 
     async def get_domain(self, domain: str):
-        return {"domain": domain, "tags": list(self.domain_tags)}
+        return {
+            "domain": domain,
+            "tags": list(self.domain_tags),
+            "max_num_aliases_for_domain": 50,
+            "aliases_in_domain": len(self.aliases),
+            "aliases_left": max(0, 50 - len(self.aliases)),
+        }
 
     async def list_aliases(self) -> list[AliasRecord]:
         return [self.aliases[key] for key in sorted(self.aliases)]
@@ -242,6 +248,7 @@ app = main_module.create_app(SETTINGS)
 
 def _clear_statistics(path: Path) -> None:
     tables = (
+        "alias_icon_settings",
         "sender_alias_settings",
         "sender_expectations",
         "sender_usage",

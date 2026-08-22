@@ -209,7 +209,9 @@ def test_unexpected_filter_count_search_and_pagination_are_server_side(
         _login(client)
         asyncio.run(_seed_sender_state(app.state.stats_store))
 
-        response = client.get("/aliases?status=unexpected&per_page=10&page=2")
+        response = client.get(
+            "/aliases?status=unexpected&per_page=10&page=2&sort=last_used&direction=asc"
+        )
         assert response.status_code == 200
         html = response.text
         assert _unexpected_count(html) == 26

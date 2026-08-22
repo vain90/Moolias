@@ -28,6 +28,13 @@ class FakeMailcowClient:
             "tags": [],
         }
 
+    async def get_domain(self, domain: str):
+        return {
+            "domain_name": domain,
+            "aliases_in_domain": 1,
+            "max_num_aliases_for_domain": 400,
+        }
+
     async def list_aliases(self):
         return []
 

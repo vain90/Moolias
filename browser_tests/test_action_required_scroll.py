@@ -1,11 +1,22 @@
 from __future__ import annotations
 
+import re
+
 from playwright.sync_api import Page, expect
 
 
 def _open_action_required(page: Page, base_url: str) -> None:
     page.goto(f"{base_url}/oauth/callback?code=e2e&state=e2e")
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
     expect(page.locator("[data-alias-results-region]")).to_be_visible()
+    expect(page.locator("dialog[data-action-required-dialog][open]")).to_have_count(0)
+
+    page.goto(f"{base_url}/overview")
+    action = page.locator("[data-action-required-open]")
+    expect(action).to_be_visible()
+    action.click()
+
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
     expect(page.locator("dialog[data-action-required-dialog]")).to_be_visible(timeout=5000)
 
 

@@ -236,3 +236,11 @@ async def set_sender_domain_expectation(
         "domain": sender.sender_domain,
         "expected": True,
     }
+
+
+# Keep these imports late to avoid a module cycle: ui.py uses AliasReviewSettingsStore.
+from moolias.pool_ui import router as pool_ui_router  # noqa: E402
+from moolias.ui import router as ui_router  # noqa: E402
+
+router.include_router(pool_ui_router)
+router.include_router(ui_router)

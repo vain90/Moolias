@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}{% if language == 'de' %}Übersicht{% else %}Overview{% endif %} · Moolias{% endblock %}
+{% block content %}
+<header class="page-heading">
+  <div>
+    <h1>{% if language == 'de' %}Willkommen zurück{% else %}Welcome back{% endif %}</h1>
+    <p class="muted">{% if language == 'de' %}Hier ist dein aktueller Überblick über Moolias.{% else %}Here is your current Moolias overview.{% endif %}</p>
+  </div>
+</header>
+
+<section class="metric-grid overview-metrics" aria-label="{% if language == 'de' %}Übersicht{% else %}Overview{% endif %}">
+  <a class="metric-card" href="/aliases">
+    <span class="metric-icon green" aria-hidden="true">@</span>
+    <strong>{{ assigned_total }}</strong>
+    <span>{% if language == 'de' %}Aliase{% else %}Aliases{% endif %}</span>
+    <small>{% if language == 'de' %}Insgesamt{% else %}Total{% endif %}</small>
+  </a>
+  <a class="metric-card" href="/aliases?status=active">
+    <span class="metric-icon green" aria-hidden="true">●</span>
+    <strong>{{ active_total }}</strong>
+    <span>{% if language == 'de' %}Aktiv{% else %}Active{% endif %}</span>
+    <small>{% if language == 'de' %}Aliase{% else %}Aliases{% endif %}</small>
+  </a>
+  <a class="metric-card" href="/offline-pool">
+    <span class="metric-icon blue" aria-hidden="true">▣</span>
+    <strong>{{ reserved|length }}</strong>
+    <span>Offline-Pool</span>
+    <small>{% if language == 'de' %}Vorbereitet{% else %}Prepared{% endif %}</small>
+  </a>
+  <button class="metric-card metric-card-button" type="button" data-primary-protection-card data-open-settings-section="protection">
+    <span class="metric-icon amber" aria-hidden="true">◇</span>
+    <strong data-primary-protection-state>…</strong>
+    <span>{% if language == 'de' %}Hauptadresse{% else %}Primary address{% endif %}</span>
+    <small data-primary-protection-detail>{% if language == 'de' %}Status wird geprüft{% else %}Checking status{% endif %}</small>
+  </button>
+</section>
+
+<div class="overview-layout top-gap">
+  <div class="overview-primary">
+    <section class="card overview-recent-card">
+      <div class="section-head">
+        <div>
+          <h2>{% if language == 'de' %}Zuletzt benutzt{% else %}Recently used{% endif %}</h2>
+          <p class="muted">{% if language == 'de' %}Die fünf zuletzt verwendeten Aliase.{% else %}The five aliases used most recently.{% endif %}</p>
+        </div>
+      </div>
+
+      {% if usage_stats_visible and recent_aliases %}
+      <div class="recent-alias-list">
+        {% for alias in recent_aliases %}
+        {% set usage = usage_stats.get(alias.address|lower, {}) %}
+        {% set icon = service_icons.get(alias.address|lower) %}
+        <a class="recent-alias-row" href="/aliases?q={{ alias.address|urlencode }}">
+          <span class="service-badge tone-{{ icon.tone if icon else 'neutral' }}" aria-hidden="true">{{ icon.glyph if icon else '?' }}</span>
+          <span class="recent-alias-identity">
+            <strong>{{ alias.address }}</strong>
+            <small>{{ alias.description or t.no_purpose }}</small>
+          </span>
+          <span class="status {{ 'on' if alias.active else 'off' }}">{{ t.status_active if alias.active else t.status_inactive }}</span>
+          <span class="recent-alias-time">
+            {% if usage.last_used_at %}
+              <time data-local-timestamp="{{ usage.last_used_at }}">{{ usage.last_used_at }}</time>
+            {% else %}
+              {% if language == 'de' %}Noch nicht benutzt{% else %}Not used yet{% endif %}
+            {% endif %}
+          </span>
+          <span class="row-chevron" aria-hidden="true">›</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% elif not usage_stats_visible %}
+      <div class="overview-empty">
+        <strong>{% if language == 'de' %}Nutzungsstatistik ist aus{% else %}Usage statistics are off{% endif %}</strong>
+        <p class="muted">{% if language == 'de' %}Aktiviere einen Statistikmodus in den Einstellungen, damit Moolias die zuletzt benutzten Aliase anzeigen kann.{% else %}Enable a statistics mode in Settings so Moolias can show recently used aliases.{% endif %}</p>
+        <button class="button compact" type="button" data-open-settings>{% if language == 'de' %}Einstellungen öffnen{% else %}Open settings{% endif %}</button>
+      </div>
+      {% else %}
+      <p class="empty">{% if language == 'de' %}Noch keine Nutzung erfasst.{% else %}No usage has been recorded yet.{% endif %}</p>
+      {% endif %}
+
+      <a class="card-footer-link" href="/aliases">
+        {% if language == 'de' %}Alle Aliase anzeigen{% else %}Show all aliases{% endif %}<span aria-hidden="true">›</span>
+      </a>
+    </section>
+
+    <section class="card overview-stat-card top-gap">
+      <div class="section-head">
+        <div>
+          <h2>{% if language == 'de' %}Statistik{% else %}Statistics{% endif %}</h2>
+          <p class="muted">{% if language == 'de' %}Aktueller Datenbestand des Statistik-Collectors.{% else %}Current statistics collector data.{% endif %}</p>
+        </div>
+        <a class="text-link" href="/statistics">{% if language == 'de' %}Details{% else %}Details{% endif %} ›</a>
+      </div>
+
+      {% if usage_stats_visible %}
+      <div class="stat-preview-grid">
+        <div class="stat-preview-item"><span class="stat-symbol green" aria-hidden="true">↓</span><strong>{{ stats_summary.received }}</strong><span>{% if language == 'de' %}Empfangen{% else %}Received{% endif %}</span></div>
+        <div class="stat-preview-item"><span class="stat-symbol blue" aria-hidden="true">↑</span><strong>{{ stats_summary.sent }}</strong><span>{% if language == 'de' %}Gesendet{% else %}Sent{% endif %}</span></div>
+        <div class="stat-preview-item"><span class="stat-symbol violet" aria-hidden="true">✦</span><strong>{{ stats_summary.recognized_senders }}</strong><span>{% if language == 'de' %}Automatisch erkannt{% else %}Auto-detected{% endif %}</span></div>
+        <div class="stat-preview-item"><span class="stat-symbol amber" aria-hidden="true">!</span><strong>{{ stats_summary.unrecognized_senders }}</strong><span>{% if language == 'de' %}Nicht erkannt{% else %}Not detected{% endif %}</span></div>
+        <div class="stat-preview-item"><span class="stat-symbol green" aria-hidden="true">◎</span>{% if top_sources %}<strong class="stat-domain">{{ top_sources[0][0] }}</strong>{% else %}<strong>–</strong>{% endif %}<span>{% if language == 'de' %}Aktivste Quelle{% else %}Top source{% endif %}</span></div>
+      </div>
+      {% else %}
+      <p class="empty">{% if language == 'de' %}Für diese Ansicht sind Nutzungsstatistiken erforderlich.{% else %}Usage statistics are required for this view.{% endif %}</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="card action-rail" data-action-rail>
+    <div class="section-head">
+      <div>
+        <h2>{% if language == 'de' %}Handlungsbedarf{% else %}Action required{% endif %}</h2>
+        <p class="muted">{% if language == 'de' %}Dinge, die deine Aufmerksamkeit verdienen.{% else %}Things that deserve your attention.{% endif %}</p>
+      </div>
+      <span class="count action-count" data-action-count>{{ action_required.base_count }}</span>
+    </div>
+
+    <div class="action-list">
+      <button class="action-item" type="button" data-primary-protection-action data-open-settings-section="protection" hidden>
+        <span class="action-icon amber" aria-hidden="true">◇</span>
+        <span><strong>{% if language == 'de' %}Hauptadresse schützen{% else %}Protect primary address{% endif %}</strong><small>{% if language == 'de' %}Verhindere das Senden mit deiner echten Adresse.{% else %}Prevent sending with your real address.{% endif %}</small></span>
+        <span aria-hidden="true">›</span>
+      </button>
+
+      {% if action_required.used_pool %}
+      <a class="action-item" href="/offline-pool?used=1"><span class="action-icon blue" aria-hidden="true">▣</span><span><strong>{{ action_required.used_pool }} {% if language == 'de' %}benutzte Offline-Aliase{% else %}used offline aliases{% endif %}</strong><small>{% if language == 'de' %}Ordne bereits benutzte Adressen einem Zweck zu.{% else %}Assign already used addresses to a purpose.{% endif %}</small></span><span aria-hidden="true">›</span></a>
+      {% endif %}
+
+      {% if action_required.unexpected %}
+      <a class="action-item" href="/aliases?status=unexpected"><span class="action-icon amber" aria-hidden="true">!</span><span><strong>{{ action_required.unexpected }} {% if language == 'de' %}Aliase mit unerwarteten Absendern{% else %}aliases with unexpected senders{% endif %}</strong><small>{% if language == 'de' %}Prüfe die nicht automatisch erkannten Absender.{% else %}Review senders that were not detected automatically.{% endif %}</small></span><span aria-hidden="true">›</span></a>
+      {% endif %}
+
+      {% if action_required.unused_90 %}
+      <a class="action-item" href="/aliases?sort=last_used&direction=asc"><span class="action-icon blue" aria-hidden="true">◷</span><span><strong>{{ action_required.unused_90 }} {% if language == 'de' %}Aliase seit 90 Tagen ungenutzt{% else %}aliases unused for 90 days{% endif %}</strong><small>{% if language == 'de' %}Prüfe, ob du sie noch brauchst.{% else %}Check whether you still need them.{% endif %}</small></span><span aria-hidden="true">›</span></a>
+      {% endif %}
+
+      {% if action_required.collector %}
+      <a class="action-item" href="/statistics"><span class="action-icon red" aria-hidden="true">!</span><span><strong>{% if language == 'de' %}Statistik-Collector prüfen{% else %}Check statistics collector{% endif %}</strong><small>{{ action_required.collector_state }}</small></span><span aria-hidden="true">›</span></a>
+      {% endif %}
+
+      <div class="action-empty" data-action-empty {% if action_required.base_count %}hidden{% endif %}>
+        <span class="action-icon green" aria-hidden="true">✓</span>
+        <div><strong>{% if language == 'de' %}Aktuell nichts zu tun{% else %}Nothing to do right now{% endif %}</strong><p class="muted">{% if language == 'de' %}Moolias hat derzeit keinen Handlungsbedarf erkannt.{% else %}Moolias currently sees no action required.{% endif %}</p></div>
+      </div>
+    </div>
+
+    <button class="button ghost action-details-button" type="button" data-action-required-open>{% if language == 'de' %}Alle Details anzeigen{% else %}Show all details{% endif %}</button>
+  </aside>
+</div>
+{% endblock %}

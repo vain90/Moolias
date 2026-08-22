@@ -1,195 +1,23 @@
 {% extends "base.html" %}
-{% block title %}{{ t.aliases_title }}{% endblock %}
+{% block title %}{% if language == 'de' %}Aliase{% else %}Aliases{% endif %} · Moolias{% endblock %}
 {% block content %}
-<header class="topbar">
+<header class="page-heading page-heading-actions">
   <div>
-    <p class="eyebrow">{{ domain }}</p>
-    <h1>{{ t.your_aliases }}</h1>
-    <p class="muted">{{ t.signed_in_as.format(user=user) }}</p>
+    <h1>{% if language == 'de' %}Aliase{% else %}Aliases{% endif %}</h1>
+    <p class="muted">{% if language == 'de' %}Verwalte deine Aliase und behalte Nutzung und Status im Blick.{% else %}Manage your aliases and keep usage and status in view.{% endif %}</p>
   </div>
-  <form method="post" action="/logout">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button class="button ghost" type="submit">{{ t.sign_out }}</button>
-  </form>
+  <button class="button primary" type="button" data-open-create-alias>+ {% if language == 'de' %}Neuer Alias{% else %}New alias{% endif %}</button>
 </header>
 
 {% if catch_all %}
-<section class="card warning-card top-gap">
+<section class="card compact-notice top-gap">
   <strong>{{ t.catch_all_active }}</strong>
-  <p>{{ t.catch_all_hint.format(domain=domain) }}</p>
+  <span class="muted">{{ t.catch_all_hint.format(domain=domain) }}</span>
 </section>
 {% endif %}
 
-<section class="grid two top-gap">
-  <div class="card">
-    <h2>{{ t.create_alias }}</h2>
-    <form method="post" action="/aliases" class="stack">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label>{{ t.purpose }}
-        <input
-          name="description"
-          maxlength="160"
-          required
-          placeholder="{{ t.purpose_placeholder }}"
-        >
-      </label>
-
-      <fieldset class="mode-picker">
-        <legend>{{ t.address_style }}</legend>
-        <p class="hint mode-picker-hint">{{ t.address_style_hint }}</p>
-
-        <label class="mode-option">
-          <input type="radio" name="mode" value="named" data-mode-option checked>
-          <span class="mode-option-body">
-            <span class="mode-option-head">
-              <strong>{{ t.name_random }}</strong>
-              <span class="recommended-badge">{{ t.recommended }}</span>
-            </span>
-            <code>amazon-k7@{{ domain }}</code>
-            <small>{{ t.name_random_hint }}</small>
-          </span>
-        </label>
-
-        <label class="mode-option">
-          <input type="radio" name="mode" value="readable" data-mode-option>
-          <span class="mode-option-body">
-            <span class="mode-option-head">
-              <strong>{{ t.readable_random }}</strong>
-            </span>
-            <code>feder-hafen-27@{{ domain }}</code>
-            <small>{{ t.readable_random_hint }}</small>
-          </span>
-        </label>
-
-        <label class="mode-option">
-          <input type="radio" name="mode" value="custom" data-mode-option>
-          <span class="mode-option-body">
-            <span class="mode-option-head">
-              <strong>{{ t.custom_local_part }}</strong>
-            </span>
-            <code>mein-alias@{{ domain }}</code>
-            <small>{{ t.custom_local_part_hint }}</small>
-          </span>
-        </label>
-      </fieldset>
-
-      <label class="hidden" data-custom-local-part>{{ t.custom_address }}
-        <div class="address-input">
-          <input name="local_part" maxlength="63" placeholder="my-alias" autocomplete="off">
-          <span>@{{ domain }}</span>
-        </div>
-      </label>
-      <label class="check-row">
-        <input type="checkbox" name="sogo_visible" value="1">
-        <span>{{ t.show_in_sogo }}</span>
-      </label>
-      <p class="hint">{{ t.sogo_create_hint }}</p>
-      <button class="button primary" type="submit">{{ t.create_alias_button }}</button>
-    </form>
-  </div>
-
-  <div class="card" id="pool">
-    <div class="section-head">
-      <div>
-        <h2>{{ t.offline_pool }}</h2>
-        <p class="muted">{{ t.offline_pool_hint }}</p>
-      </div>
-      <span class="count">{{ reserved|length }}</span>
-    </div>
-    <div class="button-row">
-      {% for amount in [1, 5, 10, 20] %}
-      <form method="post" action="/aliases/pool">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="count" value="{{ amount }}">
-        <button class="button compact" type="submit">+{{ amount }}</button>
-      </form>
-      {% endfor %}
-    </div>
-    {% if reserved %}
-    <div class="pool-list">
-      {% for alias in reserved %}
-      {% set pool_stats = usage_stats.get(alias.address|lower) if usage_stats_visible else none %}
-      {% set pool_used = alias.is_reserved_used or (pool_stats and (pool_stats.received_count or pool_stats.sent_count)) %}
-      {% set pool_senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
-      <div class="pool-item {% if pool_used %}pool-item-used{% endif %}">
-        <div class="alias-info">
-          <code data-pool-address>{{ alias.address }}</code>
-          {% if pool_stats and (pool_stats.received_count or pool_stats.sent_count) %}
-          <div class="usage-summary">
-            {% if pool_stats.received_count %}
-            <span class="sender-stats-alert">{{ pool_stats.received_count }} {{ t.usage_received }}</span>
-            {% endif %}
-            {% if pool_stats.sent_count %}
-            <span class="sender-stats-alert">{{ pool_stats.sent_count }} {{ t.usage_sent }}</span>
-            {% endif %}
-            {% if pool_stats.last_used_at %}
-            <span>
-              {{ t.usage_last_used }}
-              <time data-local-timestamp="{{ pool_stats.last_used_at }}">{{ pool_stats.last_used_at }}</time>
-            </span>
-            {% endif %}
-          </div>
-          {% endif %}
-          {% if pool_senders %}
-          <details class="sender-stats">
-            <summary>
-              {{ t.sender_stats_title }}
-              <span class="sender-stats-count">{{ pool_senders|length }}</span>
-            </summary>
-            <div class="sender-stats-list">
-              {% for sender in pool_senders %}
-              <div class="sender-stats-row">
-                <div class="sender-stats-identity">
-                  <code>{{ sender.label }}</code>
-                </div>
-                <span class="sender-message-count">{{ sender.received_count }}</span>
-              </div>
-              {% endfor %}
-            </div>
-          </details>
-          {% endif %}
-        </div>
-        <div class="pool-actions">
-          <button
-            class="button compact primary"
-            type="button"
-            data-open-assign-dialog="{{ alias.id }}"
-          >{{ t.assign }}</button>
-          <button class="button compact" type="button" data-copy="{{ alias.address }}">
-            {{ t["copy"] }}
-          </button>
-          {% if not pool_used %}
-          <form
-            method="post"
-            action="/aliases/{{ alias.id }}/delete-reserved"
-            data-confirm="{{ t.delete_confirm }}"
-          >
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="button compact danger" type="submit">{{ t.delete }}</button>
-          </form>
-          {% endif %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    <div class="button-row top-gap">
-      <button class="button ghost" type="button" data-copy-pool>{{ t.copy_all }}</button>
-      <a class="button ghost" href="/aliases/pool.txt">{{ t.plain_text }}</a>
-    </div>
-    {% else %}
-    <p class="empty">{{ t.no_prepared_aliases }}</p>
-    {% endif %}
-  </div>
-</section>
-
-<section class="card alias-card top-gap">
-  <div class="section-head alias-toolbar">
-    <div>
-      <h2>{{ t.assigned_aliases }}</h2>
-      <p class="muted" data-assigned-summary>
-        {{ t.assigned_summary.format(filtered=filtered_total, total=assigned_total) }}
-      </p>
-    </div>
+<section class="card alias-management-card top-gap">
+  <div class="alias-toolbar-new">
     <div class="search-box">
       <input
         class="search"
@@ -202,114 +30,43 @@
         data-status="{{ status_filter }}"
         data-per-page="{{ per_page }}"
       >
-      <button
-        class="search-clear"
-        type="button"
-        aria-label="{{ t.clear_search }}"
-        title="{{ t.clear_search }}"
-        data-search-clear
-        {% if not search_query %}hidden{% endif %}
-      >×</button>
+      <button class="search-clear" type="button" aria-label="{{ t.clear_search }}" title="{{ t.clear_search }}" data-search-clear {% if not search_query %}hidden{% endif %}>×</button>
     </div>
-  </div>
 
-  {% if stats_available %}
-  <section class="usage-settings" aria-label="{{ t.usage_settings_title }}">
-    {% if stats_error or not stats_state %}
-    <div>
-      <strong>{{ t.usage_settings_title }}</strong>
-      <p class="usage-settings-hint">{{ t.usage_settings_unavailable }}</p>
-    </div>
-    {% else %}
-    <div class="usage-settings-copy">
-      <div class="usage-settings-title-row">
-        <strong>{{ t.usage_settings_title }}</strong>
-        <span class="usage-mode-badge mode-{{ stats_state.effective.value }}">
-          {% if stats_state.effective.value == 'off' %}{{ t.usage_mode_off }}
-          {% elif stats_state.effective.value == 'basic' %}{{ t.usage_mode_basic }}
-          {% elif stats_state.effective.value == 'domain' %}{{ t.usage_mode_domain }}
-          {% else %}{{ t.usage_mode_full }}{% endif %}
-        </span>
-      </div>
-      <p class="usage-settings-hint">
-        {% if stats_state.conflict %}
-          {{ t.usage_mode_conflict }}
-        {% elif stats_state.effective.value == 'off' %}
-          {{ t.usage_mode_off_hint }}
-        {% elif stats_state.effective.value == 'basic' %}
-          {{ t.usage_mode_basic_hint }}
-        {% elif stats_state.effective.value == 'domain' %}
-          {{ t.usage_mode_domain_hint }}
-        {% else %}
-          {{ t.usage_mode_full_hint }}
-        {% endif %}
-        <span class="usage-mode-source">
-          {% if stats_state.source.value == 'mailbox' %}{{ t.usage_source_mailbox }}
-          {% elif stats_state.source.value == 'domain' %}{{ t.usage_source_domain }}
-          {% else %}{{ t.usage_source_none }}{% endif %}
-        </span>
-      </p>
-    </div>
-    <form method="post" action="/aliases/stats-mode" class="usage-mode-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <input type="hidden" name="return_to" value="{{ return_to }}">
+    <form method="get" action="/aliases" class="sort-controls">
+      <input type="hidden" name="q" value="{{ search_query }}">
+      <input type="hidden" name="status" value="{{ status_filter }}">
+      <input type="hidden" name="per_page" value="{{ per_page }}">
       <label>
-        <span class="sr-only">{{ t.usage_choose_mode }}</span>
-        <select name="mode" aria-label="{{ t.usage_choose_mode }}">
-          {% if stats_mode_selection == 'conflict' %}
-          <option value="" selected disabled>{{ t.usage_fix_conflict }}</option>
-          {% endif %}
-          <option value="inherit" {% if stats_mode_selection == 'inherit' %}selected{% endif %}>
-            {{ t.usage_mode_inherit }}
-          </option>
-          <option value="off" {% if stats_mode_selection == 'off' %}selected{% endif %}>
-            {{ t.usage_mode_off }}
-          </option>
-          <option value="basic" {% if stats_mode_selection == 'basic' %}selected{% endif %}>
-            {{ t.usage_mode_basic }}
-          </option>
-          <option value="domain" {% if stats_mode_selection == 'domain' %}selected{% endif %}>
-            {{ t.usage_mode_domain }}
-          </option>
-          <option value="full" {% if stats_mode_selection == 'full' %}selected{% endif %}>
-            {{ t.usage_mode_full }}
-          </option>
+        <span>{% if language == 'de' %}Sortieren nach{% else %}Sort by{% endif %}</span>
+        <select name="sort" data-auto-submit>
+          <option value="last_used" {% if sort_mode == 'last_used' %}selected{% endif %}>{% if language == 'de' %}Zuletzt benutzt{% else %}Last used{% endif %}</option>
+          <option value="most_used" {% if sort_mode == 'most_used' %}selected{% endif %}>{% if language == 'de' %}Am meisten benutzt{% else %}Most used{% endif %}</option>
         </select>
       </label>
-      <button class="button compact" type="submit">{{ t.save }}</button>
+      <label class="sort-direction-label">
+        <span>{% if language == 'de' %}Reihenfolge{% else %}Order{% endif %}</span>
+        <select name="direction" data-auto-submit>
+          <option value="desc" {% if sort_direction == 'desc' %}selected{% endif %}>↓ {% if language == 'de' %}Absteigend{% else %}Descending{% endif %}</option>
+          <option value="asc" {% if sort_direction == 'asc' %}selected{% endif %}>↑ {% if language == 'de' %}Aufsteigend{% else %}Ascending{% endif %}</option>
+        </select>
+      </label>
     </form>
-    {% endif %}
-  </section>
-  {% endif %}
+  </div>
+
+  <div class="alias-filter-row">
+    <nav class="status-filters" aria-label="{{ t.filter_aria }}">
+      <a class="filter-pill {% if status_filter == 'all' %}current{% endif %}" href="/aliases?status=all&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.filter_all }} <span>{{ status_counts.all }}</span></a>
+      <a class="filter-pill {% if status_filter == 'active' %}current{% endif %}" href="/aliases?status=active&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.filter_active }} <span>{{ status_counts.active }}</span></a>
+      <a class="filter-pill {% if status_filter == 'disabled' %}current{% endif %}" href="/aliases?status=disabled&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.filter_disabled }} <span>{{ status_counts.disabled }}</span></a>
+      <a class="filter-pill unexpected-filter-pill {% if status_filter == 'unexpected' %}current{% endif %} {% if status_counts.unexpected %}has-unexpected{% endif %}" href="/aliases?status=unexpected&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}" data-unexpected-filter>{{ t.sender_state_unexpected }} <span>{{ status_counts.unexpected }}</span></a>
+    </nav>
+    <p class="muted alias-result-summary" data-assigned-summary>{{ t.assigned_summary.format(filtered=filtered_total, total=assigned_total) }}</p>
+  </div>
 
   <div data-alias-results-region>
-    <nav class="status-filters" aria-label="{{ t.filter_aria }}">
-      <a
-        class="filter-pill {% if status_filter == 'all' %}current{% endif %}"
-        href="/aliases?status=all&q={{ search_query|urlencode }}&per_page={{ per_page }}"
-      >{{ t.filter_all }} <span>{{ status_counts["all"] }}</span></a>
-      <a
-        class="filter-pill {% if status_filter == 'active' %}current{% endif %}"
-        href="/aliases?status=active&q={{ search_query|urlencode }}&per_page={{ per_page }}"
-      >{{ t.filter_active }} <span>{{ status_counts["active"] }}</span></a>
-      <a
-        class="filter-pill {% if status_filter == 'disabled' %}current{% endif %}"
-        href="/aliases?status=disabled&q={{ search_query|urlencode }}&per_page={{ per_page }}"
-      >{{ t.filter_disabled }} <span>{{ status_counts["disabled"] }}</span></a>
-      <a
-        class="filter-pill unexpected-filter-pill {% if status_filter == 'unexpected' %}current{% endif %} {% if status_counts['unexpected'] %}has-unexpected{% endif %}"
-        href="/aliases?status=unexpected&q={{ search_query|urlencode }}&per_page={{ per_page }}"
-        data-unexpected-filter
-      >{{ t.sender_state_unexpected }} <span>{{ status_counts["unexpected"] }}</span></a>
-    </nav>
-
     {% if assigned %}
-    <div
-      class="bulk-toolbar"
-      data-bulk-toolbar
-      data-selected-template="{{ t.selected_count }}"
-      data-bulk-failed="{{ t.bulk_failed }}"
-    >
+    <div class="bulk-toolbar" data-bulk-toolbar data-selected-template="{{ t.selected_count }}" data-bulk-failed="{{ t.bulk_failed }}">
       <div class="bulk-selection">
         <button class="button compact ghost" type="button" data-select-all>{{ t.select_all }}</button>
         <button class="button compact ghost" type="button" data-select-none>{{ t.select_none }}</button>
@@ -325,278 +82,157 @@
     </div>
     {% endif %}
 
-    <div class="alias-list">
-      {% for alias in assigned %}
-      <article class="alias-row {% if not alias.active %}disabled-row{% endif %}">
-        <label class="alias-select-control">
-          <input
-            type="checkbox"
-            value="{{ alias.id }}"
-            aria-label="{{ t.select_alias.format(address=alias.address) }}"
-            data-alias-select
-            data-address="{{ alias.address }}"
-            data-description="{{ alias.description }}"
-            data-active="{{ '1' if alias.active else '0' }}"
-            data-sogo="{{ '1' if alias.sogo_visible else '0' }}"
-          >
-        </label>
-        <div class="alias-main">
-          <div class="alias-info">
-            <strong>{{ alias.description or t.no_purpose }}</strong>
-            <code>{{ alias.address }}</code>
-            {% if usage_stats_visible %}
-            {% set stats = usage_stats.get(alias.address|lower) %}
-            <div class="usage-summary">
-              <span><span class="usage-count">{{ stats.received_count }}</span> {{ t.usage_received }}</span>
-              <span class="usage-separator" aria-hidden="true">·</span>
-              <span><span class="usage-count">{{ stats.sent_count }}</span> {{ t.usage_sent }}</span>
-              {% if stats.last_used_at %}
-              <span class="usage-separator" aria-hidden="true">·</span>
-              <span>
-                {{ t.usage_last_used }}
-                <time data-local-timestamp="{{ stats.last_used_at }}">{{ stats.last_used_at }}</time>
-              </span>
-              {% endif %}
-            </div>
-            {% endif %}
+    <div class="alias-table-wrap">
+      <div class="alias-table-head" aria-hidden="true">
+        <span></span>
+        <span>{% if language == 'de' %}Zweck / Alias-Adresse{% else %}Purpose / alias address{% endif %}</span>
+        <span>{% if language == 'de' %}Status{% else %}Status{% endif %}</span>
+        <span>{% if language == 'de' %}Nutzung{% else %}Usage{% endif %}</span>
+        <span>{% if language == 'de' %}Zuletzt benutzt{% else %}Last used{% endif %}</span>
+        <span></span>
+      </div>
+      <div class="alias-list alias-table-list">
+        {% for alias in assigned %}
+        {% set usage = usage_stats.get(alias.address|lower, {}) %}
+        {% set total_usage = (usage.received_count or 0) + (usage.sent_count or 0) %}
+        {% set icon = service_icons.get(alias.address|lower) %}
+        {% set senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
+        {% set unexpected_count = senders|selectattr('expected', 'equalto', false)|list|length %}
+        <article class="alias-row alias-table-row {% if not alias.active %}disabled-row{% endif %}">
+          <label class="alias-select-control">
+            <input type="checkbox" value="{{ alias.id }}" aria-label="{{ t.select_alias.format(address=alias.address) }}" data-alias-select data-address="{{ alias.address }}" data-description="{{ alias.description }}" data-active="{{ '1' if alias.active else '0' }}" data-sogo="{{ '1' if alias.sogo_visible else '0' }}">
+          </label>
 
-            {% if stats_state and stats_state.sender_detail_enabled %}
-            {% set senders = sender_stats.get(alias.address|lower, []) %}
-            {% set unexpected_count = senders|selectattr('expected', 'equalto', false)|list|length %}
-            <details class="sender-stats">
-              <summary>
-                {{ t.sender_stats_title }}
-                {% if senders %}<span class="sender-stats-count">{{ senders|length }}</span>{% endif %}
-                {% if unexpected_count %}
-                <span class="sender-stats-alert">{{ unexpected_count }} {{ t.sender_stats_unexpected_short }}</span>
-                {% endif %}
-              </summary>
-              {% if senders %}
-              <div class="sender-stats-list">
-                {% for sender in senders %}
-                <div class="sender-stats-row {{ 'expected' if sender.expected else 'unexpected' }}">
-                  <div class="sender-stats-identity">
-                    <code>{{ sender.label }}</code>
-                    <span class="sender-review-state">
-                      {% if sender.review_source == 'manual' %}
-                        {{ t.sender_state_confirmed }}
-                      {% elif sender.review_source == 'automatic' %}
-                        {{ t.sender_state_automatic }}{% if sender.match_token %} · {{ sender.match_token }}{% endif %}
-                      {% elif sender.review_source == 'manual-unexpected' %}
-                        {{ t.sender_state_manual_unexpected }}
-                      {% else %}
-                        {{ t.sender_state_unexpected }}
-                      {% endif %}
-                    </span>
+          <div class="alias-cell-identity">
+            <span class="service-badge tone-{{ icon.tone if icon else 'neutral' }}" data-service-icon-for="{{ alias.id }}" title="{{ icon.label if icon else '' }}">{{ icon.glyph if icon else '?' }}</span>
+            <div class="alias-info">
+              <strong>{{ alias.description or t.no_purpose }}</strong>
+              <code>{{ alias.address }}</code>
+              {% if stats_state and stats_state.sender_detail_enabled %}
+              <details class="sender-stats">
+                <summary class="sender-stats-trigger">
+                  {{ t.sender_stats_title }}{% if senders %} <span class="sender-stats-count">{{ senders|length }}</span>{% endif %}{% if unexpected_count %} <span class="sender-stats-alert">{{ unexpected_count }} {{ t.sender_stats_unexpected_short }}</span>{% endif %}
+                </summary>
+                {% if senders %}
+                <div class="sender-stats-list">
+                  {% for sender in senders %}
+                  <div class="sender-stats-row {{ 'expected' if sender.expected else 'unexpected' }}">
+                    <div class="sender-stats-identity">
+                      <code>{{ sender.label }}</code>
+                      <span class="sender-review-state">
+                        {% if sender.review_source == 'manual' %}{{ t.sender_state_confirmed }}
+                        {% elif sender.review_source == 'automatic' %}{{ t.sender_state_automatic }}{% if sender.match_token %} · {{ sender.match_token }}{% endif %}
+                        {% elif sender.review_source == 'manual-unexpected' %}{{ t.sender_state_manual_unexpected }}
+                        {% else %}{{ t.sender_state_unexpected }}{% endif %}
+                      </span>
+                    </div>
+                    <span class="sender-message-count">{{ sender.received_count }}</span>
+                    <form method="post" action="/aliases/{{ alias.id }}/sender-expectation" class="sender-review-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <input type="hidden" name="return_to" value="{{ return_to }}">
+                      <input type="hidden" name="sender_key" value="{{ sender.sender_key }}">
+                      {% if sender.review_source == 'manual' or sender.review_source == 'manual-unexpected' %}<input type="hidden" name="decision" value="clear"><button class="button compact ghost" type="submit">{{ t.sender_action_clear }}</button>
+                      {% elif sender.expected %}<input type="hidden" name="decision" value="unexpected"><button class="button compact ghost" type="submit">{{ t.sender_action_unexpected }}</button>
+                      {% else %}<input type="hidden" name="decision" value="expected"><button class="button compact" type="submit">{{ t.sender_action_expected }}</button>{% endif %}
+                    </form>
                   </div>
-                  <span class="sender-message-count">{{ sender.received_count }}</span>
-                  <form
-                    method="post"
-                    action="/aliases/{{ alias.id }}/sender-expectation"
-                    class="sender-review-form"
-                  >
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <input type="hidden" name="return_to" value="{{ return_to }}">
-                    <input type="hidden" name="sender_key" value="{{ sender.sender_key }}">
-                    {% if sender.review_source == 'manual' or sender.review_source == 'manual-unexpected' %}
-                    <input type="hidden" name="decision" value="clear">
-                    <button class="button compact ghost" type="submit">{{ t.sender_action_clear }}</button>
-                    {% elif sender.expected %}
-                    <input type="hidden" name="decision" value="unexpected">
-                    <button class="button compact ghost" type="submit">{{ t.sender_action_unexpected }}</button>
-                    {% else %}
-                    <input type="hidden" name="decision" value="expected">
-                    <button class="button compact" type="submit">{{ t.sender_action_expected }}</button>
-                    {% endif %}
-                  </form>
+                  {% endfor %}
                 </div>
-                {% endfor %}
-              </div>
-              <p class="sender-stats-footnote">{{ t.sender_stats_all }}</p>
-              {% else %}
-              <p class="sender-stats-empty">{{ t.sender_stats_empty }}</p>
+                <p class="sender-stats-footnote">{{ t.sender_stats_all }}</p>
+                {% else %}<p class="sender-stats-empty">{{ t.sender_stats_empty }}</p>{% endif %}
+              </details>
               {% endif %}
-            </details>
-            {% endif %}
-          </div>
-          <div class="status-row">
-            <span class="status status-fixed {{ 'on' if alias.active else 'off' }}">
-              {{ t.status_active if alias.active else t.status_inactive }}
-            </span>
-            <span class="status status-fixed {{ 'sogo-on' if alias.sogo_visible else 'sogo-off' }}">
-              {{ t.sogo_on if alias.sogo_visible else t.sogo_off_short }}
-            </span>
-          </div>
-        </div>
-        <div class="alias-actions">
-          <button class="button compact alias-copy-action" type="button" data-copy="{{ alias.address }}">
-            {{ t["copy"] }}
-          </button>
-          <details class="alias-edit-action">
-            <summary class="button compact">{{ t.edit }}</summary>
-            <div class="edit-panel">
-              <form method="post" action="/aliases/{{ alias.id }}/metadata" class="stack small">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <input type="hidden" name="return_to" value="{{ return_to }}">
-                <label>{{ t.purpose }}
-                  <input name="description" maxlength="160" value="{{ alias.description }}">
-                </label>
-                <label class="check-row">
-                  <input
-                    type="checkbox"
-                    name="sogo_visible"
-                    value="1"
-                    {% if alias.sogo_visible %}checked{% endif %}
-                  >
-                  <span>{{ t.show_in_sogo }}</span>
-                </label>
-                <p class="hint">{{ t.edit_sogo_hint }}</p>
-                <p class="hint">{{ t.address_unchanged }}</p>
-                <button class="button primary compact" type="submit">{{ t.save }}</button>
-              </form>
             </div>
-          </details>
-          <form class="alias-toggle-action" method="post" action="/aliases/{{ alias.id }}/toggle">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="hidden" name="return_to" value="{{ return_to }}">
-            <button class="button compact {{ 'danger' if alias.active else '' }}" type="submit">
-              {{ t.disable if alias.active else t.enable }}
-            </button>
-          </form>
-        </div>
-      </article>
-      {% else %}
-      <p class="empty">
-        {% if search_query or status_filter != 'all' %}
-          {{ t.no_search_matches }}
+          </div>
+
+          <div class="alias-cell-status">
+            {% if alias.address|lower in unexpected_aliases %}<span class="status warning">{% if language == 'de' %}Auffällig{% else %}Review{% endif %}</span>{% else %}<span class="status {{ 'on' if alias.active else 'off' }}">{{ t.status_active if alias.active else t.status_inactive }}</span>{% endif %}
+            {% if alias.sogo_visible %}<span class="mini-meta">SOGo</span>{% endif %}
+          </div>
+
+          <div class="alias-cell-usage">
+            {% if usage_stats_visible %}<strong>{{ total_usage }}</strong><small>{{ usage.received_count or 0 }} ↓ · {{ usage.sent_count or 0 }} ↑</small>{% else %}<span>–</span>{% endif %}
+          </div>
+
+          <div class="alias-cell-last-used">
+            {% if usage_stats_visible and usage.last_used_at %}<time data-local-timestamp="{{ usage.last_used_at }}">{{ usage.last_used_at }}</time>{% elif usage_stats_visible %}<span class="muted">{% if language == 'de' %}Noch nie{% else %}Never{% endif %}</span>{% else %}<span class="muted">–</span>{% endif %}
+          </div>
+
+          <div class="alias-actions">
+            <button class="button compact alias-copy-action" type="button" data-copy="{{ alias.address }}" title="{{ t['copy'] }}">⧉</button>
+            <details class="alias-edit-action">
+              <summary class="button compact" aria-label="{{ t.edit }}" title="{{ t.edit }}">⋮</summary>
+              <div class="edit-panel">
+                <form method="post" action="/aliases/{{ alias.id }}/metadata" class="stack small">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="return_to" value="{{ return_to }}">
+                  <label>{{ t.purpose }}<input name="description" maxlength="160" value="{{ alias.description }}"></label>
+                  <label class="check-row"><input type="checkbox" name="sogo_visible" value="1" {% if alias.sogo_visible %}checked{% endif %}><span>{{ t.show_in_sogo }}</span></label>
+                  <button class="button primary compact" type="submit">{{ t.save }}</button>
+                </form>
+                <div class="icon-preference top-gap">
+                  <label>
+                    <span>{% if language == 'de' %}Dienstsymbol{% else %}Service icon{% endif %}</span>
+                    <select data-alias-icon-select data-alias-id="{{ alias.id }}">
+                      <option value="auto" {% if not icon_overrides.get(alias.address|lower) %}selected{% endif %}>{% if language == 'de' %}Automatisch erkennen{% else %}Detect automatically{% endif %}</option>
+                      {% for option in icon_catalog %}
+                      <option value="{{ option.key }}" {% if icon_overrides.get(alias.address|lower) == option.key %}selected{% endif %}>{{ option.label }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <p class="hint">{% if language == 'de' %}Moolias ordnet bekannte Dienste anhand von Aliasname und Zweck zu. Du kannst die Zuordnung jederzeit überschreiben.{% else %}Moolias detects known services from the alias name and purpose. You can override it at any time.{% endif %}</p>
+                </div>
+                <form class="alias-toggle-action top-gap" method="post" action="/aliases/{{ alias.id }}/toggle">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="return_to" value="{{ return_to }}">
+                  <button class="button compact {{ 'danger' if alias.active else '' }}" type="submit">{{ t.disable if alias.active else t.enable }}</button>
+                </form>
+              </div>
+            </details>
+          </div>
+        </article>
         {% else %}
-          {{ t.no_assigned_aliases }}
-        {% endif %}
-      </p>
-      {% endfor %}
+        <p class="empty alias-empty">{% if search_query or status_filter != 'all' %}{{ t.no_search_matches }}{% else %}{{ t.no_assigned_aliases }}{% endif %}</p>
+        {% endfor %}
+      </div>
     </div>
 
     <div class="list-footer">
-      <div class="range-summary">
-        {% if filtered_total %}
-        {{ t.showing_range.format(start=range_start, end=range_end, total=filtered_total) }}
-        {% else %}
-        {{ t.showing_zero }}
-        {% endif %}
-      </div>
-
+      <div class="range-summary">{% if filtered_total %}{{ t.showing_range.format(start=range_start, end=range_end, total=filtered_total) }}{% else %}{{ t.showing_zero }}{% endif %}</div>
       <form method="get" action="/aliases" class="page-size-form">
-        <input type="hidden" name="q" value="{{ search_query }}">
-        <input type="hidden" name="status" value="{{ status_filter }}">
-        <label>{{ t.rows_per_page }}
-          <select name="per_page" data-page-size>
-            {% for size in page_sizes %}
-            <option value="{{ size }}" {% if size == per_page %}selected{% endif %}>{{ size }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <noscript><button class="button compact" type="submit">{{ t.apply }}</button></noscript>
+        <input type="hidden" name="q" value="{{ search_query }}"><input type="hidden" name="status" value="{{ status_filter }}"><input type="hidden" name="sort" value="{{ sort_mode }}"><input type="hidden" name="direction" value="{{ sort_direction }}">
+        <label>{{ t.rows_per_page }}<select name="per_page" data-page-size>{% for size in page_sizes %}<option value="{{ size }}" {% if size == per_page %}selected{% endif %}>{{ size }}</option>{% endfor %}</select></label>
       </form>
-
       {% if total_pages > 1 %}
       <nav class="pagination" aria-label="{{ t.pagination_aria }}">
-        {% if page > 1 %}
-        <a
-          class="page-link"
-          href="/aliases?status={{ status_filter }}&q={{ search_query|urlencode }}&per_page={{ per_page }}&page={{ page - 1 }}"
-        >{{ t.previous }}</a>
-        {% endif %}
-
-        {% for item in pagination_items %}
-          {% if item is none %}
-          <span class="page-ellipsis">…</span>
-          {% elif item == page %}
-          <span class="page-link current" aria-current="page">{{ item }}</span>
-          {% else %}
-          <a
-            class="page-link"
-            href="/aliases?status={{ status_filter }}&q={{ search_query|urlencode }}&per_page={{ per_page }}&page={{ item }}"
-          >{{ item }}</a>
-          {% endif %}
-        {% endfor %}
-
-        {% if page < total_pages %}
-        <a
-          class="page-link"
-          href="/aliases?status={{ status_filter }}&q={{ search_query|urlencode }}&per_page={{ per_page }}&page={{ page + 1 }}"
-        >{{ t.next }}</a>
-        {% endif %}
+        {% if page > 1 %}<a class="page-link" href="/aliases?status={{ status_filter }}&q={{ search_query|urlencode }}&per_page={{ per_page }}&page={{ page - 1 }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.previous }}</a>{% endif %}
+        {% for item in pagination_items %}{% if item is none %}<span class="page-ellipsis">…</span>{% elif item == page %}<span class="page-link current" aria-current="page">{{ item }}</span>{% else %}<a class="page-link" href="/aliases?status={{ status_filter }}&q={{ search_query|urlencode }}&per_page={{ per_page }}&page={{ item }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ item }}</a>{% endif %}{% endfor %}
+        {% if page < total_pages %}<a class="page-link" href="/aliases?status={{ status_filter }}&q={{ search_query|urlencode }}&per_page={{ per_page }}&page={{ page + 1 }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.next }}</a>{% endif %}
       </nav>
       {% endif %}
     </div>
   </div>
 </section>
 
-{% for alias in reserved %}
-{% set pool_stats = usage_stats.get(alias.address|lower) if usage_stats_visible else none %}
-{% set pool_used = alias.is_reserved_used or (pool_stats and (pool_stats.received_count or pool_stats.sent_count)) %}
-{% set pool_senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
-<dialog class="assign-dialog assign-dialog-single" data-assign-dialog="{{ alias.id }}">
+<dialog class="assign-dialog create-alias-dialog" data-create-alias-dialog>
   <div class="dialog-head">
-    <div>
-      <h2>{{ t.assign_prepared }}</h2>
-      <p class="muted">{{ t.assign_hint }}</p>
-    </div>
-    <button
-      class="dialog-close"
-      type="button"
-      aria-label="{{ t.close }}"
-      title="{{ t.close }}"
-      data-close-dialog
-    >×</button>
+    <div><h2>{{ t.create_alias }}</h2><p class="muted">{% if language == 'de' %}Erstelle eine neue Adresse für einen bestimmten Zweck.{% else %}Create a new address for a specific purpose.{% endif %}</p></div>
+    <button class="dialog-close" type="button" data-close-create-alias aria-label="{{ t.close }}">×</button>
   </div>
-  <form method="post" action="/aliases/{{ alias.id }}/description" class="stack">
+  <form method="post" action="/aliases" class="stack">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <code class="assign-address">{{ alias.address }}</code>
-    {% if pool_stats and (pool_stats.received_count or pool_stats.sent_count) %}
-    <div class="pool-assignment-usage">
-      <div class="usage-summary">
-        {% if pool_stats.received_count %}
-        <span class="sender-stats-alert">{{ pool_stats.received_count }} {{ t.usage_received }}</span>
-        {% endif %}
-        {% if pool_stats.sent_count %}
-        <span class="sender-stats-alert">{{ pool_stats.sent_count }} {{ t.usage_sent }}</span>
-        {% endif %}
-        {% if pool_stats.last_used_at %}
-        <span>
-          {{ t.usage_last_used }}
-          <time data-local-timestamp="{{ pool_stats.last_used_at }}">{{ pool_stats.last_used_at }}</time>
-        </span>
-        {% endif %}
-      </div>
-      {% if pool_senders %}
-      <div class="sender-stats-list pool-sender-list">
-        {% for sender in pool_senders %}
-        <div class="sender-stats-row">
-          <div class="sender-stats-identity">
-            <code>{{ sender.label }}</code>
-          </div>
-          <span class="sender-message-count">{{ sender.received_count }}</span>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-    </div>
-    {% endif %}
-    <label>{{ t.purpose }}
-      <input
-        name="description"
-        maxlength="160"
-        required
-        placeholder="{{ t.used_for_placeholder }}"
-      >
-    </label>
-    <label class="check-row">
-      <input type="checkbox" name="sogo_visible" value="1">
-      <span>{{ t.show_in_sogo }}</span>
-    </label>
-    <button class="button primary" type="submit">{{ t.assign }}</button>
+    <label>{{ t.purpose }}<input name="description" maxlength="160" required placeholder="{{ t.purpose_placeholder }}"></label>
+    <fieldset class="mode-picker">
+      <legend>{{ t.address_style }}</legend>
+      <p class="hint mode-picker-hint">{{ t.address_style_hint }}</p>
+      <label class="mode-option"><input type="radio" name="mode" value="named" data-mode-option checked><span class="mode-option-body"><span class="mode-option-head"><strong>{{ t.name_random }}</strong><span class="recommended-badge">{{ t.recommended }}</span></span><code>amazon-k7@{{ domain }}</code><small>{{ t.name_random_hint }}</small></span></label>
+      <label class="mode-option"><input type="radio" name="mode" value="readable" data-mode-option><span class="mode-option-body"><span class="mode-option-head"><strong>{{ t.readable_random }}</strong></span><code>feder-hafen-27@{{ domain }}</code><small>{{ t.readable_random_hint }}</small></span></label>
+      <label class="mode-option"><input type="radio" name="mode" value="custom" data-mode-option><span class="mode-option-body"><span class="mode-option-head"><strong>{{ t.custom_local_part }}</strong></span><code>mein-alias@{{ domain }}</code><small>{{ t.custom_local_part_hint }}</small></span></label>
+    </fieldset>
+    <label class="hidden" data-custom-local-part>{{ t.custom_address }}<div class="address-input"><input name="local_part" maxlength="63" placeholder="my-alias" autocomplete="off"><span>@{{ domain }}</span></div></label>
+    <label class="check-row"><input type="checkbox" name="sogo_visible" value="1"><span>{{ t.show_in_sogo }}</span></label>
+    <p class="hint">{{ t.sogo_create_hint }}</p>
+    <button class="button primary" type="submit">{{ t.create_alias_button }}</button>
   </form>
 </dialog>
-{% endfor %}
 {% endblock %}

@@ -18,15 +18,12 @@ def _login(page: Page, base_url: str) -> None:
     page.goto(f"{base_url}/oauth/callback?code=e2e&state=e2e")
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
     expect(page.locator("[data-alias-results-region]")).to_be_visible()
-
-    action_dialog = page.locator("dialog[data-action-required-dialog]")
-    expect(action_dialog).to_be_visible(timeout=5000)
-    action_dialog.locator(".dialog-close").click()
+    expect(page.locator("dialog[data-action-required-dialog][open]")).to_have_count(0)
 
 
 def _open_amazon_senders(page: Page):
-    row = _alias_row(page, AMAZON)
-    trigger = row.locator(".sender-stats-trigger")
+    trigger = _alias_row(page, AMAZON).locator("button.sender-stats-trigger")
+    expect(trigger).to_be_visible()
     dialog_id = trigger.get_attribute("aria-controls")
     assert dialog_id
     trigger.click()
