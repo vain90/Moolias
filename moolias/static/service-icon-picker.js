@@ -5,7 +5,7 @@
   if (!selects.length) return;
 
   const fallbackGlyphs = new Map([
-    ["generic", "?"],
+    ["generic", "AL"],
     ["amazon", "A"],
     ["check24", "C"],
     ["linkedin", "in"],
@@ -31,6 +31,7 @@
         replace: "Alias ersetzen",
         disable: "Alias deaktivieren",
         enable: "Alias aktivieren",
+        noName: "Alias",
       }
     : {
         title: "Choose alias logo",
@@ -43,6 +44,7 @@
         replace: "Replace alias",
         disable: "Disable alias",
         enable: "Enable alias",
+        noName: "Alias",
       };
 
   const optionSource = selects[0];
@@ -63,7 +65,7 @@
 
     const href = logoHref(key);
     if (!href) {
-      mark.textContent = fallbackGlyphs.get(key) || label.slice(0, 1) || "?";
+      mark.textContent = fallbackGlyphs.get(key) || label.slice(0, 2).toUpperCase() || "AL";
       return mark;
     }
 
@@ -186,7 +188,7 @@
       currentName = badge.title || currentName;
     } else {
       const selected = iconOptions.find((option) => option.key === select.value);
-      preview.append(createLogo(select.value, selected?.label || "?"));
+      preview.append(createLogo(select.value, selected?.label || "AL"));
       currentName = selected?.label || currentName;
     }
 
@@ -253,19 +255,41 @@
   const polishEditPanel = (select) => {
     const panel = select.closest(".edit-panel");
     const iconPreference = select.closest(".icon-preference");
-    if (!panel || !iconPreference) return;
+    if (!panel || !iconPreference || panel.querySelector(".alias-edit-identity")) return;
 
     iconPreference.querySelector(".hint")?.remove();
-    panel.prepend(iconPreference);
+    const iconLabel = iconPreference.querySelector(".service-icon-picker-label");
+    iconLabel?.classList.add("sr-only");
 
+    const aliasRow = panel.closest(".alias-row");
+    const aliasCheckbox = aliasRow?.querySelector("[data-alias-select]");
     const description = panel.querySelector('form[action$="/metadata"] input[name="description"]');
     replaceLabelText(description?.closest("label"), text.aliasPurpose);
+
+    const identity = document.createElement("div");
+    identity.className = "alias-edit-identity";
+    const name = document.createElement("div");
+    name.className = "alias-edit-current-name";
+    const nameStrong = document.createElement("strong");
+    const address = document.createElement("code");
+    const currentAddress = aliasCheckbox?.dataset.address || "";
+    const syncName = () => {
+      nameStrong.textContent = description?.value.trim()
+        || aliasCheckbox?.dataset.description?.trim()
+        || currentAddress
+        || text.noName;
+    };
+    syncName();
+    address.textContent = currentAddress;
+    name.append(nameStrong, address);
+    identity.append(iconPreference, name);
+    panel.prepend(identity);
+    description?.addEventListener("input", syncName);
 
     const replaceButton = panel.querySelector("[data-replace-alias]");
     const toggleForm = panel.querySelector(".alias-toggle-action");
     const toggleButton = toggleForm?.querySelector("button");
-    const aliasRow = panel.closest(".alias-row");
-    const active = aliasRow?.querySelector("[data-alias-select]")?.dataset.active !== "0";
+    const active = aliasCheckbox?.dataset.active !== "0";
 
     if (replaceButton) {
       const previous = replaceButton.previousElementSibling;
