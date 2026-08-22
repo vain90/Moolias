@@ -51,7 +51,7 @@
         {% set usage = usage_stats.get(alias.address|lower, {}) %}
         {% set icon = service_icons.get(alias.address|lower) %}
         <a class="recent-alias-row" href="/aliases?q={{ alias.address|urlencode }}">
-          <span class="service-badge tone-{{ icon.tone if icon else 'neutral' }}" aria-hidden="true">{{ icon.glyph if icon else '?' }}</span>
+          <span class="service-badge tone-{{ icon.tone if icon else 'neutral' }}" title="{{ icon.label if icon else '' }}" aria-hidden="true">{{ icon.glyph if icon else 'AL' }}</span>
           <span class="recent-alias-identity">
             <strong>{{ alias.address }}</strong>
             <small>{{ alias.description or t.no_purpose }}</small>
