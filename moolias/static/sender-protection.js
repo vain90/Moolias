@@ -11,13 +11,17 @@
       unavailable: "Nicht verfügbar",
       disabled: "Nicht aktiviert",
       external: "Extern geschützt",
+      agentRequired: "Agent erforderlich",
       protectedDetail: "Primäradresse geschützt",
       unprotectedDetail: "Senden ist derzeit erlaubt",
       unavailableDetail: "Status kann nicht geprüft werden",
       disabledDetail: "Funktion ist serverseitig deaktiviert",
       externalDetail: "Durch bestehende Mailcow-Regel geschützt",
+      agentRequiredDetail: "Mailcow Agent nicht installiert",
       cooldown: (seconds) => `Erneute Änderung in ${seconds} Sekunden möglich.`,
       missing: "Der Moolias Mailcow Agent wurde nicht gefunden.",
+      missingHelp: "Für diesen Schutz muss der Moolias Mailcow Agent auf dem Mailcow-Server installiert sein.",
+      learnMore: "Installation auf GitHub ansehen",
       authentication: "Der Mailcow Agent ist erreichbar, aber die Authentifizierung ist fehlgeschlagen.",
       unreachable: "Der Moolias Mailcow Agent ist momentan nicht erreichbar.",
       failed: "Die Änderung konnte nicht gespeichert werden.",
@@ -28,13 +32,17 @@
       unavailable: "Unavailable",
       disabled: "Not enabled",
       external: "Protected externally",
+      agentRequired: "Agent required",
       protectedDetail: "Primary address protected",
       unprotectedDetail: "Sending is currently allowed",
       unavailableDetail: "Status cannot be checked",
       disabledDetail: "Feature is disabled on the server",
       externalDetail: "Protected by an existing Mailcow rule",
+      agentRequiredDetail: "Mailcow Agent is not installed",
       cooldown: (seconds) => `You can change this again in ${seconds} seconds.`,
       missing: "The Moolias Mailcow Agent was not found.",
+      missingHelp: "This protection requires the Moolias Mailcow Agent to be installed on the Mailcow server.",
+      learnMore: "View installation on GitHub",
       authentication: "The Mailcow agent is reachable, but authentication failed.",
       unreachable: "The Moolias Mailcow Agent is currently unreachable.",
       failed: "The change could not be saved.",
@@ -45,13 +53,28 @@
   const toggle = document.querySelector("[data-sender-protection-toggle]");
   const stateLabel = document.querySelector("[data-sender-protection-state]");
   const message = document.querySelector("[data-sender-protection-message]");
+  const toggleControl = toggle?.closest(".switch-control");
   const overviewState = document.querySelector("[data-primary-protection-state]");
   const overviewDetail = document.querySelector("[data-primary-protection-detail]");
+  const overviewCard = document.querySelector("[data-primary-protection-card]");
   const action = document.querySelector("[data-primary-protection-action]");
   const actionCount = document.querySelector("[data-action-count]");
   const actionEmpty = document.querySelector("[data-action-empty]");
 
   if (!section || !toggle || !stateLabel || !message) return;
+
+  const agentHelp = document.createElement("p");
+  agentHelp.className = "hint sender-protection-agent-help";
+  agentHelp.hidden = true;
+  const agentHelpText = document.createElement("span");
+  agentHelpText.textContent = `${copy.missingHelp} `;
+  const agentHelpLink = document.createElement("a");
+  agentHelpLink.href = "https://github.com/vain90/Moolias";
+  agentHelpLink.target = "_blank";
+  agentHelpLink.rel = "noopener noreferrer";
+  agentHelpLink.textContent = copy.learnMore;
+  agentHelp.append(agentHelpText, agentHelpLink);
+  message.insertAdjacentElement("afterend", agentHelp);
 
   let currentBlocked = false;
   let externallyManaged = false;
@@ -67,6 +90,16 @@
     element.style.display = hidden ? "none" : "";
   };
 
+  const setVisualState = (state) => {
+    const states = ["protected", "unprotected", "unavailable", "disabled", "external"];
+    states.forEach((name) => {
+      stateLabel.classList.remove(`protection-${name}`);
+      overviewCard?.classList.remove(`protection-${name}`);
+    });
+    stateLabel.classList.add(`protection-${state}`);
+    overviewCard?.classList.add(`protection-${state}`);
+  };
+
   const syncActionRequired = (required) => {
     protectionRequiresAction = Boolean(required);
     setHidden(action, !protectionRequiresAction);
@@ -75,13 +108,11 @@
     setHidden(actionEmpty, total > 0);
   };
 
-  const syncOverview = (state, detail, attention = false) => {
+  const syncOverview = (state, detail, visualState, attention = false) => {
     if (overviewState) overviewState.textContent = state;
     if (overviewDetail) overviewDetail.textContent = detail;
-    document.querySelector("[data-primary-protection-card]")?.classList.toggle(
-      "needs-attention",
-      attention,
-    );
+    setVisualState(visualState);
+    overviewCard?.classList.toggle("needs-attention", attention);
   };
 
   const stopCountdown = () => {
@@ -121,21 +152,23 @@
     currentBlocked = Boolean(blocked);
     externallyManaged = managed === false;
     section.hidden = false;
+    setHidden(toggleControl, false);
+    agentHelp.hidden = true;
     toggle.checked = currentBlocked;
 
     if (externallyManaged) {
       stateLabel.textContent = copy.external;
-      syncOverview(copy.external, copy.externalDetail, false);
+      syncOverview(copy.external, copy.externalDetail, "external", false);
       syncActionRequired(false);
       message.textContent = copy.externalDetail;
     } else if (currentBlocked) {
       stateLabel.textContent = copy.protected;
-      syncOverview(copy.protected, copy.protectedDetail, false);
+      syncOverview(copy.protected, copy.protectedDetail, "protected", false);
       syncActionRequired(false);
       message.textContent = "";
     } else {
       stateLabel.textContent = copy.unprotected;
-      syncOverview(copy.unprotected, copy.unprotectedDetail, true);
+      syncOverview(copy.unprotected, copy.unprotectedDetail, "unprotected", true);
       syncActionRequired(true);
       message.textContent = "";
     }
@@ -143,22 +176,42 @@
   };
 
   const applyUnavailable = (reason) => {
+    stopCountdown();
     section.hidden = false;
     toggle.checked = false;
     toggle.disabled = true;
+    externallyManaged = false;
+
+    if (reason === "not-installed") {
+      setHidden(toggleControl, true);
+      stateLabel.textContent = copy.agentRequired;
+      syncOverview(copy.agentRequired, copy.agentRequiredDetail, "disabled", false);
+      syncActionRequired(false);
+      message.textContent = copy.missing;
+      agentHelp.hidden = false;
+      return;
+    }
+
+    setHidden(toggleControl, false);
+    agentHelp.hidden = true;
     stateLabel.textContent = copy.unavailable;
-    syncOverview(copy.unavailable, copy.unavailableDetail, true);
+    syncOverview(copy.unavailable, copy.unavailableDetail, "unavailable", true);
     syncActionRequired(true);
-    message.textContent = reason === "not-installed"
-      ? copy.missing
-      : reason === "authentication"
-        ? copy.authentication
-        : copy.unreachable;
+    message.textContent = reason === "authentication"
+      ? copy.authentication
+      : copy.unreachable;
   };
 
   const applyDisabled = () => {
-    section.hidden = true;
-    syncOverview(copy.disabled, copy.disabledDetail, false);
+    stopCountdown();
+    section.hidden = false;
+    setHidden(toggleControl, true);
+    agentHelp.hidden = true;
+    toggle.checked = false;
+    toggle.disabled = true;
+    stateLabel.textContent = copy.disabled;
+    message.textContent = copy.disabledDetail;
+    syncOverview(copy.disabled, copy.disabledDetail, "disabled", false);
     syncActionRequired(false);
   };
 
