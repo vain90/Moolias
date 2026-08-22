@@ -18,7 +18,7 @@ def _alias_row(page: Page, address: str):
 
 
 def _pool_item(page: Page, address: str):
-    return page.locator(".pool-item").filter(has_text=address)
+    return page.locator(".offline-pool-row").filter(has_text=address)
 
 
 def _open_sender_dialog(page: Page, owner):
@@ -67,6 +67,25 @@ def test_login_does_not_auto_open_action_required_and_overview_opens_it(
     expect(dialog).to_contain_text(AMAZON)
     expect(dialog).to_contain_text("odd@unexpected.example")
     expect(page.locator("dialog[open]")).to_have_count(1)
+
+    dialog.locator(".dialog-close").click()
+    page.reload()
+    expect(page.locator("dialog[data-action-required-dialog][open]")).to_have_count(0)
+
+
+def test_fresh_login_auto_opens_action_required_once(page: Page, base_url: str) -> None:
+    page.goto(f"{base_url}/")
+    page.evaluate(
+        "sessionStorage.setItem('moolias-action-required-after-login', '1')"
+    )
+    page.goto(f"{base_url}/oauth/callback?code=e2e&state=e2e")
+
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
+    dialog = page.locator("dialog[data-action-required-dialog]")
+    expect(dialog).to_be_visible(timeout=5000)
+    expect(dialog).to_contain_text("Used offline aliases")
+    expect(dialog).to_contain_text(USED_POOL)
+    expect(dialog).to_contain_text("Unexpected senders")
 
     dialog.locator(".dialog-close").click()
     page.reload()
@@ -201,9 +220,11 @@ def test_used_offline_alias_stays_protected_and_pool_export_excludes_it(
     unused = _pool_item(page, UNUSED_POOL)
     expect(used).to_have_count(1)
     expect(unused).to_have_count(1)
+    expect(page.locator(".pool-table-head")).to_be_visible()
 
     expect(used.locator('form[action$="/delete"]')).to_have_count(0)
     expect(unused.locator('form[action$="/delete"]')).to_have_count(1)
+    expect(unused.locator("button.sender-stats-trigger")).to_have_count(0)
 
     used_assign_box = used.locator("details.pool-assign-action > summary").bounding_box()
     unused_assign_box = unused.locator("details.pool-assign-action > summary").bounding_box()
@@ -212,6 +233,7 @@ def test_used_offline_alias_stays_protected_and_pool_export_excludes_it(
     assert used_assign_box and unused_assign_box and used_copy_box and unused_copy_box
     assert abs(used_assign_box["x"] - unused_assign_box["x"]) <= 1
     assert abs(used_copy_box["x"] - unused_copy_box["x"]) <= 1
+    assert used_assign_box["x"] < used_copy_box["x"]
 
     sender_dialog = _open_sender_dialog(page, used)
     expect(sender_dialog).to_contain_text("booking@example.net")
@@ -225,6 +247,9 @@ def test_used_offline_alias_stays_protected_and_pool_export_excludes_it(
     clipboard = page.evaluate("navigator.clipboard.readText()")
     assert UNUSED_POOL in clipboard
     assert USED_POOL not in clipboard
+
+    text_link = page.locator('a[href="/aliases/pool.txt"]')
+    expect(text_link).to_have_attribute("target", "_blank")
 
     exported = page.evaluate(
         "async () => await (await fetch('/aliases/pool.txt')).text()"
@@ -250,7 +275,30 @@ def test_offline_sender_review_uses_same_overlay_as_assigned_alias(
     expect(offline_dialog.locator(".sender-review-settings")).to_be_visible()
     expect(offline_dialog.locator(".sender-review-form")).to_be_visible()
     expect(offline_dialog).to_contain_text("booking@example.net")
-    expect(offline_dialog).to_contain_text("No longer flagged as unexpected")
+    expect(offline_dialog).to_contain_text("No longer flagged for review")
+
+
+def test_ignoring_offline_sender_review_keeps_assignment_warning(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+    page.goto(f"{base_url}/offline-pool")
+
+    used = _pool_item(page, USED_POOL)
+    expect(used).to_have_class(re.compile(r"\bpool-item-used\b"))
+    expect(used.locator(".alias-cell-status")).to_contain_text("Assign")
+
+    dialog = _open_sender_dialog(page, used)
+    checkbox = dialog.locator(".sender-review-settings input[type=checkbox]")
+    expect(checkbox).not_to_be_checked()
+    with page.expect_navigation(wait_until="load"):
+        checkbox.check()
+
+    used = _pool_item(page, USED_POOL)
+    expect(used).to_have_count(1)
+    expect(used).to_have_class(re.compile(r"\bpool-item-used\b"))
+    expect(used.locator(".alias-cell-status")).to_contain_text("Assign")
 
 
 def test_action_required_assigns_used_offline_alias(page: Page, base_url: str) -> None:
@@ -291,16 +339,30 @@ def test_generic_alias_badge_uses_initials_instead_of_question_mark(
     expect(badge).not_to_have_text("?")
 
 
-def test_alias_edit_panel_starts_with_logo_and_alias_name(page: Page, base_url: str) -> None:
+def test_alias_edit_panel_starts_with_logo_and_purpose_input(page: Page, base_url: str) -> None:
     _login(page, base_url)
 
-    edit = _alias_row(page, AMAZON).locator("details.alias-edit-action")
+    amazon = _alias_row(page, AMAZON)
+    sogo = amazon.locator(".alias-cell-status .mini-meta")
+    expect(sogo).to_have_text("SOGo")
+    border_radius = sogo.evaluate("element => getComputedStyle(element).borderRadius")
+    assert border_radius != "0px"
+
+    edit = amazon.locator("details.alias-edit-action")
     edit.locator("summary").click()
-    identity = edit.locator(".alias-edit-identity")
-    expect(identity).to_be_visible(timeout=5000)
-    expect(identity.locator("[data-icon-picker-trigger]")).to_be_visible()
-    expect(identity.locator(".alias-edit-current-name strong")).to_have_text("Amazon")
-    expect(identity.locator(".alias-edit-current-name code")).to_have_text(AMAZON)
+    purpose_row = edit.locator(".alias-edit-purpose-row")
+    expect(purpose_row).to_be_visible(timeout=5000)
+    expect(purpose_row.locator("[data-icon-picker-trigger]")).to_be_visible()
+    purpose = purpose_row.locator('input[name="description"]')
+    expect(purpose).to_have_value("Amazon")
+    expect(purpose.locator("xpath=..")).to_contain_text("Alias name / purpose")
+    expect(edit.locator(".alias-edit-current-name")).to_have_count(0)
+    expect(edit.locator('form[action$="/metadata"] button[type="submit"]')).to_have_class(
+        re.compile(r"\bprimary\b")
+    )
+    expect(edit.locator(".alias-toggle-action button")).to_have_class(
+        re.compile(r"\bdanger\b")
+    )
 
 
 def test_copy_button_turns_green_then_returns_to_copy_icon(page: Page, base_url: str) -> None:
@@ -338,9 +400,9 @@ def test_expired_browser_session_redirects_to_login(page: Page, base_url: str) -
     _login(page, base_url)
 
     page.context.clear_cookies()
-    page.reload()
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_url(re.compile(rf"{re.escape(base_url)}/?$"), timeout=5000)
 
-    expect(page).to_have_url(f"{base_url}/")
     expect(page.locator('a[href="/login"]')).to_be_visible()
     expect(page.locator("body")).not_to_contain_text("Authentication required")
 
@@ -424,5 +486,10 @@ def test_global_controls_and_statistics_wording_are_polished(
     assert transform != "none"
 
     page.goto(f"{base_url}/statistics")
+    expect(page.locator("h1")).to_have_text("Statistics")
+    expect(page.locator("body")).not_to_contain_text("Statistics mode")
     review_link = page.locator('a[href="/aliases?status=unexpected"]')
-    expect(review_link).to_contain_text("unrecognized aliases to review")
+    expect(review_link).to_have_text("Review now")
+    expect(page.locator(".statistics-card").filter(has_text="Most active destinations")).to_contain_text(
+        "customer@example.net"
+    )
