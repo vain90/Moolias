@@ -231,6 +231,12 @@ def detect_service_icon(address: str, description: str = "") -> ServiceIcon:
     tokens = set(normalized.split())
     compact = normalized.replace(" ", "")
 
+    # Composite labels such as "Meta - Instagram und Facebook" should resolve
+    # to the umbrella brand named first instead of whichever child service
+    # happens to appear earlier in the catalog.
+    if "meta" in tokens:
+        return _ICON_BY_KEY["meta"]
+
     for icon in SERVICE_ICONS:
         for keyword in icon.keywords:
             folded = keyword.casefold()
