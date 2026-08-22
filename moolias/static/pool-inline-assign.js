@@ -15,7 +15,7 @@
     if (!sourceForm) return;
 
     const details = document.createElement("details");
-    details.className = "pool-assign-action alias-edit-action";
+    details.className = "pool-assign-action";
     details.dataset.poolInlineAssign = aliasId;
 
     const summary = document.createElement("summary");
