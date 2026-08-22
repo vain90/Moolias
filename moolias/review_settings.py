@@ -177,6 +177,34 @@ async def update_unexpected_monitoring(
     }
 
 
+@router.post("/offline-pool/{alias_id}/unexpected-monitoring")
+async def update_offline_unexpected_monitoring(
+    request: Request,
+    alias_id: int,
+    ignored: bool = Form(False),
+    csrf_token: str = Form(...),
+):
+    validate_csrf(request, csrf_token)
+    user = require_user(request)
+    store = _store(request)
+    if store is None:
+        raise HTTPException(status_code=409, detail="Usage statistics are disabled")
+
+    alias = await request.app.state.mailcow.get_alias(alias_id)
+    if (
+        not is_owned_alias(alias, user)
+        or not alias.is_reserved
+        or is_primary_mailbox_alias(alias, user)
+    ):
+        raise HTTPException(status_code=403, detail="Offline alias cannot be managed here")
+
+    await store.set_ignore_unexpected(user, alias.address, ignored)
+    return {
+        "alias": alias.address,
+        "ignored": ignored,
+    }
+
+
 @router.post("/aliases/{alias_id}/sender-domain-expectation")
 async def set_sender_domain_expectation(
     request: Request,
