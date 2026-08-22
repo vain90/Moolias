@@ -12,6 +12,7 @@ import moolias.main as main_module
 from moolias.aliases import RESERVED_COMMENT, USED_RESERVED_COMMENT, AliasRecord
 from moolias.config import Settings
 from moolias.stats import SenderEvent, StatsStore, UsageEvent
+from moolias.usage_evidence import UsageEvidenceEvent, UsageEvidenceStore
 
 USER = "user@example.org"
 DOMAIN = "example.org"
@@ -270,6 +271,8 @@ app = main_module.create_app(SETTINGS)
 def _clear_statistics(path: Path) -> None:
     tables = (
         "alias_icon_settings",
+        "usage_backfill_state",
+        "alias_usage_evidence",
         "sender_alias_settings",
         "sender_expectations",
         "sender_usage",
@@ -365,6 +368,25 @@ async def _seed_statistics(store: StatsStore) -> None:
                 started_at + 6,
             ),
         ]
+    )
+
+    evidence_store = UsageEvidenceStore(store.path)
+    await evidence_store.record_events(
+        [
+            UsageEvidenceEvent(USER, "amazon-k7@example.org", started_at + 2),
+            UsageEvidenceEvent(USER, "amazon-k7@example.org", started_at + 7),
+            UsageEvidenceEvent(USER, "github-m4@example.org", started_at + 4),
+            UsageEvidenceEvent(USER, "mond-segel-42@example.org", started_at + 5),
+        ],
+        source="live",
+    )
+    await evidence_store.complete_backfills(
+        {USER},
+        oldest_history_at=started_at - 3600,
+        newest_history_at=started_at + 7,
+        history_count=6,
+        history_limit=SETTINGS.usage_history_count,
+        completed_at=started_at + 8,
     )
 
 
