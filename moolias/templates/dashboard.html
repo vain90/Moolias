@@ -61,6 +61,7 @@
       <a class="filter-pill {% if status_filter == 'active' %}current{% endif %}" href="/aliases?status=active&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.filter_active }} <span>{{ status_counts.active }}</span></a>
       <a class="filter-pill {% if status_filter == 'disabled' %}current{% endif %}" href="/aliases?status=disabled&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.filter_disabled }} <span>{{ status_counts.disabled }}</span></a>
       <a class="filter-pill unexpected-filter-pill {% if status_filter == 'unexpected' %}current{% endif %} {% if status_counts.unexpected %}has-unexpected{% endif %}" href="/aliases?status=unexpected&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}" data-unexpected-filter>{% if language == 'de' %}Prüfen{% else %}Review{% endif %} <span>{{ status_counts.unexpected }}</span></a>
+      <a class="filter-pill {% if status_filter == 'unused' %}current{% endif %}" href="/aliases?status=unused&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{% if language == 'de' %}Keine Nutzung{% else %}No usage{% endif %} <span>{{ status_counts.unused }}</span></a>
     </nav>
     <p class="muted alias-result-summary" data-assigned-summary>{{ t.assigned_summary.format(filtered=filtered_total, total=assigned_total) }}</p>
   </div>
@@ -156,7 +157,7 @@
           </div>
 
           <div class="alias-cell-last-used">
-            {% if usage_stats_visible and usage.last_used_at %}<time data-local-timestamp="{{ usage.last_used_at }}">{{ usage.last_used_at }}</time>{% elif usage_stats_visible %}<span class="muted">{% if language == 'de' %}Noch nie{% else %}Never{% endif %}</span>{% else %}<span class="muted">–</span>{% endif %}
+            {% if usage_stats_visible and usage.last_used_at %}<time data-local-timestamp="{{ usage.last_used_at }}">{{ usage.last_used_at }}</time>{% elif usage_stats_visible %}<span class="muted">{% if language == 'de' %}Kein Nachweis{% else %}No evidence{% endif %}</span>{% else %}<span class="muted">–</span>{% endif %}
           </div>
 
           <div class="alias-actions">
