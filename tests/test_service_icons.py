@@ -18,12 +18,35 @@ def test_service_icon_is_detected_from_alias_local_part() -> None:
     assert icon.has_logo is True
 
 
-def test_unknown_service_uses_generic_fallback() -> None:
-    icon = detect_service_icon("feder-hafen-27@example.org", "Private registration")
+def test_unknown_service_uses_deterministic_generic_fallback() -> None:
+    icon = detect_service_icon("feder-hafen-27@example.org", "Bettenhaus Leinetal")
+    repeated = detect_service_icon("other-address@example.org", "Bettenhaus Leinetal")
 
     assert icon.key == "generic"
-    assert icon.glyph == "?"
+    assert icon.glyph == "BL"
+    assert icon.tone == repeated.tone
     assert icon.has_logo is False
+
+
+def test_generic_initials_are_limited_to_two_letters() -> None:
+    icon = detect_service_icon(
+        "feder-hafen-27@example.org",
+        "Bettenhaus Leinetal Hannover",
+    )
+
+    assert icon.glyph == "BL"
+    assert len(icon.glyph) == 2
+
+
+def test_manual_generic_override_uses_generated_monogram() -> None:
+    icon = resolve_service_icon(
+        "github-k7@example.org",
+        "Bettenhaus Leinetal",
+        "generic",
+    )
+
+    assert icon.key == "generic"
+    assert icon.glyph == "BL"
 
 
 def test_manual_service_icon_override_wins_over_detection() -> None:
