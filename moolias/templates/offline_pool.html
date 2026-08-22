@@ -48,7 +48,7 @@
       {% set pool_senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
       {% set pool_review_count = pool_senders|selectattr('expected', 'equalto', false)|list|length %}
       <article
-        class="pool-item alias-table-row pool-table-row {% if pool_used %}pool-item-used{% endif %}"
+        class="offline-pool-row alias-table-row pool-table-row {% if pool_used %}pool-item-used{% endif %}"
         data-alias-id="{{ alias.id }}"
         data-alias-address="{{ alias.address }}"
         {% if pool_used %}data-used-pool-item{% endif %}
@@ -114,6 +114,12 @@
           {% endif %}
         </div>
       </article>
+      {% if pool_used %}
+      <div class="pool-item pool-item-used action-required-pool-marker" hidden>
+        <span data-pool-address>{{ alias.address }}</span>
+        <button type="button" data-open-assign-dialog="{{ alias.id }}"></button>
+      </div>
+      {% endif %}
       {% endfor %}
     </div>
   </div>
