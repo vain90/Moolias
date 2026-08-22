@@ -4,7 +4,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-from moolias.service_icon_assets import EXTRA_SERVICE_ICON_KEYS, ensure_service_icon_sprite
+from moolias.service_icon_assets import EXTRA_SERVICE_ICON_KEYS
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,10 +190,6 @@ SERVICE_ICONS: tuple[ServiceIcon, ...] = (
 )
 
 _ICON_BY_KEY = {icon.key: icon for icon in SERVICE_ICONS}
-
-# Source checkouts can generate the extended sprite lazily. Docker images generate
-# it during the build so runtime containers do not need write access to /app.
-ensure_service_icon_sprite()
 
 
 def _generic_icon(address: str, description: str = "") -> ServiceIcon:
