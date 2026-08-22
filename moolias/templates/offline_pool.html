@@ -32,81 +32,94 @@
   </div>
 
   {% if reserved %}
-  <div class="pool-list pool-page-list">
-    {% for alias in reserved %}
-    {% set pool_stats = usage_stats.get(alias.address|lower, {}) if usage_stats_visible else {} %}
-    {% set pool_used = alias.is_reserved_used or (pool_stats and ((pool_stats.received_count or 0) or (pool_stats.sent_count or 0))) %}
-    {% set pool_senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
-    {% set pool_unexpected_count = pool_senders|selectattr('expected', 'equalto', false)|list|length %}
-    <article
-      class="pool-item {% if pool_used %}pool-item-used{% endif %}"
-      data-alias-id="{{ alias.id }}"
-      data-alias-address="{{ alias.address }}"
-      {% if pool_used %}data-used-pool-item{% endif %}
-    >
-      <div class="pool-address-cell">
-        <span class="service-badge tone-neutral" aria-hidden="true">@</span>
-        <div class="alias-info">
-          <code data-pool-address>{{ alias.address }}</code>
-          <div class="usage-summary">
-            {% if pool_used %}<span class="sender-stats-alert">{% if language == 'de' %}Bereits benutzt{% else %}Already used{% endif %}</span>{% else %}<span class="status on">{% if language == 'de' %}Verfügbar{% else %}Available{% endif %}</span>{% endif %}
-            {% if usage_stats_visible %}
-              {% if pool_stats.received_count %}<span>{{ pool_stats.received_count }} {{ t.usage_received }}</span>{% endif %}
-              {% if pool_stats.sent_count %}<span>{{ pool_stats.sent_count }} {{ t.usage_sent }}</span>{% endif %}
-              {% if pool_stats.last_used_at %}<span>{{ t.usage_last_used }} <time data-local-timestamp="{{ pool_stats.last_used_at }}">{{ pool_stats.last_used_at }}</time></span>{% endif %}
+  <div class="alias-table-wrap pool-table-wrap">
+    <div class="alias-table-head pool-table-head" aria-hidden="true">
+      <span>{% if language == 'de' %}Alias-Adresse{% else %}Alias address{% endif %}</span>
+      <span>Status</span>
+      <span>{% if language == 'de' %}Nutzung{% else %}Usage{% endif %}</span>
+      <span>{% if language == 'de' %}Zuletzt benutzt{% else %}Last used{% endif %}</span>
+      <span></span>
+    </div>
+    <div class="alias-table-list pool-page-list">
+      {% for alias in reserved %}
+      {% set pool_stats = usage_stats.get(alias.address|lower, {}) if usage_stats_visible else {} %}
+      {% set pool_total = (pool_stats.received_count or 0) + (pool_stats.sent_count or 0) %}
+      {% set pool_used = alias.is_reserved_used or pool_total > 0 %}
+      {% set pool_senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
+      {% set pool_review_count = pool_senders|selectattr('expected', 'equalto', false)|list|length %}
+      <article
+        class="pool-item alias-table-row pool-table-row {% if pool_used %}pool-item-used{% endif %}"
+        data-alias-id="{{ alias.id }}"
+        data-alias-address="{{ alias.address }}"
+        {% if pool_used %}data-used-pool-item{% endif %}
+      >
+        <div class="alias-cell-identity pool-address-cell">
+          <span class="service-badge tone-neutral" aria-hidden="true">@</span>
+          <div class="alias-info">
+            <code data-pool-address>{{ alias.address }}</code>
+            {% if pool_used and pool_senders %}
+            <details class="sender-stats">
+              <summary class="sender-stats-trigger">
+                {{ t.sender_stats_title }} <span class="sender-stats-count">{{ pool_senders|length }}</span>{% if pool_review_count %} <span class="sender-stats-alert">{{ pool_review_count }} {{ t.sender_stats_unexpected_short }}</span>{% endif %}
+              </summary>
+              <div class="sender-stats-list">
+                {% for sender in pool_senders %}
+                <div class="sender-stats-row {{ 'expected' if sender.expected else 'unexpected' }}">
+                  <div class="sender-stats-identity">
+                    <code>{{ sender.label }}</code>
+                    <span class="sender-review-state">
+                      {% if sender.review_source == 'manual' %}{{ t.sender_state_confirmed }}
+                      {% elif sender.review_source == 'automatic' %}{{ t.sender_state_automatic }}{% if sender.match_token %} · {{ sender.match_token }}{% endif %}
+                      {% elif sender.review_source == 'manual-unexpected' %}{{ t.sender_state_manual_unexpected }}
+                      {% else %}{{ t.sender_state_unexpected }}{% endif %}
+                    </span>
+                  </div>
+                  <span class="sender-message-count">{{ sender.received_count }}</span>
+                  <form method="post" action="/offline-pool/{{ alias.id }}/sender-expectation" class="sender-review-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="sender_key" value="{{ sender.sender_key }}">
+                    {% if sender.review_source == 'manual' or sender.review_source == 'manual-unexpected' %}<input type="hidden" name="decision" value="clear"><button class="button compact ghost" type="submit">{{ t.sender_action_clear }}</button>
+                    {% elif sender.expected %}<input type="hidden" name="decision" value="unexpected"><button class="button compact ghost" type="submit">{{ t.sender_action_unexpected }}</button>
+                    {% else %}<input type="hidden" name="decision" value="expected"><button class="button compact" type="submit">{{ t.sender_action_expected }}</button>{% endif %}
+                  </form>
+                </div>
+                {% endfor %}
+              </div>
+              <p class="sender-stats-footnote">{{ t.sender_stats_all }}</p>
+            </details>
             {% endif %}
           </div>
-          {% if stats_state and stats_state.sender_detail_enabled %}
-          <details class="sender-stats">
-            <summary class="sender-stats-trigger">
-              {{ t.sender_stats_title }}{% if pool_senders %} <span class="sender-stats-count">{{ pool_senders|length }}</span>{% endif %}{% if pool_unexpected_count %} <span class="sender-stats-alert">{{ pool_unexpected_count }} {{ t.sender_stats_unexpected_short }}</span>{% endif %}
-            </summary>
-            {% if pool_senders %}
-            <div class="sender-stats-list">
-              {% for sender in pool_senders %}
-              <div class="sender-stats-row {{ 'expected' if sender.expected else 'unexpected' }}">
-                <div class="sender-stats-identity">
-                  <code>{{ sender.label }}</code>
-                  <span class="sender-review-state">
-                    {% if sender.review_source == 'manual' %}{{ t.sender_state_confirmed }}
-                    {% elif sender.review_source == 'automatic' %}{{ t.sender_state_automatic }}{% if sender.match_token %} · {{ sender.match_token }}{% endif %}
-                    {% elif sender.review_source == 'manual-unexpected' %}{{ t.sender_state_manual_unexpected }}
-                    {% else %}{{ t.sender_state_unexpected }}{% endif %}
-                  </span>
-                </div>
-                <span class="sender-message-count">{{ sender.received_count }}</span>
-                <form method="post" action="/offline-pool/{{ alias.id }}/sender-expectation" class="sender-review-form">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <input type="hidden" name="sender_key" value="{{ sender.sender_key }}">
-                  {% if sender.review_source == 'manual' or sender.review_source == 'manual-unexpected' %}<input type="hidden" name="decision" value="clear"><button class="button compact ghost" type="submit">{{ t.sender_action_clear }}</button>
-                  {% elif sender.expected %}<input type="hidden" name="decision" value="unexpected"><button class="button compact ghost" type="submit">{{ t.sender_action_unexpected }}</button>
-                  {% else %}<input type="hidden" name="decision" value="expected"><button class="button compact" type="submit">{{ t.sender_action_expected }}</button>{% endif %}
-                </form>
-              </div>
-              {% endfor %}
-            </div>
-            <p class="sender-stats-footnote">{{ t.sender_stats_all }}</p>
-            {% else %}<p class="sender-stats-empty">{{ t.sender_stats_empty }}</p>{% endif %}
-          </details>
+        </div>
+
+        <div class="alias-cell-status">
+          {% if pool_used %}<span class="status warning">{% if language == 'de' %}Zuordnen{% else %}Assign{% endif %}</span>{% else %}<span class="status on">{% if language == 'de' %}Verfügbar{% else %}Available{% endif %}</span>{% endif %}
+        </div>
+
+        <div class="alias-cell-usage">
+          {% if usage_stats_visible %}<strong>{{ pool_total }}</strong><small>{{ pool_stats.received_count or 0 }} ↓ · {{ pool_stats.sent_count or 0 }} ↑</small>{% else %}<span>–</span>{% endif %}
+        </div>
+
+        <div class="alias-cell-last-used">
+          {% if usage_stats_visible and pool_stats.last_used_at %}<time data-local-timestamp="{{ pool_stats.last_used_at }}">{{ pool_stats.last_used_at }}</time>{% elif usage_stats_visible %}<span class="muted">{% if language == 'de' %}Noch nie{% else %}Never{% endif %}</span>{% else %}<span class="muted">–</span>{% endif %}
+        </div>
+
+        <div class="pool-actions">
+          <button class="button compact primary pool-assign-button" type="button" data-open-assign-dialog="{{ alias.id }}">{{ t.assign }}</button>
+          <button class="button compact" type="button" data-copy="{{ alias.address }}" title="{{ t['copy'] }}">⧉</button>
+          {% if not pool_used %}
+          <form method="post" action="/offline-pool/{{ alias.id }}/delete" data-confirm="{{ t.delete_confirm }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="button compact danger" type="submit">{{ t.delete }}</button>
+          </form>
           {% endif %}
         </div>
-      </div>
-      <div class="pool-actions">
-        <button class="button compact primary" type="button" data-open-assign-dialog="{{ alias.id }}">{{ t.assign }}</button>
-        <button class="button compact" type="button" data-copy="{{ alias.address }}">{{ t["copy"] }}</button>
-        {% if not pool_used %}
-        <form method="post" action="/offline-pool/{{ alias.id }}/delete" data-confirm="{{ t.delete_confirm }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button class="button compact danger" type="submit">{{ t.delete }}</button>
-        </form>
-        {% endif %}
-      </div>
-    </article>
-    {% endfor %}
+      </article>
+      {% endfor %}
+    </div>
   </div>
   <div class="pool-footer-actions">
     <button class="button ghost" type="button" data-copy-pool>{{ t.copy_all }}</button>
-    <a class="button ghost" href="/aliases/pool.txt">{{ t.plain_text }}</a>
+    <a class="button ghost" href="/aliases/pool.txt" target="_blank" rel="noopener noreferrer">{{ t.plain_text }}</a>
   </div>
   {% else %}
   <div class="overview-empty pool-empty">
@@ -118,6 +131,8 @@
 
 {% for alias in reserved %}
 {% set pool_stats = usage_stats.get(alias.address|lower, {}) if usage_stats_visible else {} %}
+{% set pool_total = (pool_stats.received_count or 0) + (pool_stats.sent_count or 0) %}
+{% set pool_used = alias.is_reserved_used or pool_total > 0 %}
 {% set pool_senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
 <dialog class="assign-dialog assign-dialog-single" data-assign-dialog="{{ alias.id }}">
   <div class="dialog-head">
@@ -127,7 +142,7 @@
   <form method="post" action="/offline-pool/{{ alias.id }}/assign" class="stack">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <code class="assign-address">{{ alias.address }}</code>
-    {% if pool_stats and ((pool_stats.received_count or 0) or (pool_stats.sent_count or 0)) %}
+    {% if pool_used %}
     <div class="pool-assignment-usage">
       <div class="usage-summary">
         {% if pool_stats.received_count %}<span class="sender-stats-alert">{{ pool_stats.received_count }} {{ t.usage_received }}</span>{% endif %}
@@ -147,5 +162,5 @@
   </form>
 </dialog>
 {% endfor %}
-<script src="/static/pool-inline-assign.js?v=20260822-1" defer></script>
+<script src="/static/pool-inline-assign.js?v=20260822-2" defer></script>
 {% endblock %}
