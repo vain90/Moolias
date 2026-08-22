@@ -9,8 +9,7 @@ RUN useradd --create-home --uid 10001 moolias \
 
 COPY pyproject.toml README.md LICENSE ./
 COPY moolias ./moolias
-RUN pip install --no-cache-dir . \
-    && python -m moolias.service_icon_assets
+RUN pip install --no-cache-dir .
 
 USER moolias
 EXPOSE 8000
