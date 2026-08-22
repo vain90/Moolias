@@ -13,7 +13,7 @@ from moolias.ui import (
 )
 
 router = APIRouter()
-SORT_MODES = {"last_used", "usage", "most_used", "status", "purpose"}
+SORT_MODES = {"attention", "last_used", "usage", "most_used", "status", "purpose"}
 SORT_DIRECTIONS = {"asc", "desc"}
 
 
@@ -24,7 +24,7 @@ async def aliases_page(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=25),
     status_filter: str = Query(default="all", alias="status"),
-    sort: str = Query(default="last_used"),
+    sort: str = Query(default="attention"),
     direction: str = Query(default="desc"),
 ):
     state = await _load_ui_state(request)
@@ -33,7 +33,7 @@ async def aliases_page(
     if status_filter not in STATUS_FILTERS:
         status_filter = "all"
     if sort not in SORT_MODES:
-        sort = "last_used"
+        sort = "attention"
     if sort == "most_used":
         sort = "usage"
     if direction not in SORT_DIRECTIONS:
@@ -95,7 +95,18 @@ async def aliases_page(
         purpose_key, address_key = purpose(alias)
         return (last_used(alias), usage_total(alias), purpose_key, address_key)
 
+    def attention_sort_key(alias) -> tuple[int, int, int, str, str]:
+        purpose_key, address_key = purpose(alias)
+        return (
+            1 if alias.address.lower() in unexpected_aliases else 0,
+            last_used(alias),
+            usage_total(alias),
+            purpose_key,
+            address_key,
+        )
+
     sort_keys = {
+        "attention": attention_sort_key,
         "purpose": purpose,
         "status": status_rank,
         "usage": usage_sort_key,
