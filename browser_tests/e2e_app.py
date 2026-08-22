@@ -121,6 +121,27 @@ class FakeMailcow:
     async def get_alias(self, alias_id: int) -> AliasRecord:
         return self.aliases[alias_id]
 
+    async def get_rspamd_history(self, count: int) -> list[dict]:
+        history = [
+            {
+                "action": "clean",
+                "user": USER,
+                "sender_mime": "amazon-k7@example.org",
+                "sender_smtp": "amazon-k7@example.org",
+                "rcpt_smtp": ["customer@example.net"],
+                "unix_time": 1787167900,
+            },
+            {
+                "action": "clean",
+                "user": USER,
+                "sender_mime": "amazon-k7@example.org",
+                "sender_smtp": "amazon-k7@example.org",
+                "rcpt_smtp": ["customer@example.net", "team@example.com"],
+                "unix_time": 1787167890,
+            },
+        ]
+        return history[:count]
+
     async def set_mailbox_tags(self, email: str, tags: list[str]) -> None:
         assert email == USER
         self.mailbox_tags = list(tags)
