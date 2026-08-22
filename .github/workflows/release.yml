@@ -21,7 +21,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
-          persist-credentials: false
 
       - name: Derive and validate release version
         id: meta
@@ -70,8 +69,48 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Extract changelog section
+      - uses: actions/setup-python@v7
         if: steps.release_state.outputs.exists != 'true'
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Generate release service icons
+        if: steps.release_state.outputs.exists != 'true'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install simple-icons-pack==16.28.0
+          python -m moolias.service_icon_assets
+
+      - name: Commit release service icons when needed
+        id: icon_state
+        if: steps.release_state.outputs.exists != 'true'
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add moolias/static/service-icons.generated.svg
+          if git diff --cached --quiet; then
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "$EXPECTED_SHA" ]; then
+            echo "main advanced while preparing the release; a newer CI run will handle it"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update service icon sprite for release"
+          git push origin HEAD:main
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+          echo "Committed the generated icon sprite. The resulting main push will run CI and restart release publishing."
+
+      - name: Extract changelog section
+        if: steps.release_state.outputs.exists != 'true' && steps.icon_state.outputs.committed != 'true'
         env:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
@@ -97,17 +136,17 @@ jobs:
           PY
 
       - uses: docker/setup-buildx-action@v4
-        if: steps.release_state.outputs.exists != 'true'
+        if: steps.release_state.outputs.exists != 'true' && steps.icon_state.outputs.committed != 'true'
 
       - uses: docker/login-action@v4
-        if: steps.release_state.outputs.exists != 'true'
+        if: steps.release_state.outputs.exists != 'true' && steps.icon_state.outputs.committed != 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish stable container image
-        if: steps.release_state.outputs.exists != 'true'
+        if: steps.release_state.outputs.exists != 'true' && steps.icon_state.outputs.committed != 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -126,7 +165,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Create GitHub release and tag
-        if: steps.release_state.outputs.exists != 'true'
+        if: steps.release_state.outputs.exists != 'true' && steps.icon_state.outputs.committed != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.meta.outputs.tag }}
