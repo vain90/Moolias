@@ -26,12 +26,13 @@ from moolias.senders import sender_match_token
 from moolias.service_icons import icon_catalog, resolve_service_icon
 from moolias.stats_mode import StatsModeSource
 from moolias.usage import mailbox_stats_state
+from moolias.usage_evidence import UsageEvidenceStore
 
 router = APIRouter()
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
 
 PAGE_SIZES = (10, 25, 50, 100)
-STATUS_FILTERS = ("all", "active", "disabled", "unexpected")
+STATUS_FILTERS = ("all", "active", "disabled", "unexpected", "unused")
 SORT_MODES = ("last_used", "most_used")
 SORT_DIRECTIONS = ("asc", "desc")
 ACTIONABLE_HEALTH_STATES = {"low", "gap", "stale", "failed"}
@@ -216,6 +217,8 @@ async def _load_ui_state(request: Request) -> dict:
     stats_confirmation_mode: str | None = None
     usage_stats_visible = False
     usage_stats: dict[str, dict[str, int | None]] = {}
+    usage_evidence = {}
+    usage_backfill = None
     sender_stats: dict[str, list[dict[str, str | int | bool | None]]] = {}
     unexpected_aliases: set[str] = set()
     ignored_aliases: set[str] = set()
@@ -239,26 +242,34 @@ async def _load_ui_state(request: Request) -> dict:
             usage_stats_visible = False
 
     addresses = [alias.address for alias in [*assigned_all, *reserved]]
-    if usage_stats_visible and stats_state is not None and addresses:
-        stored_usage = await stats_store.alias_usage(user, addresses)
-        for alias in [*assigned_all, *reserved]:
-            usage = stored_usage.get(alias.address.lower())
-            received_count = usage.received_count if usage is not None else 0
-            sent_count = usage.sent_count if usage is not None else 0
-            timestamps = (
-                []
-                if usage is None
-                else [
-                    value
-                    for value in (usage.last_received_at, usage.last_sent_at)
-                    if value is not None
-                ]
-            )
-            usage_stats[alias.address.lower()] = {
-                "received_count": received_count,
-                "sent_count": sent_count,
-                "last_used_at": max(timestamps) if timestamps else None,
-            }
+    if usage_stats_visible and stats_state is not None:
+        evidence_store = UsageEvidenceStore(stats_store.path)
+        usage_backfill = await evidence_store.backfill_state(user)
+        if addresses:
+            usage_evidence = await evidence_store.alias_evidence(user, addresses)
+            stored_usage = await stats_store.alias_usage(user, addresses)
+            for alias in [*assigned_all, *reserved]:
+                alias_key = alias.address.lower()
+                usage = stored_usage.get(alias_key)
+                evidence = usage_evidence.get(alias_key)
+                received_count = usage.received_count if usage is not None else 0
+                sent_count = usage.sent_count if usage is not None else 0
+                timestamps = (
+                    []
+                    if usage is None
+                    else [
+                        value
+                        for value in (usage.last_received_at, usage.last_sent_at)
+                        if value is not None
+                    ]
+                )
+                if evidence is not None:
+                    timestamps.append(evidence.last_seen_at)
+                usage_stats[alias_key] = {
+                    "received_count": received_count,
+                    "sent_count": sent_count,
+                    "last_used_at": max(timestamps) if timestamps else None,
+                }
 
     if (
         usage_stats_visible
@@ -390,6 +401,7 @@ async def _load_ui_state(request: Request) -> dict:
         alias
         for alias in reserved
         if alias.is_reserved_used
+        or alias.address.lower() in usage_evidence
         or usage_total(alias) > 0
     ]
     cutoff = int(time.time()) - 90 * 24 * 60 * 60
@@ -398,7 +410,11 @@ async def _load_ui_state(request: Request) -> dict:
         for alias in assigned_all
         if last_used(alias) > 0 and last_used(alias) < cutoff
     ]
-    never_used = [alias for alias in assigned_all if usage_total(alias) == 0]
+    no_usage_evidence = {
+        alias.address.lower()
+        for alias in assigned_all
+        if alias.address.lower() not in usage_evidence
+    }
 
     collector_health = None
     if stats_available:
@@ -452,6 +468,9 @@ async def _load_ui_state(request: Request) -> dict:
         "stats_confirmation_mode": stats_confirmation_mode,
         "usage_stats_visible": usage_stats_visible,
         "usage_stats": usage_stats,
+        "usage_evidence": usage_evidence,
+        "usage_backfill": usage_backfill,
+        "no_usage_evidence": no_usage_evidence,
         "sender_stats": sender_stats,
         "unexpected_aliases": unexpected_aliases,
         "ignored_aliases": ignored_aliases,
@@ -469,7 +488,9 @@ async def _load_ui_state(request: Request) -> dict:
             "recognized_messages": recognized_messages,
             "unrecognized_messages": unrecognized_messages,
             "recognition_rate": recognition_rate,
-            "never_used": len(never_used),
+            "known_used": len(assigned_all) - len(no_usage_evidence),
+            "no_usage_evidence": len(no_usage_evidence),
+            "never_used": len(no_usage_evidence),
             "last_activity": max(
                 (int(item.get("last_used_at") or 0) for item in usage_stats.values()),
                 default=0,
@@ -518,6 +539,7 @@ async def aliases_page(
 
     assigned_all = list(state["assigned_all"])
     unexpected_aliases = state["unexpected_aliases"]
+    no_usage_evidence = state["no_usage_evidence"]
     usage_stats = state["usage_stats"]
 
     if status_filter == "active":
@@ -529,6 +551,12 @@ async def aliases_page(
             alias
             for alias in assigned_all
             if alias.address.lower() in unexpected_aliases
+        ]
+    elif status_filter == "unused":
+        filtered = [
+            alias
+            for alias in assigned_all
+            if alias.address.lower() in no_usage_evidence
         ]
     else:
         filtered = assigned_all
@@ -567,6 +595,7 @@ async def aliases_page(
         "active": sum(alias.active for alias in assigned_all),
         "disabled": sum(not alias.active for alias in assigned_all),
         "unexpected": len(unexpected_aliases),
+        "unused": len(no_usage_evidence),
     }
 
     state.update(
