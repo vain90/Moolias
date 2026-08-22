@@ -67,7 +67,7 @@ async def _create_unique_reserved(request: Request, user: str, attempts: int = 1
 @router.get("/statistics", response_class=HTMLResponse)
 async def statistics_page(
     request: Request,
-    detail: str = Query(default="domain"),
+    detail: str = Query(default="address"),
 ):
     # Imported lazily to keep the existing router inclusion order free of cycles.
     from moolias.ui import TEMPLATES, _load_ui_state, _template_context
@@ -78,7 +78,7 @@ async def statistics_page(
     destination_mode_available = False
     detail_toggle_available = False
     stats_state = state.get("stats_state")
-    detail = detail if detail in {"domain", "address"} else "domain"
+    detail = detail if detail in {"domain", "address"} else "address"
 
     if state.get("usage_stats_visible") and stats_state is not None:
         mode = stats_state.effective
