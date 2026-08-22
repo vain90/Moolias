@@ -175,7 +175,23 @@ class UsageEvidenceStore:
                 """,
                 params,
             ).fetchall()
-        return {
+            usage_rows = connection.execute(
+                f"""
+                SELECT
+                    alias,
+                    received_count,
+                    sent_count,
+                    last_received_at,
+                    last_sent_at
+                FROM alias_usage
+                WHERE mailbox = ?
+                    AND alias IN ({placeholders})
+                    AND (received_count > 0 OR sent_count > 0)
+                """,
+                params,
+            ).fetchall()
+
+        evidence = {
             str(row["alias"]).lower(): AliasUsageEvidence(
                 first_seen_at=int(row["first_seen_at"]),
                 last_seen_at=int(row["last_seen_at"]),
@@ -184,6 +200,32 @@ class UsageEvidenceStore:
             )
             for row in rows
         }
+        for row in usage_rows:
+            alias = str(row["alias"]).lower()
+            timestamps = [
+                int(value)
+                for value in (row["last_received_at"], row["last_sent_at"])
+                if value is not None
+            ]
+            if not timestamps:
+                continue
+            seen_at = max(timestamps)
+            current = evidence.get(alias)
+            if current is None:
+                evidence[alias] = AliasUsageEvidence(
+                    first_seen_at=seen_at,
+                    last_seen_at=seen_at,
+                    backfill_seen=False,
+                    live_seen=True,
+                )
+            elif seen_at > current.last_seen_at:
+                evidence[alias] = AliasUsageEvidence(
+                    first_seen_at=current.first_seen_at,
+                    last_seen_at=seen_at,
+                    backfill_seen=current.backfill_seen,
+                    live_seen=True,
+                )
+        return evidence
 
     async def pending_backfills(
         self,
