@@ -39,16 +39,16 @@ _NAME_PREFIXES = {
 }
 
 
-def _mailbox_first_name(mailbox: dict, fallback: str) -> str:
+def _mailbox_first_name(mailbox: dict) -> str:
     full_name = re.sub(r"\s+", " ", str(mailbox.get("name") or "").strip())
     if not full_name:
-        return fallback
+        return ""
 
     candidate = full_name.split(",", 1)[1].strip() if "," in full_name else full_name
     parts = candidate.split()
     while parts and parts[0].casefold() in _NAME_PREFIXES:
         parts.pop(0)
-    return parts[0].strip(" ,") if parts else fallback
+    return parts[0].strip(" ,") if parts else ""
 
 
 class AliasReviewSettingsStore:
@@ -146,7 +146,10 @@ async def get_account_profile(request: Request):
         mailbox = await request.app.state.mailcow.get_mailbox(user)
     except MailcowError as exc:
         raise HTTPException(status_code=502, detail="Mailbox profile is unavailable") from exc
-    return {"display_name": _mailbox_first_name(mailbox, user)}
+    return {
+        "display_name": user,
+        "welcome_name": _mailbox_first_name(mailbox),
+    }
 
 
 @router.get("/aliases/review-settings")
