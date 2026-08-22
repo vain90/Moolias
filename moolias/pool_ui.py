@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from moolias.alias_table_ui import router as alias_table_router
 from moolias.aliases import (
@@ -14,6 +14,8 @@ from moolias.aliases import (
 from moolias.i18n import LANGUAGE_COOKIE, detect_language
 from moolias.mailcow import MailcowError
 from moolias.security import require_user, validate_csrf
+from moolias.statistics_destinations import top_outgoing_destinations
+from moolias.stats_mode import StatsMode
 from moolias.usage import mailbox_stats_state
 
 router = APIRouter()
@@ -57,6 +59,46 @@ async def _create_unique_reserved(request: Request, user: str, attempts: int = 1
             last_error = exc
     raise MailcowError(
         f"Could not create a unique offline alias after {attempts} attempts: {last_error}"
+    )
+
+
+@router.get("/statistics", response_class=HTMLResponse)
+async def statistics_page(request: Request):
+    # Imported lazily to keep the existing router inclusion order free of cycles.
+    from moolias.ui import TEMPLATES, _load_ui_state, _template_context
+
+    state = await _load_ui_state(request)
+    destinations: list[dict[str, int | str]] = []
+    destination_stats_error = False
+    destination_mode_available = False
+    stats_state = state.get("stats_state")
+
+    if state.get("usage_stats_visible") and stats_state is not None:
+        mode = stats_state.effective
+        destination_mode_available = mode in {StatsMode.DOMAIN, StatsMode.FULL}
+        if destination_mode_available:
+            try:
+                destinations = await top_outgoing_destinations(
+                    request.app.state.settings,
+                    request.app.state.mailcow,
+                    state["user"],
+                    state["assigned_all"],
+                    mode,
+                )
+            except MailcowError:
+                destination_stats_error = True
+
+    state.update(
+        {
+            "top_destinations": destinations,
+            "destination_mode_available": destination_mode_available,
+            "destination_stats_error": destination_stats_error,
+        }
+    )
+    return TEMPLATES.TemplateResponse(
+        request,
+        "statistics.html",
+        _template_context(request, active_nav="statistics", **state),
     )
 
 
