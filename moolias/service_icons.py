@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 
@@ -16,7 +17,8 @@ class ServiceIcon:
     has_logo: bool = False
 
 
-_GENERIC = ServiceIcon("generic", "Allgemein", "?", "neutral")
+_GENERIC = ServiceIcon("generic", "Generisch", "AL", "neutral")
+_GENERIC_TONES = ("blue", "green", "violet", "orange", "pink", "teal", "red", "dark")
 
 
 def _icon(
@@ -175,6 +177,24 @@ _ICON_BY_KEY = {icon.key: icon for icon in SERVICE_ICONS}
 ensure_service_icon_sprite()
 
 
+def _generic_icon(address: str, description: str = "") -> ServiceIcon:
+    local_part = address.partition("@")[0]
+    source = description.strip() or local_part.strip() or "Alias"
+    words = re.findall(r"[^\W_]+", source, flags=re.UNICODE)
+    if len(words) >= 2:
+        glyph = "".join(word[0] for word in words[:2])
+    elif words:
+        glyph = words[0][:2]
+    else:
+        glyph = "AL"
+    glyph = glyph.upper()[:2] or "AL"
+
+    normalized = " ".join(words).casefold() or source.casefold()
+    digest = hashlib.sha256(normalized.encode("utf-8")).digest()
+    tone = _GENERIC_TONES[digest[0] % len(_GENERIC_TONES)]
+    return ServiceIcon("generic", "Generisch", glyph, tone)
+
+
 def icon_catalog() -> tuple[ServiceIcon, ...]:
     return (_GENERIC, *SERVICE_ICONS)
 
@@ -197,7 +217,7 @@ def detect_service_icon(address: str, description: str = "") -> ServiceIcon:
             folded = keyword.casefold()
             if folded in tokens or (len(folded) >= 4 and folded in compact):
                 return icon
-    return _GENERIC
+    return _generic_icon(address, description)
 
 
 def resolve_service_icon(
@@ -206,5 +226,7 @@ def resolve_service_icon(
     override: str | None,
 ) -> ServiceIcon:
     if override and override != "auto":
+        if override.strip().lower() == "generic":
+            return _generic_icon(address, description)
         return icon_by_key(override)
     return detect_service_icon(address, description)
