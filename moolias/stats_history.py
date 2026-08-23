@@ -6,8 +6,19 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from moolias.aliases import AliasRecord, is_owned_alias, is_primary_mailbox_alias
+from moolias.config import Settings
+from moolias.mailcow import MailcowClient
 from moolias.stats import AliasUsage, SenderUsage
 from moolias.stats_mode import StatsMode, stats_mode_rank
+from moolias.usage import (
+    ACCEPTED_ACTIONS,
+    _event_key,
+    _event_timestamp,
+    _normalise_address,
+    _normalise_recipients,
+    _sender_identity,
+)
 
 LEVELS = (StatsMode.BASIC, StatsMode.DOMAIN, StatsMode.FULL)
 
@@ -56,12 +67,11 @@ class HistoryCoverage:
 
 
 class StatsHistoryStore:
-    """Stores opt-in historical statistics separately from live counters.
+    """Stores opt-in historical statistics separately from live aggregates.
 
-    Historical aggregates stop at the live start of their respective detail level.
-    This keeps Basic, Domain and Full coverage independent and prevents mode upgrades
-    from making older low-detail data look as if it had always been collected at the
-    higher detail level.
+    Basic, Domain and Full each keep their own live start and historical coverage.
+    A later mode upgrade can therefore extend Full further back without changing the
+    older Domain coverage or pretending that address-level detail existed earlier.
     """
 
     def __init__(self, path: str | Path) -> None:
@@ -151,7 +161,11 @@ class StatsHistoryStore:
 
     def _sync_mode(self, mailbox: str, mode: StatsMode, started_at: int) -> None:
         mailbox = mailbox.lower()
-        enabled = {level for level in LEVELS if stats_mode_rank(level) <= stats_mode_rank(mode)}
+        enabled = {
+            level
+            for level in LEVELS
+            if stats_mode_rank(level) <= stats_mode_rank(mode)
+        }
         with self._connect() as connection:
             for level in enabled:
                 connection.execute(
@@ -164,9 +178,20 @@ class StatsHistoryStore:
                 )
 
             for level in LEVELS:
-                if level in enabled:
-                    continue
-                self._clear_level(connection, mailbox, level)
+                if level not in enabled:
+                    self._clear_level(connection, mailbox, level)
+
+            pending = connection.execute(
+                "SELECT target_mode FROM stats_history_requests WHERE mailbox = ?",
+                (mailbox,),
+            ).fetchone()
+            if pending is not None:
+                pending_mode = StatsMode(str(pending["target_mode"]))
+                if stats_mode_rank(pending_mode) > stats_mode_rank(mode):
+                    connection.execute(
+                        "DELETE FROM stats_history_requests WHERE mailbox = ?",
+                        (mailbox,),
+                    )
 
             if mode is StatsMode.OFF:
                 connection.execute(
@@ -511,11 +536,7 @@ class StatsHistoryStore:
                 ).fetchone()
                 if existing is not None and existing["history_oldest_at"] is not None:
                     previous = int(existing["history_oldest_at"])
-                    usable_oldest = (
-                        previous
-                        if usable_oldest is None
-                        else min(previous, usable_oldest)
-                    )
+                    usable_oldest = previous if usable_oldest is None else min(previous, usable_oldest)
                 connection.execute(
                     """
                     INSERT INTO stats_history_coverage (
@@ -577,13 +598,19 @@ class StatsHistoryStore:
                     else None
                 ),
                 completed_at=(
-                    int(row["completed_at"]) if row["completed_at"] is not None else None
+                    int(row["completed_at"])
+                    if row["completed_at"] is not None
+                    else None
                 ),
                 history_count=(
-                    int(row["history_count"]) if row["history_count"] is not None else None
+                    int(row["history_count"])
+                    if row["history_count"] is not None
+                    else None
                 ),
                 history_limit=(
-                    int(row["history_limit"]) if row["history_limit"] is not None else None
+                    int(row["history_limit"])
+                    if row["history_limit"] is not None
+                    else None
                 ),
             )
             for row in rows
@@ -716,3 +743,159 @@ class StatsHistoryStore:
                 )
             )
         return result
+
+
+async def perform_pending_backfill(
+    settings: Settings,
+    mailcow: MailcowClient,
+    stats_store,
+    mailbox: str,
+    aliases: list[AliasRecord],
+) -> dict[str, int] | None:
+    """Apply one requested historical supplementation using the available Rspamd window.
+
+    Only events older than the live start of each detail level are imported. Live
+    counters therefore never overlap the historical aggregates, even when Domain and
+    Full were enabled at different times.
+    """
+
+    store = StatsHistoryStore(stats_store.path)
+    request = await store.pending_request(mailbox)
+    if request is None:
+        return None
+
+    starts = await store.level_starts(mailbox)
+    if not starts:
+        return None
+
+    history = await mailcow.get_rspamd_history(settings.usage_history_count)
+    mailbox = mailbox.lower()
+    target_rank = stats_mode_rank(request.target_mode)
+
+    alias_records: dict[str, AliasRecord] = {}
+    for alias in aliases:
+        address = alias.address.strip().lower()
+        target = alias.goto.strip().lower()
+        if target != mailbox or not address:
+            continue
+        if alias.is_catch_all or is_primary_mailbox_alias(alias, mailbox):
+            continue
+        if is_owned_alias(alias, mailbox):
+            alias_records[address] = alias
+
+    usage_events: list[HistoricalUsageEvent] = []
+    sender_events: list[HistoricalSenderEvent] = []
+
+    for item in history:
+        action = str(item.get("action") or "").strip().lower()
+        if action not in ACCEPTED_ACTIONS:
+            continue
+        event_at = _event_timestamp(item)
+        if event_at is None:
+            continue
+
+        recipients = _normalise_recipients(item.get("rcpt_smtp"))
+        sender_identity = _sender_identity(item)
+        for alias in recipients.intersection(alias_records):
+            basic_start = starts.get(StatsMode.BASIC)
+            if (
+                target_rank >= stats_mode_rank(StatsMode.BASIC)
+                and basic_start is not None
+                and event_at < basic_start
+            ):
+                usage_events.append(
+                    HistoricalUsageEvent(
+                        event_key=_event_key("history-received", item, alias, event_at),
+                        mailbox=mailbox,
+                        alias=alias,
+                        kind="received",
+                        event_at=event_at,
+                    )
+                )
+
+            if sender_identity is None:
+                continue
+            sender_address, sender_domain = sender_identity
+            domain_start = starts.get(StatsMode.DOMAIN)
+            if (
+                target_rank >= stats_mode_rank(StatsMode.DOMAIN)
+                and domain_start is not None
+                and event_at < domain_start
+            ):
+                sender_events.append(
+                    HistoricalSenderEvent(
+                        event_key=_event_key(
+                            "history-sender-domain", item, alias, event_at
+                        ),
+                        mailbox=mailbox,
+                        alias=alias,
+                        sender_domain=sender_domain,
+                        sender_address=None,
+                        level=StatsMode.DOMAIN,
+                        event_at=event_at,
+                    )
+                )
+
+            full_start = starts.get(StatsMode.FULL)
+            if (
+                target_rank >= stats_mode_rank(StatsMode.FULL)
+                and full_start is not None
+                and event_at < full_start
+            ):
+                sender_events.append(
+                    HistoricalSenderEvent(
+                        event_key=_event_key(
+                            "history-sender-full", item, alias, event_at
+                        ),
+                        mailbox=mailbox,
+                        alias=alias,
+                        sender_domain=sender_domain,
+                        sender_address=sender_address,
+                        level=StatsMode.FULL,
+                        event_at=event_at,
+                    )
+                )
+
+        authenticated_user = _normalise_address(item.get("user"))
+        if authenticated_user != mailbox:
+            continue
+        sender_mime = _normalise_address(item.get("sender_mime"))
+        sender_smtp = _normalise_address(item.get("sender_smtp"))
+        sent_alias = sender_mime if sender_mime in alias_records else ""
+        if not sent_alias and sender_smtp in alias_records:
+            sent_alias = sender_smtp
+        basic_start = starts.get(StatsMode.BASIC)
+        if (
+            sent_alias
+            and target_rank >= stats_mode_rank(StatsMode.BASIC)
+            and basic_start is not None
+            and event_at < basic_start
+        ):
+            usage_events.append(
+                HistoricalUsageEvent(
+                    event_key=_event_key("history-sent", item, sent_alias, event_at),
+                    mailbox=mailbox,
+                    alias=sent_alias,
+                    kind="sent",
+                    event_at=event_at,
+                )
+            )
+
+    usage_recorded = await store.record_usage_events(usage_events)
+    sender_recorded = await store.record_sender_events(sender_events)
+    timestamps = [
+        timestamp
+        for item in history
+        if (timestamp := _event_timestamp(item)) is not None
+    ]
+    await store.complete_backfill(
+        request,
+        oldest_history_at=min(timestamps) if timestamps else None,
+        history_count=len(history),
+        history_limit=settings.usage_history_count,
+    )
+    return {
+        "usage": usage_recorded,
+        "senders": sender_recorded,
+        "history_count": len(history),
+    }
