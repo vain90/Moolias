@@ -77,9 +77,11 @@ Then run on the Mailcow host:
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/vain90/Moolias/main/scripts/install.sh \
+  https://raw.githubusercontent.com/vain90/Moolias/main/install.sh \
   | sudo bash
 ```
+
+The small bootstrap prefers installer files from the latest stable release. During the first release transition for a newer installer it can safely fall back to the installer files on `main`; the Moolias application image still stays on the stable `latest` channel.
 
 The guided installer:
 
