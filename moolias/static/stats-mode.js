@@ -8,6 +8,9 @@
       fromNow: 'Nur ab jetzt erfassen',
       cancel: 'Abbrechen',
       close: 'Schließen',
+      processingTitle: 'Statistik wird aktualisiert',
+      processingHistory: 'Die vorhandene Historie wird ausgewertet. Das kann einen Moment dauern.',
+      processingNow: 'Der neue Statistikmodus wird gespeichert.',
     },
     en: {
       title: 'Include available history?',
@@ -16,6 +19,9 @@
       fromNow: 'Collect from now on only',
       cancel: 'Cancel',
       close: 'Close',
+      processingTitle: 'Updating statistics',
+      processingHistory: 'The available history is being evaluated. This may take a moment.',
+      processingNow: 'The new statistics mode is being saved.',
     },
   }[language];
 
@@ -83,6 +89,34 @@
     });
   }
 
+  function showProcessingDialog(choice) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'moolias-dialog moolias-dialog-default stats-processing-dialog';
+    dialog.setAttribute('aria-busy', 'true');
+
+    const title = document.createElement('h2');
+    title.textContent = text.processingTitle;
+
+    const body = document.createElement('p');
+    body.className = 'moolias-dialog-message';
+    body.setAttribute('role', 'status');
+    body.setAttribute('aria-live', 'polite');
+    body.textContent = choice === 'backfill' ? text.processingHistory : text.processingNow;
+
+    const progress = document.createElement('progress');
+    progress.className = 'stats-processing-progress';
+    progress.setAttribute('aria-label', body.textContent);
+    progress.style.width = '100%';
+    progress.style.marginTop = '16px';
+
+    dialog.append(title, body, progress);
+    document.body.append(dialog);
+    dialog.showModal();
+    return dialog;
+  }
+
+  document.querySelector('.usage-evidence-link')?.classList.add('top-gap');
+
   document.addEventListener('submit', async (event) => {
     const form = event.target.closest?.('.usage-mode-form');
     if (!form || form.querySelector('input[name="backfill_history"]')) return;
@@ -105,6 +139,7 @@
     input.name = 'backfill_history';
     input.value = choice === 'backfill' ? '1' : '0';
     form.append(input);
+    showProcessingDialog(choice);
     form.requestSubmit(submitter || undefined);
   });
 })();
