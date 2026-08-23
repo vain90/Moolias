@@ -124,9 +124,11 @@
                       <span class="sender-review-state">
                         {% if sender.review_source == 'manual' %}{{ t.sender_state_confirmed }}
                         {% elif sender.review_source == 'automatic' %}{{ t.sender_state_automatic }}{% if sender.match_token %} · {{ sender.match_token }}{% endif %}
+                        {% elif sender.review_source == 'rspamd-spam' %}{% if language == 'de' %}Durch Rspamd zur Prüfung markiert{% else %}Flagged for review by Rspamd{% endif %}
                         {% elif sender.review_source == 'manual-unexpected' %}{{ t.sender_state_manual_unexpected }}
                         {% else %}{{ t.sender_state_unexpected }}{% endif %}
                       </span>
+                      {% if sender.spam_count %}<span class="sender-review-state sender-spam-state">Rspamd: Spam{% if sender.spam_count > 1 %} · {{ sender.spam_count }} {% if language == 'de' %}Treffer{% else %}hits{% endif %}{% endif %}{% if sender.max_spam_score is not none %} · {% if sender.spam_count > 1 %}max. {% else %}Score {% endif %}{% if language == 'de' %}{{ ('%.1f'|format(sender.max_spam_score))|replace('.', ',') }}{% else %}{{ '%.1f'|format(sender.max_spam_score) }}{% endif %}{% endif %}</span>{% endif %}
                     </div>
                     <span class="sender-message-count">{{ sender.received_count }}</span>
                     <form method="post" action="/aliases/{{ alias.id }}/sender-expectation" class="sender-review-form">
