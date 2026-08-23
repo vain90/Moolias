@@ -14,14 +14,19 @@ MOOLIAS_HOSTNAME = "moolias.mailcow-ci.test"
 
 
 def _run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    result = subprocess.run(
         args,
         cwd=cwd,
-        check=True,
+        check=False,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
+    if result.returncode != 0:
+        if result.stdout:
+            print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+        result.check_returncode()
+    return result
 
 
 def _mailcow_compose(*args: str) -> subprocess.CompletedProcess[str]:
