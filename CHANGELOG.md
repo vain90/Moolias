@@ -2,6 +2,13 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.0.1 - 2026-08-23
+
+### Changed
+
+- the authenticated header now uses the same 8 px spacing between the language selector and Settings as between Settings and Help
+- the Overview `Recently used` list now shows the assigned alias name first and the alias address underneath
+
 ## 1.0.0 - 2026-08-23
 
 ### Added
