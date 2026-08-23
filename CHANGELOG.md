@@ -2,6 +2,13 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.1.5 - 2026-08-24
+
+### Fixed
+
+- the terminal progress spinner now keeps every animation frame exactly one character wide, so status text no longer shifts when the backslash frame is rendered
+- the same-host Mailcow installer now includes both IPv4 and IPv6 CIDRs from the detected Mailcow Docker network in API allowlist guidance and validation errors, so dual-stack installations no longer suggest only the IPv4 subnet
+
 ## 1.1.4 - 2026-08-23
 
 ### Changed
