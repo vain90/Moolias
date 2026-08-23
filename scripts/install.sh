@@ -315,7 +315,7 @@ write_nginx_config() {
   fi
 
   if [[ "$public_scheme" == "https" ]]; then
-    http_behavior='    if ($moolias_forwarded_proto = http) { return 301 https://$host$request_uri; }'
+    http_behavior='        if ($moolias_forwarded_proto = http) { return 301 https://$host$request_uri; }'
   fi
 
   cat > "$destination" <<EOF
@@ -330,10 +330,15 @@ server {
     listen ${http_port}${listen_proxy};
 ${ipv6_http}
     server_name ${hostname};
+    root /web;
 
-${http_behavior}
+    location ^~ /.well-known/acme-challenge/ {
+        allow all;
+        default_type "text/plain";
+    }
 
     location / {
+${http_behavior}
         proxy_pass http://moolias-app:8000;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -670,8 +675,8 @@ fi
 mailcow_compose exec -T nginx-mailcow nginx -s reload
 
 if [[ "$acme_changed" == "true" ]]; then
-  log "Restarting acme-mailcow so it can request a certificate containing ${moolias_hostname}..."
-  mailcow_compose restart acme-mailcow
+  log "Recreating acme-mailcow so it can request a certificate containing ${moolias_hostname}..."
+  mailcow_compose up -d --no-deps --force-recreate acme-mailcow
 fi
 
 sender_protection_enabled=false
