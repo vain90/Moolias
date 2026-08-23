@@ -8,6 +8,11 @@ All notable changes to Moolias are documented here.
 
 - the authenticated header now uses the same 8 px spacing between the language selector and Settings as between Settings and Help
 - the Overview `Recently used` list now shows the assigned alias name first and the alias address underneath
+- the repository's explicit local-development Compose file is now named `compose.dev.yml`, leaving `compose.local.yml` available for operator-specific deployment overrides
+
+### Fixed
+
+- the updater now ignores the legacy stock development `compose.local.yml` from older clones instead of accidentally layering `moolias:local` over the stable GHCR image
 
 ## 1.0.0 - 2026-08-23
 
