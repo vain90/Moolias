@@ -8,7 +8,7 @@ from playwright.sync_api import Page, expect
 def test_theme_follows_system_and_persists_explicit_choice(page: Page, base_url: str) -> None:
     page.emulate_media(color_scheme="dark")
     page.goto(f"{base_url}/oauth/callback?code=e2e&state=e2e")
-    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
 
     root = page.locator("html")
     theme_color = page.locator('meta[name="theme-color"]')
