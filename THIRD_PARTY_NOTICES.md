@@ -1,5 +1,16 @@
 # Third-party notices
 
+## Interface icons
+
+Moolias bundles selected interface symbols from the Lucide Icons project:
+
+- https://lucide.dev/
+- https://github.com/lucide-icons/lucide
+
+The icons are stored and served locally by Moolias. The browser does not contact an external icon CDN.
+
+Lucide is published under the ISC License. Some Lucide icons are derived from the Feather project and additionally carry Feather's MIT License notice. The complete license text shipped with the bundled UI sprite is available in `moolias/static/ui-icons.LICENSE.txt`.
+
 ## Service logos
 
 Some service logo glyphs bundled with Moolias are derived from the Simple Icons project:
