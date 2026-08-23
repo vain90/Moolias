@@ -90,13 +90,10 @@
 
     const summary = document.createElement("summary");
     summary.className = "language-dropdown-trigger";
-    summary.setAttribute("aria-label", nav.getAttribute("aria-label") || "Language");
+    const languageLabel = nav.getAttribute("aria-label") || "Language";
+    summary.setAttribute("aria-label", `${languageLabel}: ${current.label}`);
+    summary.title = current.label;
     summary.append(createFlag(current.code));
-
-    const currentLabel = document.createElement("span");
-    currentLabel.className = "language-dropdown-current";
-    currentLabel.textContent = current.label;
-    summary.append(currentLabel, createUiIcon("chevron-down"));
 
     const menu = document.createElement("div");
     menu.className = "language-dropdown-menu";
@@ -132,7 +129,7 @@
     document.querySelectorAll(".brand-mark").forEach((mark) => {
       if (mark.querySelector("img")) return;
       const image = document.createElement("img");
-      image.src = "/static/icon-192.png?v=20260823-2";
+      image.src = "/static/icon-192.png?v=20260823-3";
       image.alt = "";
       image.width = 40;
       image.height = 40;
@@ -146,7 +143,7 @@
     if (hero && heading && !hero.querySelector(".hero-brand-logo")) {
       const image = document.createElement("img");
       image.className = "hero-brand-logo";
-      image.src = "/static/icon-192.png?v=20260823-2";
+      image.src = "/static/icon-192.png?v=20260823-3";
       image.alt = "";
       image.width = 88;
       image.height = 88;
