@@ -72,6 +72,19 @@ def test_bootstrap_suppresses_nested_success_blocks_and_never_reprints_agent_sec
     assert "MOOLIAS_SENDER_AGENT_SECRET=" not in BOOTSTRAP
 
 
+def test_bootstrap_preserves_existing_sender_protection_on_rerun():
+    assert "resolve_sender_install_mode" in BOOTSTRAP
+    assert 'read_key_value "$env_file" MOOLIAS_SENDER_PROTECTION' in BOOTSTRAP
+    assert 'sender_install_mode="no"' in BOOTSTRAP
+    assert 'MOOLIAS_INSTALL_SENDER_PROTECTION="$sender_install_mode"' in BOOTSTRAP
+
+
+def test_bootstrap_filters_successful_nginx_chatter_from_later_failures():
+    assert "print_child_failure" in BOOTSTRAP
+    assert "/nginx: \\[warn\\]/ { next }" in BOOTSTRAP
+    assert "/nginx: configuration file .* test is successful/ { next }" in BOOTSTRAP
+
+
 def test_bootstrap_waits_for_mailcow_acme_certificate():
     assert "certificate_matches_host" in BOOTSTRAP
     assert "MOOLIAS_TLS_WAIT_SECONDS" in BOOTSTRAP
