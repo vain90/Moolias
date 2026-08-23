@@ -54,16 +54,54 @@ By default, Moolias does not need its own user database. Optional usage statisti
 
 ## Installation
 
-### Requirements
+### Recommended: install on the Mailcow host
+
+For most installations, run Moolias on the same Docker host as Mailcow. Moolias stays a **separate Compose project** under `/opt/moolias`; it does not modify Mailcow's main `docker-compose.yml` and it does not publish another host port.
+
+Instead, the installer joins Moolias to Mailcow's existing Docker network and creates a dedicated Mailcow nginx virtual host that proxies internally to Moolias.
 
 You need:
 
-- a running mailcow installation that Moolias can reach;
-- Docker with Docker Compose;
-- a hostname for Moolias served over HTTPS;
-- mailcow administrator access to create an OAuth2 client and a read/write API key.
+- a running Mailcow installation, normally `/opt/mailcow-dockerized`;
+- a dedicated DNS hostname such as `moolias.example.org`;
+- a Mailcow **read/write API key**;
+- a Mailcow OAuth2 client.
 
-### 1. Clone the repository
+Create the OAuth2 client in **Configuration -> Access -> OAuth2** with this redirect URI:
+
+```text
+https://moolias.example.org/oauth/callback
+```
+
+Then run on the Mailcow host:
+
+```bash
+curl -fsSL \
+  https://raw.githubusercontent.com/vain90/Moolias/main/scripts/install.sh \
+  | sudo bash
+```
+
+The guided installer:
+
+- detects the Mailcow installation and the real Mailcow Docker network;
+- suggests a Moolias hostname based on `MAILCOW_HOSTNAME`;
+- generates a strong Moolias session secret automatically;
+- reads API/OAuth secrets without echoing or printing them;
+- creates `/opt/moolias` with a private `.env`, Compose file and updater;
+- starts the stable Moolias image without a published host port;
+- creates and validates a dedicated Mailcow nginx reverse-proxy site;
+- can optionally add the Moolias hostname to Mailcow `ADDITIONAL_SAN` for Mailcow ACME;
+- can optionally install the hardened primary-sender-protection sidecar;
+- backs up installer-managed files before replacing them;
+- validates Docker Compose, Moolias health and Mailcow nginx before completing.
+
+After installation, open the configured Moolias URL and sign in through Mailcow.
+
+See **[Install Moolias on the Mailcow host](docs/install-on-mailcow.md)** for TLS modes, non-interactive installation, backups and the exact files the installer manages.
+
+### Alternative: standalone Docker host
+
+Moolias can also run on another Docker host or container platform. This is useful when application workloads are intentionally separated from the Mailcow server or an existing reverse proxy should own the Moolias hostname.
 
 ```bash
 git clone https://github.com/vain90/Moolias.git
@@ -71,57 +109,41 @@ cd Moolias
 cp .env.example .env
 ```
 
-### 2. Create a mailcow OAuth2 client
-
-In the mailcow administration interface, open **Configuration -> Access -> OAuth2** and create a client with this redirect URI:
-
-```text
-https://aliases.example.com/oauth/callback
-```
-
-Replace `aliases.example.com` with the hostname you will use for Moolias, then copy the generated client ID and client secret into `.env`.
-
-Keep the mailcow OAuth redirect URI on `/oauth/callback`. Moolias processes the OAuth response at that endpoint and then sends the authenticated user to the **Overview** page. `/overview` itself is not an OAuth callback URL.
-
-### 3. Create a mailcow API key
-
-Create a **read/write** API key in mailcow. Moolias needs it to create and manage aliases and, when usage-statistics self-service is enabled, to update the authenticated mailbox's statistics tags.
-
-Restrict the API key to the Moolias server's source IP whenever your network design allows it.
-
-### 4. Configure Moolias
-
-At minimum, set these values in `.env`:
+Configure at least:
 
 ```dotenv
-MOOLIAS_BASE_URL=https://aliases.example.com
+MOOLIAS_BASE_URL=https://moolias.example.org
 MOOLIAS_SESSION_SECRET=<random-secret>
-MOOLIAS_TRUSTED_HOSTS=aliases.example.com
+MOOLIAS_TRUSTED_HOSTS=moolias.example.org
 
-MAILCOW_URL=https://mail.example.com
+MAILCOW_URL=https://mail.example.org
 MAILCOW_API_KEY=<read-write-api-key>
 MAILCOW_OAUTH_CLIENT_ID=<oauth-client-id>
 MAILCOW_OAUTH_CLIENT_SECRET=<oauth-secret>
 ```
 
-Generate a strong session secret with:
+Generate a session secret with:
 
 ```bash
 openssl rand -hex 32
 ```
 
-See [.env.example](.env.example) for the complete configuration reference and all optional settings.
+The OAuth redirect URI remains:
 
-### 5. Start Moolias
+```text
+https://moolias.example.org/oauth/callback
+```
+
+Then start Moolias:
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-The repository Compose file publishes Moolias on host port `8080` by default. Put your normal HTTPS reverse proxy, such as Caddy, nginx or Traefik, in front of it and forward requests to Moolias.
+The standalone `compose.yml` publishes port `8080` by default. Put Caddy, nginx, Traefik or another HTTPS reverse proxy in front of it.
 
-Then open your configured `MOOLIAS_BASE_URL` and sign in through mailcow. After successful authentication, Moolias opens the **Overview** page.
+See [.env.example](.env.example) for all configuration values.
 
 ## Optional configuration
 
@@ -174,6 +196,14 @@ Moolias can prepare aliases before they are needed. They can be copied to a phon
 
 Once a prepared address has been used, Moolias can surface it in **Action required / Handlungsbedarf** so a purpose can be assigned. The address itself does not change when it is assigned.
 
+### Primary sender protection
+
+Primary sender protection is optional. It prevents a signed-in mailbox user from sending with the mailbox's primary address while normal aliases continue through Mailcow's standard sender policy.
+
+On a Mailcow-host installation, the guided installer can set this up as an optional final step. The sender-protection component remains a separate hardened sidecar with no Docker socket, Mailcow API key or database credentials and only narrowly scoped state/Postfix-policy mounts.
+
+See [Primary sender protection](docs/sender-protection.md) for the security model, migration of existing rules and manual installation details.
+
 ### Install as a web app
 
 Moolias includes a web-app manifest and icons. On supported platforms it can be installed from the browser, for example with **Add to Home Screen** on iPhone/iPad or **Add to Dock** in Safari on macOS.
@@ -185,6 +215,13 @@ The installed app uses the same Moolias server and mailcow OAuth login as the no
 For deployments following the stable release channel:
 
 ```bash
+./update.sh
+```
+
+The recommended Mailcow-host installer places the updater in `/opt/moolias`, so the normal update is:
+
+```bash
+cd /opt/moolias
 ./update.sh
 ```
 
@@ -215,7 +252,9 @@ Existing pre-release installations from before the rename should follow [the Moo
 
 ## Security
 
-Moolias holds a privileged mailcow read/write API key. Keep the API key and OAuth credentials on the server, use HTTPS, use secure cookies in production and restrict the API key by source IP where possible.
+Moolias holds a privileged Mailcow read/write API key. Keep the API key and OAuth credentials on the server, use HTTPS, use secure cookies in production and restrict API access to the Moolias source network/address where practical.
+
+The recommended Mailcow-host deployment shares only Mailcow's Docker network with the main application. Moolias does not receive the Docker socket, Mailcow database credentials, Postfix configuration or other Mailcow filesystem mounts.
 
 Alias ownership is validated server-side before Moolias modifies an existing alias.
 
