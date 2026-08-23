@@ -49,12 +49,18 @@ class Settings(BaseSettings):
     )
 
     mailcow_url: str = Field(alias="MAILCOW_URL")
+    mailcow_internal_url: str = Field(default="", alias="MAILCOW_INTERNAL_URL")
     mailcow_api_key: str = Field(alias="MAILCOW_API_KEY", min_length=1)
     mailcow_oauth_client_id: str = Field(alias="MAILCOW_OAUTH_CLIENT_ID", min_length=1)
     mailcow_oauth_client_secret: str = Field(alias="MAILCOW_OAUTH_CLIENT_SECRET", min_length=1)
     mailcow_verify_tls: bool = Field(default=True, alias="MAILCOW_VERIFY_TLS")
 
-    @field_validator("base_url", "mailcow_url", "sender_agent_url")
+    @field_validator(
+        "base_url",
+        "mailcow_url",
+        "mailcow_internal_url",
+        "sender_agent_url",
+    )
     @classmethod
     def strip_trailing_slash(cls, value: str) -> str:
         return value.rstrip("/")
@@ -76,6 +82,10 @@ class Settings(BaseSettings):
         if self.usage_stats and not self.usage_db_path:
             raise ValueError("MOOLIAS_USAGE_DB_PATH must be set when usage statistics are enabled")
         return self
+
+    @property
+    def mailcow_backend_url(self) -> str:
+        return self.mailcow_internal_url or self.mailcow_url
 
     @property
     def oauth_callback_url(self) -> str:
