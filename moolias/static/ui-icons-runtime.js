@@ -116,7 +116,7 @@
       link.append(label);
 
       if (option.code === current.code) {
-        const selected = createUiIcon("check");
+        const selected = createUiIcon("circle-check");
         selected.classList.add("language-selected-icon");
         link.append(selected);
       }
