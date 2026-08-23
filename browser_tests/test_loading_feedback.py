@@ -71,11 +71,11 @@ def test_statistics_mode_downgrade_shows_confirmation_and_processing_dialog(
     )
 
     form.locator('button[type="submit"]').click()
-    confirmation = page.locator(".stats-downgrade-dialog")
+    confirmation = page.locator('dialog[data-moolias-dialog="confirm"]')
     expect(confirmation).to_be_visible()
-    expect(confirmation).to_contain_text("Reduce stored statistics?")
-    expect(confirmation).to_contain_text("permanently removes stored details")
-    confirmation.locator(".stats-downgrade-actions .button.primary").click()
+    expect(confirmation).to_contain_text("Change statistics mode?")
+    expect(confirmation).to_contain_text("permanently deleted")
+    confirmation.locator("[data-moolias-dialog-confirm]").click()
 
     expect(form.locator('input[name="confirm_downgrade"]')).to_have_value("1")
     processing = page.locator(".stats-processing-dialog")
