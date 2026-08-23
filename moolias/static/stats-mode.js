@@ -140,6 +140,7 @@
     input.value = choice === 'backfill' ? '1' : '0';
     form.append(input);
     showProcessingDialog(choice);
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
     form.requestSubmit(submitter || undefined);
   });
 })();
