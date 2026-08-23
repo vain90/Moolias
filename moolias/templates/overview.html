@@ -54,8 +54,8 @@
         <a class="recent-alias-row" href="/aliases?q={{ alias.address|urlencode }}">
           <span class="service-badge tone-{{ icon_data.tone if icon_data else 'neutral' }}" title="{{ icon_data.label if icon_data else '' }}" aria-hidden="true">{{ icon_data.glyph if icon_data else 'AL' }}</span>
           <span class="recent-alias-identity">
-            <strong>{{ alias.address }}</strong>
-            <small>{{ alias.description or t.no_purpose }}</small>
+            <strong>{{ alias.description or t.no_purpose }}</strong>
+            <small>{{ alias.address }}</small>
           </span>
           <span class="status {{ 'on' if alias.active else 'off' }}">{{ t.status_active if alias.active else t.status_inactive }}</span>
           <span class="recent-alias-time">
