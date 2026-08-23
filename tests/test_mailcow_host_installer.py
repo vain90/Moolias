@@ -4,6 +4,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = (ROOT / "install.sh").read_text(encoding="utf-8")
 INSTALLER = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
 COMPOSE = (ROOT / "compose.mailcow.yml").read_text(encoding="utf-8")
+AUTH = (ROOT / "moolias" / "auth.py").read_text(encoding="utf-8")
 
 
 def test_mailcow_compose_has_no_published_application_port():
@@ -14,12 +15,41 @@ def test_mailcow_compose_has_no_published_application_port():
     assert "MAILCOW_DOCKER_NETWORK" in COMPOSE
 
 
+def test_mailcow_compose_keeps_public_oauth_and_backend_routes_separate():
+    assert "MAILCOW_PUBLIC_URL: ${MAILCOW_URL}" in COMPOSE
+    assert "MAILCOW_URL: ${MAILCOW_INTERNAL_URL:-http://nginx-mailcow:8080}" in COMPOSE
+    assert 'os.environ.get("MAILCOW_PUBLIC_URL") or settings.mailcow_url' in AUTH
+    assert "_public_mailcow_url(settings)" in AUTH
+
+
 def test_installer_bootstrap_prefers_stable_and_has_initial_release_fallback():
     assert "releases/latest" in BOOTSTRAP
     assert "compose.mailcow.yml" in BOOTSTRAP
     assert 'install_ref="$latest_ref"' in BOOTSTRAP
     assert 'install_ref="main"' in BOOTSTRAP
     assert 'MOOLIAS_INSTALL_REF="$install_ref" bash "$tmp_file" "$@"' in BOOTSTRAP
+
+
+def test_bootstrap_guides_mailcow_api_allowlist_from_detected_network():
+    assert '[[ "$label" == "mailcow-network" ]]' in BOOTSTRAP
+    assert ".IPAM.Config" in BOOTSTRAP
+    assert "Mailcow API access" in BOOTSTRAP
+    assert 'Skip IP check for API' in BOOTSTRAP
+    assert "individual Moolias container IP" in BOOTSTRAP
+    assert "nginx-mailcow:8080" in BOOTSTRAP
+
+
+def test_bootstrap_validates_api_access_from_running_moolias_container():
+    assert "docker compose exec -T moolias python" in BOOTSTRAP
+    assert "/api/v1/get/domain/all" in BOOTSTRAP
+    assert "Mailcow API access from Moolias container: OK" in BOOTSTRAP
+    assert "Check the API key and its IP/CIDR allowlist" in BOOTSTRAP
+
+
+def test_bootstrap_cleanup_does_not_depend_on_local_scope_at_exit():
+    assert "printf -v tmp_file_cleanup '%q'" in BOOTSTRAP
+    assert 'trap "rm -f -- ${tmp_file_cleanup}" EXIT' in BOOTSTRAP
+    assert "trap 'rm -f \"$tmp_file\"' EXIT" not in BOOTSTRAP
 
 
 def test_installer_discovers_mailcow_network_instead_of_assuming_project_name():

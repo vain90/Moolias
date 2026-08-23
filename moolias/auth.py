@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from urllib.parse import urlencode
 
 import httpx
@@ -11,6 +12,10 @@ from moolias.security import new_token
 
 class OAuthError(RuntimeError):
     pass
+
+
+def _public_mailcow_url(settings: Settings) -> str:
+    return (os.environ.get("MAILCOW_PUBLIC_URL") or settings.mailcow_url).rstrip("/")
 
 
 def authorization_url(request: Request, settings: Settings) -> str:
@@ -25,7 +30,7 @@ def authorization_url(request: Request, settings: Settings) -> str:
             "state": state,
         }
     )
-    return f"{settings.mailcow_url}/oauth/authorize?{query}"
+    return f"{_public_mailcow_url(settings)}/oauth/authorize?{query}"
 
 
 async def exchange_code(settings: Settings, code: str) -> dict:

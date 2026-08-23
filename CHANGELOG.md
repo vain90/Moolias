@@ -2,6 +2,18 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.1.1 - 2026-08-23
+
+### Changed
+
+- the public Mailcow-host installer now detects the actual Mailcow Docker-network IPv4 CIDR and tells the administrator exactly what to allow for the Moolias read/write API key before asking for the key
+- the recommended same-host installation explicitly keeps Mailcow's API IP check enabled and avoids allowlisting a single disposable Moolias container address
+- the Mailcow-host installation guide now documents the API allowlist requirement and uses the stable-aware public bootstrap command
+
+### Fixed
+
+- the public bootstrap now validates a read-only Mailcow API request from inside the running Moolias container after installation so an invalid API key or source-IP/CIDR allowlist fails with a clear diagnostic instead of surfacing later in the application
+
 ## 1.1.0 - 2026-08-23
 
 ### Added
