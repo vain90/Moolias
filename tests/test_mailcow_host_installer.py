@@ -22,6 +22,21 @@ def test_installer_bootstrap_prefers_stable_and_has_initial_release_fallback():
     assert 'MOOLIAS_INSTALL_REF="$install_ref" bash "$tmp_file" "$@"' in BOOTSTRAP
 
 
+def test_bootstrap_guides_mailcow_api_allowlist_from_detected_network():
+    assert '[[ "$label" == "mailcow-network" ]]' in BOOTSTRAP
+    assert ".IPAM.Config" in BOOTSTRAP
+    assert "Mailcow API access" in BOOTSTRAP
+    assert 'Skip IP check for API' in BOOTSTRAP
+    assert "individual Moolias container IP" in BOOTSTRAP
+
+
+def test_bootstrap_validates_api_access_from_running_moolias_container():
+    assert "docker compose exec -T moolias python" in BOOTSTRAP
+    assert "/api/v1/get/domain/all" in BOOTSTRAP
+    assert "Mailcow API access from Moolias container: OK" in BOOTSTRAP
+    assert "Check the API key and its IP/CIDR allowlist" in BOOTSTRAP
+
+
 def test_installer_discovers_mailcow_network_instead_of_assuming_project_name():
     assert "com.docker.compose.network" in INSTALLER
     assert '[[ "$label" == "mailcow-network" ]]' in INSTALLER
