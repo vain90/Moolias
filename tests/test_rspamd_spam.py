@@ -5,16 +5,15 @@ from types import SimpleNamespace
 import pytest
 
 from moolias.rspamd_spam import (
-    apply_spam_evidence_to_state,
     RspamdSpamStore,
     SenderSpamEvidence,
     SpamEvidenceEvent,
+    apply_spam_evidence_to_state,
     spam_events_from_captured_senders,
 )
 from moolias.stats import SenderEvent
 from moolias.stats_mode import StatsMode
 from moolias.usage import _event_key
-
 
 MAILBOX = "user@example.org"
 ALIAS = "amazon-k7@example.org"
