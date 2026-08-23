@@ -4,6 +4,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = (ROOT / "install.sh").read_text(encoding="utf-8")
 INSTALLER = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
 COMPOSE = (ROOT / "compose.mailcow.yml").read_text(encoding="utf-8")
+ENV_EXAMPLE = (ROOT / ".env.example").read_text(encoding="utf-8")
 AUTH = (ROOT / "moolias" / "auth.py").read_text(encoding="utf-8")
 CONFIG = (ROOT / "moolias" / "config.py").read_text(encoding="utf-8")
 
@@ -31,7 +32,7 @@ def test_installer_bootstrap_prefers_stable_and_has_initial_release_fallback():
     assert "compose.mailcow.yml" in BOOTSTRAP
     assert 'install_ref="$latest_ref"' in BOOTSTRAP
     assert 'install_ref="main"' in BOOTSTRAP
-    assert 'MOOLIAS_INSTALL_REF="$install_ref"' in BOOTSTRAP
+    assert 'MOOLIAS_INSTALL_REF=${install_ref}' in BOOTSTRAP
 
 
 def test_bootstrap_guides_mailcow_api_allowlist_from_detected_network():
@@ -65,6 +66,12 @@ def test_bootstrap_validates_api_before_its_final_summary():
     assert "Mailcow API:       OK" in BOOTSTRAP
 
 
+def test_bootstrap_reports_mailcow_api_rejection_reason():
+    assert 'payload.get("msg", "")' in BOOTSTRAP
+    assert "Mailcow API rejected the request:" in BOOTSTRAP
+    assert "If Mailcow reports a different source IP above" in BOOTSTRAP
+
+
 def test_bootstrap_suppresses_nested_success_blocks_and_never_reprints_agent_secret():
     assert 'line == "Moolias Mailcow Agent installed successfully"' in BOOTSTRAP
     assert 'line == "Moolias installed successfully"' in BOOTSTRAP
@@ -76,7 +83,7 @@ def test_bootstrap_preserves_existing_sender_protection_on_rerun():
     assert "resolve_sender_install_mode" in BOOTSTRAP
     assert 'read_key_value "$env_file" MOOLIAS_SENDER_PROTECTION' in BOOTSTRAP
     assert 'sender_install_mode="no"' in BOOTSTRAP
-    assert 'MOOLIAS_INSTALL_SENDER_PROTECTION="$sender_install_mode"' in BOOTSTRAP
+    assert '"MOOLIAS_INSTALL_SENDER_PROTECTION=${sender_install_mode}"' in BOOTSTRAP
 
 
 def test_bootstrap_filters_successful_nginx_chatter_from_later_failures():
@@ -85,19 +92,48 @@ def test_bootstrap_filters_successful_nginx_chatter_from_later_failures():
     assert "/nginx: configuration file .* test is successful/ { next }" in BOOTSTRAP
 
 
-def test_bootstrap_waits_for_mailcow_acme_certificate():
+def test_bootstrap_waits_for_mailcow_acme_certificate_with_visible_progress():
     assert "certificate_matches_host" in BOOTSTRAP
     assert "MOOLIAS_TLS_WAIT_SECONDS" in BOOTSTRAP
-    assert "Waiting for Mailcow ACME certificate" in BOOTSTRAP
+    assert 'run_progress "Checking Mailcow TLS certificate"' in BOOTSTRAP
     assert "TLS certificate:   PENDING" in BOOTSTRAP
     assert "Do not bypass the browser certificate warning yet" in BOOTSTRAP
 
 
 def test_bootstrap_cleanup_does_not_depend_on_local_scope_at_exit():
     assert "printf -v tmp_file_cleanup '%q'" in BOOTSTRAP
+    assert "printf -v child_stdout_cleanup '%q'" in BOOTSTRAP
     assert "printf -v child_stderr_cleanup '%q'" in BOOTSTRAP
-    assert 'trap "rm -f -- ${tmp_file_cleanup} ${child_stderr_cleanup}" EXIT' in BOOTSTRAP
+    assert 'trap "rm -f -- ${tmp_file_cleanup} ${child_stdout_cleanup} ${child_stderr_cleanup}" EXIT' in BOOTSTRAP
     assert "trap 'rm -f \"$tmp_file\"' EXIT" not in BOOTSTRAP
+
+
+def test_bootstrap_has_six_page_interactive_setup_wizard():
+    assert "Moolias Setup" in BOOTSTRAP
+    assert 'setup_page 1 "Public URL"' in BOOTSTRAP
+    assert 'setup_page 2 "Mailcow API"' in BOOTSTRAP
+    assert 'setup_page 3 "OAuth"' in BOOTSTRAP
+    assert 'setup_page 4 "Access control"' in BOOTSTRAP
+    assert 'setup_page 5 "TLS certificate"' in BOOTSTRAP
+    assert 'setup_page 6 "Primary sender protection"' in BOOTSTRAP
+    assert "clear_setup_screen" in BOOTSTRAP
+
+
+def test_bootstrap_recommends_access_tag_and_sender_protection():
+    assert "Recommended: moolias-access" in BOOTSTRAP
+    assert 'access_tag="moolias-access"' in BOOTSTRAP
+    assert 'set_key_value "$env_file" MOOLIAS_ACCESS_TAG "$access_tag"' in BOOTSTRAP
+    assert 'prompt_yes_no \'Enable access restriction with "moolias-access"?\' "yes"' in BOOTSTRAP
+    assert 'prompt_yes_no "Install primary sender protection?" "yes"' in BOOTSTRAP
+    assert "Example: MOOLIAS_ACCESS_TAG=moolias-access" in ENV_EXAMPLE
+
+
+def test_bootstrap_keeps_terminal_alive_during_long_install_steps():
+    assert "run_progress()" in BOOTSTRAP
+    assert "Installing Moolias and applying Mailcow/ACME changes" in BOOTSTRAP
+    assert "Applying final private-network and access settings" in BOOTSTRAP
+    assert "Validating Mailcow API access" in BOOTSTRAP
+    assert "Checking Mailcow TLS certificate" in BOOTSTRAP
 
 
 def test_installer_discovers_mailcow_network_instead_of_assuming_project_name():
