@@ -126,10 +126,17 @@
   };
 
   const enhanceBranding = () => {
+    const favicon = document.querySelector('link[rel="icon"]');
+    if (favicon) {
+      favicon.href = "/static/favicon-32.png?v=20260823-3";
+      favicon.type = "image/png";
+      favicon.sizes = "32x32";
+    }
+
     document.querySelectorAll(".brand-mark").forEach((mark) => {
       if (mark.querySelector("img")) return;
       const image = document.createElement("img");
-      image.src = "/static/icon-192.png?v=20260823-3";
+      image.src = "/static/icon-192.webp?v=20260823-3";
       image.alt = "";
       image.width = 40;
       image.height = 40;
@@ -143,7 +150,7 @@
     if (hero && heading && !hero.querySelector(".hero-brand-logo")) {
       const image = document.createElement("img");
       image.className = "hero-brand-logo";
-      image.src = "/static/icon-192.png?v=20260823-3";
+      image.src = "/static/icon-192.webp?v=20260823-3";
       image.alt = "";
       image.width = 88;
       image.height = 88;
