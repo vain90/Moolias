@@ -120,8 +120,9 @@ main() {
   }
 
   open_tty() {
-    if [[ -r /dev/tty && -w /dev/tty ]]; then
-      exec 3<>/dev/tty
+    [[ "$noninteractive" == "true" ]] && return 0
+
+    if { exec 3<>/dev/tty; } 2>/dev/null; then
       tty_available=true
     fi
   }
