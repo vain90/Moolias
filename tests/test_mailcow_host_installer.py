@@ -100,13 +100,22 @@ def test_bootstrap_waits_for_mailcow_acme_certificate_with_visible_progress():
     assert "Do not bypass the browser certificate warning yet" in BOOTSTRAP
 
 
+def test_bootstrap_preserves_tls_status_from_progress_subshell():
+    assert 'local tls_status_file=""' in BOOTSTRAP
+    assert "record_tls_status()" in BOOTSTRAP
+    assert 'record_tls_status "ok"' in BOOTSTRAP
+    assert 'record_tls_status "pending"' in BOOTSTRAP
+    assert 'tls_status="$(tail -n1 "$tls_status_file")"' in BOOTSTRAP
+
+
 def test_bootstrap_cleanup_does_not_depend_on_local_scope_at_exit():
     assert "printf -v tmp_file_cleanup '%q'" in BOOTSTRAP
     assert "printf -v child_stdout_cleanup '%q'" in BOOTSTRAP
     assert "printf -v child_stderr_cleanup '%q'" in BOOTSTRAP
+    assert "printf -v tls_status_file_cleanup '%q'" in BOOTSTRAP
     trap_line = (
         'trap "rm -f -- ${tmp_file_cleanup} ${child_stdout_cleanup} '
-        '${child_stderr_cleanup}" EXIT'
+        '${child_stderr_cleanup} ${tls_status_file_cleanup}" EXIT'
     )
     assert trap_line in BOOTSTRAP
     assert "trap 'rm -f \"$tmp_file\"' EXIT" not in BOOTSTRAP
@@ -157,6 +166,18 @@ def test_installer_uses_dedicated_nginx_site_and_internal_upstream():
     assert "data/conf/nginx/moolias.conf" in INSTALLER
     assert "proxy_pass http://moolias-app:8000;" in INSTALLER
     assert "The Moolias application has no published host port." in INSTALLER
+
+
+def test_installer_keeps_mailcow_http01_challenge_out_of_moolias_proxy():
+    assert "    root /web;" in INSTALLER
+    assert "    location ^~ /.well-known/acme-challenge/ {" in INSTALLER
+    assert '        default_type "text/plain";' in INSTALLER
+    assert "    location / {\n${http_behavior}\n" in INSTALLER
+
+
+def test_installer_recreates_acme_container_after_additional_san_change():
+    assert "mailcow_compose up -d --no-deps --force-recreate acme-mailcow" in INSTALLER
+    assert "mailcow_compose restart acme-mailcow" not in INSTALLER
 
 
 def test_installer_keeps_secrets_off_standard_output():
