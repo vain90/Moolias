@@ -14,7 +14,11 @@ def test_public_branding_and_language_dropdown(page: Page, base_url: str) -> Non
 
     dropdown = page.locator("details[data-language-dropdown]")
     expect(dropdown).to_be_visible()
-    dropdown.locator("summary").click()
+    trigger = dropdown.locator("summary")
+    expect(trigger.locator("svg.language-flag")).to_have_count(1)
+    expect(trigger).not_to_contain_text("Deutsch")
+    expect(trigger).not_to_contain_text("English")
+    trigger.click()
 
     german = dropdown.locator('a.language-dropdown-option[lang="de"]')
     english = dropdown.locator('a.language-dropdown-option[lang="en"]')
@@ -27,7 +31,9 @@ def test_public_branding_and_language_dropdown(page: Page, base_url: str) -> Non
 
     english.click()
     expect(page.locator("html")).to_have_attribute("lang", "en")
-    expect(page.locator(".language-dropdown-current")).to_have_text("English")
+    trigger = page.locator("details[data-language-dropdown] summary")
+    expect(trigger.locator("svg.language-flag")).to_have_count(1)
+    expect(trigger).not_to_contain_text("English")
 
 
 def test_logged_in_shell_uses_moolias_logo(page: Page, base_url: str) -> None:
@@ -37,7 +43,18 @@ def test_logged_in_shell_uses_moolias_logo(page: Page, base_url: str) -> None:
     logo = page.locator(".brand-mark-logo img")
     expect(logo).to_be_visible()
     expect(logo).to_have_attribute("src", re.compile(r"/static/icon-192\.png"))
-    expect(page.locator("header .language-dropdown")).to_be_visible()
+
+    language_dropdown = page.locator("header .language-dropdown")
+    expect(language_dropdown).to_be_visible()
+    trigger = language_dropdown.locator("summary")
+    expect(trigger.locator("svg.language-flag")).to_have_count(1)
+    expect(trigger).not_to_contain_text("Deutsch")
+
+    language_box = language_dropdown.bounding_box()
+    actions_box = page.locator("header .header-actions").bounding_box()
+    assert language_box is not None
+    assert actions_box is not None
+    assert language_box["x"] + language_box["width"] <= actions_box["x"] + 1
 
 
 def test_web_app_manifest_uses_moolias_icons(page: Page, base_url: str) -> None:
@@ -60,3 +77,4 @@ def test_web_app_manifest_uses_moolias_icons(page: Page, base_url: str) -> None:
         icon_response = page.request.get(f"{base_url}{item['src']}")
         assert icon_response.ok
         assert icon_response.headers["content-type"].startswith("image/png")
+        assert icon_response.body().startswith(b"\x89PNG\r\n\x1a\n")
