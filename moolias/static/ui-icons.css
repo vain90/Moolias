@@ -24,6 +24,29 @@
 .button:not(.icon-only) .ui-icon:first-child { margin-right: 6px; }
 .button.icon-only { gap: 0; }
 
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.text-link .ui-icon,
+.card-footer-link .ui-icon { width: 14px; height: 14px; }
+
+.ui-marker-badge {
+  width: 31px;
+  height: 31px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #f2f4f7;
+  color: #475467;
+}
+.ui-marker-badge .ui-icon { width: 17px; height: 17px; }
+.ui-marker-badge.tone-blue { color: #1b5f9f; background: #eaf3ff; }
+.ui-marker-badge.tone-neutral { color: #667085; background: #f2f4f7; }
+
 .theme-segments button {
   display: flex;
   align-items: center;
