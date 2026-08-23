@@ -211,7 +211,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
         if request.session.get("user_email"):
-            return RedirectResponse("/aliases", status_code=303)
+            return RedirectResponse("/overview", status_code=303)
         return TEMPLATES.TemplateResponse(
             request,
             "index.html",
@@ -269,7 +269,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request.session.clear()
         request.session["user_email"] = email
         ensure_csrf_token(request)
-        return RedirectResponse("/aliases", status_code=303)
+        return RedirectResponse("/overview", status_code=303)
 
     @app.post("/logout")
     async def logout(request: Request, csrf_token: str = Form(...)):
@@ -686,8 +686,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ):
         validate_csrf(request, csrf_token)
         user = require_user(request)
-        if count not in {1, 5, 10, 20}:
-            raise HTTPException(status_code=400, detail="Pool size must be 1, 5, 10 or 20")
+        if count not in {1, 5, 10}:
+            raise HTTPException(status_code=400, detail="Pool size must be 1, 5 or 10")
         try:
             for _ in range(count):
                 await create_unique_alias(
