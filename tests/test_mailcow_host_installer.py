@@ -1,0 +1,71 @@
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+BOOTSTRAP = (ROOT / "install.sh").read_text(encoding="utf-8")
+INSTALLER = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
+COMPOSE = (ROOT / "compose.mailcow.yml").read_text(encoding="utf-8")
+
+
+def test_mailcow_compose_has_no_published_application_port():
+    assert "    ports:\n" not in COMPOSE
+    assert "      - moolias-data:/data" in COMPOSE
+    assert "          - moolias-app" in COMPOSE
+    assert "    external: true" in COMPOSE
+    assert "MAILCOW_DOCKER_NETWORK" in COMPOSE
+
+
+def test_installer_bootstrap_prefers_stable_and_has_initial_release_fallback():
+    assert "releases/latest" in BOOTSTRAP
+    assert "compose.mailcow.yml" in BOOTSTRAP
+    assert 'install_ref="$latest_ref"' in BOOTSTRAP
+    assert 'install_ref="main"' in BOOTSTRAP
+    assert 'MOOLIAS_INSTALL_REF="$install_ref" bash "$tmp_file" "$@"' in BOOTSTRAP
+
+
+def test_installer_discovers_mailcow_network_instead_of_assuming_project_name():
+    assert "com.docker.compose.network" in INSTALLER
+    assert '[[ "$label" == "mailcow-network" ]]' in INSTALLER
+    assert "mailcowdockerized_mailcow-network" not in INSTALLER
+
+
+def test_installer_does_not_modify_mailcow_main_compose_file():
+    assert "docker-compose.yml" in INSTALLER
+    assert 'set_key_value "$MAILCOW_CONF" ADDITIONAL_SAN' in INSTALLER
+    assert 'set_key_value "${MAILCOW_DIR}/docker-compose.yml"' not in INSTALLER
+    assert "docker-compose.override.yml" not in INSTALLER
+
+
+def test_installer_uses_dedicated_nginx_site_and_internal_upstream():
+    assert "data/conf/nginx/moolias.conf" in INSTALLER
+    assert "proxy_pass http://moolias-app:8000;" in INSTALLER
+    assert "The Moolias application has no published host port." in INSTALLER
+
+
+def test_installer_keeps_secrets_off_standard_output():
+    assert "read -r -s value" in INSTALLER
+    assert "Secrets were written to ${env_file}" in INSTALLER
+    assert "MAILCOW_API_KEY=${api_key}" not in INSTALLER
+    assert "MAILCOW_OAUTH_CLIENT_SECRET=${oauth_secret}" not in INSTALLER
+
+
+def test_installer_supports_curl_pipe_and_noninteractive_mode():
+    assert "main() {" in BOOTSTRAP
+    assert 'main "$@"' in BOOTSTRAP
+    assert "main() {" in INSTALLER
+    assert 'main "$@"' in INSTALLER
+    assert "exec 3<>/dev/tty" in INSTALLER
+    assert "MOOLIAS_NONINTERACTIVE" in INSTALLER
+    assert "MOOLIAS_SOURCE_DIR" in INSTALLER
+    assert "MOOLIAS_SKIP_PULL" in INSTALLER
+
+
+def test_installer_refuses_known_nginx_hostname_conflicts():
+    assert "ADDITIONAL_SERVER_NAMES" in INSTALLER
+    assert "dedicated Moolias nginx server can own that hostname" in INSTALLER
+
+
+def test_installer_supports_mailcow_acme_without_overwriting_existing_sans():
+    assert "append_csv_value" in INSTALLER
+    assert "ADDITIONAL_SAN" in INSTALLER
+    assert "ONLY_MAILCOW_HOSTNAME" in INSTALLER
+    assert "SKIP_LETS_ENCRYPT" in INSTALLER

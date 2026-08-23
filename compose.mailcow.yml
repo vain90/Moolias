@@ -1,0 +1,27 @@
+# Recommended deployment when Moolias runs on the Mailcow host.
+# The installer writes this file as /opt/moolias/compose.yml and discovers the
+# existing Mailcow Docker network automatically.
+services:
+  moolias:
+    image: ${MOOLIAS_IMAGE:-ghcr.io/vain90/moolias}:${MOOLIAS_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - moolias-data:/data
+    networks:
+      mailcow:
+        aliases:
+          - moolias-app
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  moolias-data:
+
+networks:
+  mailcow:
+    external: true
+    name: ${MAILCOW_DOCKER_NETWORK:?MAILCOW_DOCKER_NETWORK is set by the Moolias installer}

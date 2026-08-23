@@ -1,0 +1,188 @@
+from __future__ import annotations
+
+import os
+import stat
+import subprocess
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+INSTALLER = ROOT / "scripts" / "install.sh"
+INSTALL_DIR = Path("/tmp/moolias-host-install")
+MOOLIAS_HOSTNAME = "moolias.mailcow-ci.test"
+
+
+def _run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        args,
+        cwd=cwd,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+
+
+def _mailcow_compose(*args: str) -> subprocess.CompletedProcess[str]:
+    return _run("docker", "compose", *args, cwd=Path(os.environ["MAILCOW_DIR"]))
+
+
+def _installed_compose(*args: str) -> subprocess.CompletedProcess[str]:
+    return _run("sudo", "docker", "compose", *args, cwd=INSTALL_DIR)
+
+
+def _mailcow_network() -> str:
+    nginx_id = _mailcow_compose("ps", "-q", "nginx-mailcow").stdout.strip()
+    assert nginx_id
+    networks = _run(
+        "docker",
+        "inspect",
+        "--format",
+        "{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}",
+        nginx_id,
+    ).stdout.splitlines()
+    for network in networks:
+        label = _run(
+            "docker",
+            "network",
+            "inspect",
+            "--format",
+            '{{index .Labels "com.docker.compose.network"}}',
+            network,
+        ).stdout.strip()
+        if label == "mailcow-network":
+            return network
+    raise AssertionError("Mailcow network was not found")
+
+
+@pytest.mark.skipif(
+    os.environ.get("MOOLIAS_TEST_SCENARIO") != "fresh",
+    reason="run the full host installer only once per Mailcow matrix",
+)
+def test_recommended_mailcow_host_installer() -> None:
+    mailcow_dir = Path(os.environ["MAILCOW_DIR"])
+    mailcow_conf = mailcow_dir / "mailcow.conf"
+    nginx_custom = mailcow_dir / "data" / "conf" / "nginx" / "moolias.conf"
+    override_file = mailcow_dir / "docker-compose.override.yml"
+
+    mailcow_conf_before = mailcow_conf.read_bytes()
+    override_before = override_file.read_bytes() if override_file.exists() else None
+
+    if INSTALL_DIR.exists():
+        subprocess.run(["sudo", "rm", "-rf", str(INSTALL_DIR)], check=True)
+    if nginx_custom.exists():
+        subprocess.run(["sudo", "rm", "-f", str(nginx_custom)], check=True)
+
+    command = [
+        "sudo",
+        "env",
+        "MOOLIAS_NONINTERACTIVE=true",
+        f"MOOLIAS_SOURCE_DIR={ROOT}",
+        "MOOLIAS_INSTALL_REF=integration-test",
+        f"MOOLIAS_INSTALL_DIR={INSTALL_DIR}",
+        "MOOLIAS_IMAGE_REPOSITORY=moolias",
+        "MOOLIAS_IMAGE_TAG=sender-agent-ci",
+        "MOOLIAS_SKIP_PULL=true",
+        f"MOOLIAS_BASE_URL=http://{MOOLIAS_HOSTNAME}:8080",
+        f"MAILCOW_URL={os.environ['MAILCOW_URL']}",
+        f"MAILCOW_API_KEY={os.environ['MAILCOW_API_KEY']}",
+        "MAILCOW_OAUTH_CLIENT_ID=integration-client",
+        "MAILCOW_OAUTH_CLIENT_SECRET=integration-secret",
+        "MOOLIAS_TLS_MODE=none",
+        "MOOLIAS_INSTALL_SENDER_PROTECTION=no",
+        f"MAILCOW_DIR={mailcow_dir}",
+        "bash",
+        str(INSTALLER),
+    ]
+
+    try:
+        result = _run(*command, cwd=ROOT)
+        assert "Moolias installed successfully" in result.stdout
+        assert "The Moolias application has no published host port." in result.stdout
+
+        assert (INSTALL_DIR / "compose.yml").is_file()
+        assert (INSTALL_DIR / "update.sh").is_file()
+        assert (INSTALL_DIR / ".moolias-mailcow-install").is_file()
+        assert stat.S_IMODE((INSTALL_DIR / ".env").stat().st_mode) == 0o600
+
+        container_id = _installed_compose("ps", "-q", "moolias").stdout.strip()
+        assert container_id
+
+        port_bindings = _run(
+            "docker",
+            "inspect",
+            "--format",
+            "{{json .HostConfig.PortBindings}}",
+            container_id,
+        ).stdout.strip()
+        assert port_bindings in {"{}", "null"}
+
+        network = _mailcow_network()
+        attached_networks = _run(
+            "docker",
+            "inspect",
+            "--format",
+            "{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}",
+            container_id,
+        ).stdout.splitlines()
+        assert network in attached_networks
+
+        health = _run(
+            "docker",
+            "inspect",
+            "--format",
+            "{{.State.Health.Status}}",
+            container_id,
+        ).stdout.strip()
+        assert health == "healthy"
+
+        response = _run(
+            "curl",
+            "--noproxy",
+            "*",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--resolve",
+            f"{MOOLIAS_HOSTNAME}:8080:127.0.0.1",
+            f"http://{MOOLIAS_HOSTNAME}:8080/healthz",
+        ).stdout
+        assert response
+
+        assert nginx_custom.is_file()
+        assert "Managed by Moolias Mailcow installer" in nginx_custom.read_text(
+            encoding="utf-8"
+        )
+        assert mailcow_conf.read_bytes() == mailcow_conf_before
+        if override_before is None:
+            assert not override_file.exists()
+        else:
+            assert override_file.read_bytes() == override_before
+    finally:
+        if (INSTALL_DIR / "compose.yml").exists():
+            subprocess.run(
+                ["sudo", "docker", "compose", "down", "-v", "--remove-orphans"],
+                cwd=INSTALL_DIR,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        subprocess.run(["sudo", "rm", "-rf", str(INSTALL_DIR)], check=False)
+        subprocess.run(["sudo", "rm", "-f", str(nginx_custom)], check=False)
+        subprocess.run(
+            [
+                "docker",
+                "compose",
+                "exec",
+                "-T",
+                "nginx-mailcow",
+                "nginx",
+                "-s",
+                "reload",
+            ],
+            cwd=mailcow_dir,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )

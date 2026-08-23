@@ -36,12 +36,16 @@ jobs:
       - run: node --check moolias/static/sender-protection.js
       - run: node --check moolias/static/ui-icons-runtime.js
       - run: node --check moolias/static/pool-create-menu.js
+      - run: bash -n install.sh
+      - run: bash -n scripts/install.sh
       - run: bash -n scripts/install-mailcow-agent.sh
       - run: bash -n update.sh
       - name: Validate Docker Compose
         run: |
           cp .env.example .env
           docker compose config >/dev/null
+          MAILCOW_DOCKER_NETWORK=mailcow-ci \
+            docker compose -f compose.mailcow.yml config >/dev/null
       - name: Build Moolias image
         run: docker build -t moolias:test .
 
