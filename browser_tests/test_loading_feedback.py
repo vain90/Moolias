@@ -46,6 +46,45 @@ def test_statistics_mode_history_choice_shows_processing_dialog(
     expect(processing.locator("progress")).to_be_visible()
 
 
+def test_statistics_mode_downgrade_shows_confirmation_and_processing_dialog(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+    page.goto(f"{base_url}/statistics")
+
+    page.locator("[data-open-settings]").click()
+    form = page.locator(".usage-mode-form")
+    expect(form).to_be_visible()
+
+    page.evaluate("document.body.dataset.statsEffective = 'full'")
+    form.locator('select[name="mode"]').select_option("domain")
+    page.evaluate(
+        """
+        () => {
+          const form = document.querySelector('.usage-mode-form');
+          form.addEventListener('submit', (event) => {
+            if (form.querySelector('input[name="confirm_downgrade"]')) event.preventDefault();
+          }, { capture: true });
+        }
+        """
+    )
+
+    form.locator('button[type="submit"]').click()
+    confirmation = page.locator(".stats-downgrade-dialog")
+    expect(confirmation).to_be_visible()
+    expect(confirmation).to_contain_text("Reduce stored statistics?")
+    expect(confirmation).to_contain_text("permanently removes stored details")
+    confirmation.locator(".stats-downgrade-actions .button.primary").click()
+
+    expect(form.locator('input[name="confirm_downgrade"]')).to_have_value("1")
+    processing = page.locator(".stats-processing-dialog")
+    expect(processing).to_be_visible()
+    expect(processing).to_contain_text("Updating statistics")
+    expect(processing).to_contain_text("Details that are no longer permitted are being deleted")
+    expect(processing.locator("progress")).to_be_visible()
+
+
 def test_action_required_dialog_shows_loading_feedback(
     page: Page,
     base_url: str,
