@@ -35,7 +35,7 @@ class MailcowClient:
     ) -> None:
         self.settings = settings
         self._client = httpx.AsyncClient(
-            base_url=settings.mailcow_url,
+            base_url=settings.mailcow_backend_url,
             headers={"X-API-Key": settings.mailcow_api_key, "Accept": "application/json"},
             verify=settings.mailcow_verify_tls,
             timeout=15.0,
