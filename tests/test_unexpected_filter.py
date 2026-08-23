@@ -113,7 +113,7 @@ def _login(client: TestClient) -> None:
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert response.headers["location"] == "/aliases"
+    assert response.headers["location"] == "/overview"
 
 
 async def _seed_sender_state(store) -> None:
