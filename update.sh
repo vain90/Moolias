@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-UPDATER_VERSION="0.1.3"
+UPDATER_VERSION="0.1.4"
 REPOSITORY="vain90/Moolias"
 IMAGE="ghcr.io/vain90/moolias"
 LATEST_RELEASE_URL="https://github.com/${REPOSITORY}/releases/latest"
@@ -156,6 +156,37 @@ fi
 
 cd "${SCRIPT_DIR}"
 
+is_legacy_stock_dev_compose() {
+  local expected_file
+  [[ -f "compose.local.yml" ]] || return 1
+
+  expected_file="$(mktemp)"
+  cat > "${expected_file}" <<'EOF'
+services:
+  moolias:
+    build:
+      context: .
+    image: moolias:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${MOOLIAS_PORT:-8080}:8000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+EOF
+
+  if cmp -s "compose.local.yml" "${expected_file}"; then
+    rm -f "${expected_file}"
+    return 0
+  fi
+
+  rm -f "${expected_file}"
+  return 1
+}
+
 COMPOSE_ARGS=()
 COMPOSE_DISPLAY=""
 
@@ -164,8 +195,13 @@ if [[ -n "${MOOLIAS_COMPOSE_FILE:-}" ]]; then
   COMPOSE_ARGS=(-f "${MOOLIAS_COMPOSE_FILE}")
   COMPOSE_DISPLAY="${MOOLIAS_COMPOSE_FILE}"
 elif [[ -f "compose.yml" && -f "compose.local.yml" ]]; then
-  COMPOSE_ARGS=(-f "compose.yml" -f "compose.local.yml")
-  COMPOSE_DISPLAY="compose.yml + compose.local.yml"
+  if is_legacy_stock_dev_compose; then
+    COMPOSE_ARGS=(-f "compose.yml")
+    COMPOSE_DISPLAY="compose.yml (legacy development compose.local.yml ignored)"
+  else
+    COMPOSE_ARGS=(-f "compose.yml" -f "compose.local.yml")
+    COMPOSE_DISPLAY="compose.yml + compose.local.yml"
+  fi
 elif [[ -f "compose.yml" ]]; then
   COMPOSE_ARGS=(-f "compose.yml")
   COMPOSE_DISPLAY="compose.yml"
