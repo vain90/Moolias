@@ -104,7 +104,11 @@ def test_bootstrap_cleanup_does_not_depend_on_local_scope_at_exit():
     assert "printf -v tmp_file_cleanup '%q'" in BOOTSTRAP
     assert "printf -v child_stdout_cleanup '%q'" in BOOTSTRAP
     assert "printf -v child_stderr_cleanup '%q'" in BOOTSTRAP
-    assert 'trap "rm -f -- ${tmp_file_cleanup} ${child_stdout_cleanup} ${child_stderr_cleanup}" EXIT' in BOOTSTRAP
+    trap_line = (
+        'trap "rm -f -- ${tmp_file_cleanup} ${child_stdout_cleanup} '
+        '${child_stderr_cleanup}" EXIT'
+    )
+    assert trap_line in BOOTSTRAP
     assert "trap 'rm -f \"$tmp_file\"' EXIT" not in BOOTSTRAP
 
 
