@@ -2,6 +2,18 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.1.3 - 2026-08-23
+
+### Changed
+
+- the public Mailcow bootstrap now recognizes an already enabled sender-protection setup during a repair/rerun and preserves it without asking the child installer to install the sidecar again
+- failure output filters routine successful nginx warnings and validation chatter while retaining actual nginx errors and the real installer failure
+- the disposable-Mailcow integration test now runs the public installer a second time against the same persisted installation with sender protection already enabled
+
+### Fixed
+
+- rerunning the public installer on an installation with `MOOLIAS_SENDER_PROTECTION=true` no longer fails with `MOOLIAS_INSTALL_SENDER_PROTECTION must be ask, yes or no`
+
 ## 1.1.2 - 2026-08-23
 
 ### Changed
