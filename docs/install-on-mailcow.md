@@ -46,7 +46,35 @@ https://moolias.example.org/oauth/callback
 
 Do not reuse `MAILCOW_HOSTNAME` itself for Moolias. Give Moolias its own hostname.
 
-For the API key, restrict access to the Mailcow/Moolias host or Docker source range where practical.
+### Mailcow API allowlist
+
+Do not leave the API source restriction unspecified and do not enable **Skip IP check for API** for the normal same-host deployment.
+
+Moolias runs as a container on Mailcow's existing Docker network. The API key should therefore allow the IPv4 CIDR of that network rather than one individual Moolias container address. A container address may change whenever the container is recreated.
+
+A default Mailcow installation commonly uses:
+
+```text
+172.22.1.0/24
+```
+
+Do not copy that example blindly. The public Moolias bootstrap inspects the running `nginx-mailcow` container, finds the network whose Docker Compose label is `mailcow-network`, reads its configured IPv4 subnet and prints the exact CIDR value that should be entered in Mailcow before it asks for the API key.
+
+The installer displays guidance similar to:
+
+```text
+Mailcow API access
+------------------
+Mailcow Docker network:
+  mailcowdockerized_mailcow-network
+
+Allow this IPv4 CIDR for the Moolias read/write API key:
+  172.22.1.0/24
+
+Do not enable "Skip IP check for API".
+```
+
+After installation, the bootstrap performs a read-only Mailcow API request **from inside the running Moolias container**. An invalid key or incorrect IP/CIDR allowlist therefore fails the installation with a specific API-access message instead of leaving a seemingly successful but unusable deployment.
 
 ## Recommended interactive installation
 
@@ -54,14 +82,14 @@ Run on the Mailcow host:
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/vain90/Moolias/main/scripts/install.sh \
+  https://raw.githubusercontent.com/vain90/Moolias/main/install.sh \
   | sudo bash
 ```
 
 The bootstrap installer follows the latest stable Moolias release by default. It asks only for values that cannot be derived safely:
 
 1. public Moolias URL, with a suggested hostname derived from `MAILCOW_HOSTNAME`;
-2. Mailcow read/write API key;
+2. Mailcow read/write API key, after displaying the detected API allowlist CIDR;
 3. OAuth client ID;
 4. OAuth client secret;
 5. whether Mailcow ACME should add the Moolias hostname to `ADDITIONAL_SAN`;
@@ -106,6 +134,8 @@ com.docker.compose.network=mailcow-network
 ```
 
 The discovered Docker network name is stored as `MAILCOW_DOCKER_NETWORK` in the Moolias `.env` file and used by the external network declaration in `compose.yml`.
+
+The public bootstrap also reads the IPv4 subnet from this network and displays it for the Mailcow API-key source allowlist.
 
 This also works when the Mailcow Compose project has a non-default project name.
 
@@ -180,7 +210,9 @@ Also back up `/opt/moolias/.env`; it contains the Mailcow API key, OAuth secret 
 
 ## Non-interactive installation
 
-Automation is supported, but all required values must be explicit. Example:
+Automation is supported, but all required values must be explicit. For automation, configure the API-key allowlist before running the installer. You can determine the Mailcow Docker-network CIDR with `docker network inspect`, or run the public bootstrap interactively once to see the detected value.
+
+Example:
 
 ```bash
 sudo env \
