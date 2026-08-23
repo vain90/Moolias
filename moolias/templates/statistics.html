@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}{% if language == 'de' %}Statistiken{% else %}Statistics{% endif %} · Moolias{% endblock %}
 {% block content %}
 <header class="page-heading page-heading-actions">
@@ -10,12 +11,12 @@
 
 {% if usage_stats_visible %}
 <section class="metric-grid statistics-metrics">
-  <div class="metric-card static-card"><span class="metric-icon green" aria-hidden="true">↓</span><strong>{{ stats_summary.received }}</strong><span>{% if language == 'de' %}Empfangen{% else %}Received{% endif %}</span><small>{% if language == 'de' %}Nachrichten{% else %}Messages{% endif %}</small></div>
-  <div class="metric-card static-card"><span class="metric-icon blue" aria-hidden="true">↑</span><strong>{{ stats_summary.sent }}</strong><span>{% if language == 'de' %}Gesendet{% else %}Sent{% endif %}</span><small>{% if language == 'de' %}Nachrichten{% else %}Messages{% endif %}</small></div>
-  <div class="metric-card static-card"><span class="metric-icon green" aria-hidden="true">✓</span><strong>{{ stats_summary.recognized_senders }}</strong><span>{% if language == 'de' %}Erkannt{% else %}Recognized{% endif %}</span><small>{% if language == 'de' %}Absender{% else %}Senders{% endif %}</small></div>
-  <div class="metric-card static-card"><span class="metric-icon amber" aria-hidden="true">?</span><strong>{{ stats_summary.unrecognized_senders }}</strong><span>{% if language == 'de' %}Nicht erkannt{% else %}Not recognized{% endif %}</span><small>{% if language == 'de' %}Absender{% else %}Senders{% endif %}{% if unexpected_aliases %} · <a class="metric-inline-link" href="/aliases?status=unexpected">{% if language == 'de' %}Jetzt prüfen{% else %}Review now{% endif %}</a>{% endif %}</small></div>
-  <div class="metric-card static-card"><span class="metric-icon violet" aria-hidden="true">◎</span><strong>{% if stats_summary.recognition_rate is not none %}{{ stats_summary.recognition_rate }}%{% else %}–{% endif %}</strong><span>{% if language == 'de' %}Erkennungsquote{% else %}Recognition rate{% endif %}</span><small>{% if language == 'de' %}Nachrichten{% else %}Messages{% endif %}</small></div>
-  <div class="metric-card static-card"><span class="metric-icon neutral" aria-hidden="true">○</span><strong>{{ stats_summary.no_usage_evidence }}</strong><span>{% if language == 'de' %}Keine Nutzung{% else %}No usage{% endif %}</span><small>{% if language == 'de' %}nachgewiesen{% else %}evidence{% endif %}</small></div>
+  <div class="metric-card static-card"><span class="metric-icon green" aria-hidden="true">{{ icon('inbox') }}</span><strong>{{ stats_summary.received }}</strong><span>{% if language == 'de' %}Empfangen{% else %}Received{% endif %}</span><small>{% if language == 'de' %}Nachrichten{% else %}Messages{% endif %}</small></div>
+  <div class="metric-card static-card"><span class="metric-icon blue" aria-hidden="true">{{ icon('send') }}</span><strong>{{ stats_summary.sent }}</strong><span>{% if language == 'de' %}Gesendet{% else %}Sent{% endif %}</span><small>{% if language == 'de' %}Nachrichten{% else %}Messages{% endif %}</small></div>
+  <div class="metric-card static-card"><span class="metric-icon green" aria-hidden="true">{{ icon('circle-check') }}</span><strong>{{ stats_summary.recognized_senders }}</strong><span>{% if language == 'de' %}Erkannt{% else %}Recognized{% endif %}</span><small>{% if language == 'de' %}Absender{% else %}Senders{% endif %}</small></div>
+  <div class="metric-card static-card"><span class="metric-icon amber" aria-hidden="true">{{ icon('triangle-alert') }}</span><strong>{{ stats_summary.unrecognized_senders }}</strong><span>{% if language == 'de' %}Nicht erkannt{% else %}Not recognized{% endif %}</span><small>{% if language == 'de' %}Absender{% else %}Senders{% endif %}{% if unexpected_aliases %} · <a class="metric-inline-link" href="/aliases?status=unexpected">{% if language == 'de' %}Jetzt prüfen{% else %}Review now{% endif %}</a>{% endif %}</small></div>
+  <div class="metric-card static-card"><span class="metric-icon violet" aria-hidden="true">{{ icon('chart-no-axes-combined') }}</span><strong>{% if stats_summary.recognition_rate is not none %}{{ stats_summary.recognition_rate }}%{% else %}–{% endif %}</strong><span>{% if language == 'de' %}Erkennungsquote{% else %}Recognition rate{% endif %}</span><small>{% if language == 'de' %}Nachrichten{% else %}Messages{% endif %}</small></div>
+  <div class="metric-card static-card"><span class="metric-icon neutral" aria-hidden="true">{{ icon('clock-3') }}</span><strong>{{ stats_summary.no_usage_evidence }}</strong><span>{% if language == 'de' %}Keine Nutzung{% else %}No usage{% endif %}</span><small>{% if language == 'de' %}nachgewiesen{% else %}evidence{% endif %}</small></div>
 </section>
 
 <section class="statistics-layout top-gap">
@@ -25,10 +26,10 @@
     <div class="rank-list">
       {% for alias in top_aliases %}
       {% set usage = usage_stats.get(alias.address|lower, {}) %}
-      {% set icon = service_icons.get(alias.address|lower) %}
+      {% set service_icon = service_icons.get(alias.address|lower) %}
       <a class="rank-row" href="/aliases?q={{ alias.address|urlencode }}">
         <span class="rank-number">{{ loop.index }}</span>
-        <span class="service-badge tone-{{ icon.tone if icon else 'neutral' }}">{{ icon.glyph if icon else 'AL' }}</span>
+        <span class="service-badge tone-{{ service_icon.tone if service_icon else 'neutral' }}">{{ service_icon.glyph if service_icon else 'AL' }}</span>
         <span class="rank-identity"><strong>{{ alias.description or t.no_purpose }}</strong><small>{{ alias.address }}</small></span>
         <span class="rank-value"><strong>{{ (usage.received_count or 0) + (usage.sent_count or 0) }}</strong><small>{{ usage.received_count or 0 }} ↓ · {{ usage.sent_count or 0 }} ↑</small></span>
       </a>
@@ -93,7 +94,7 @@
     <div class="section-head"><div><h2>{% if language == 'de' %}Aktivste Quellen{% else %}Most active sources{% endif %}</h2><p class="muted">{% if statistics_detail == 'address' %}{% if language == 'de' %}Einzelne Absenderadressen mit den meisten eingehenden Nachrichten.{% else %}Individual sender addresses with the most incoming messages.{% endif %}{% else %}{% if language == 'de' %}Absender-Domains mit den meisten eingehenden Nachrichten.{% else %}Sender domains with the most incoming messages.{% endif %}{% endif %}</p></div></div>
     {% if top_sources %}
     <div class="source-list">
-      {% for source, count in top_sources %}<div class="source-row"><span class="service-badge tone-neutral">@</span><code>{{ source }}</code><strong>{{ count }}</strong></div>{% endfor %}
+      {% for source, count in top_sources %}<div class="source-row"><span class="service-badge tone-neutral">{{ icon('inbox') }}</span><code>{{ source }}</code><strong>{{ count }}</strong></div>{% endfor %}
     </div>
     {% elif stats_state and stats_state.sender_detail_enabled %}<p class="empty">{% if language == 'de' %}Noch keine Absenderquellen erfasst.{% else %}No sender sources have been recorded yet.{% endif %}</p>
     {% else %}<p class="empty">{% if language == 'de' %}Quellen werden ab dem Statistikmodus „Domain“ erfasst.{% else %}Sources are collected from the Domain statistics mode onward.{% endif %}</p>{% endif %}
@@ -107,7 +108,7 @@
     <p class="empty">{% if language == 'de' %}Ziele werden aus Datenschutzgründen erst ab dem Statistikmodus „Domain“ angezeigt.{% else %}For privacy reasons, destinations are shown from the Domain statistics mode onward.{% endif %}</p>
     {% elif top_destinations %}
     <div class="source-list destination-list">
-      {% for destination in top_destinations %}<div class="source-row"><span class="service-badge tone-blue">→</span><code>{{ destination.label }}</code><strong>{{ destination.count }}</strong></div>{% endfor %}
+      {% for destination in top_destinations %}<div class="source-row"><span class="service-badge tone-blue">{{ icon('send') }}</span><code>{{ destination.label }}</code><strong>{{ destination.count }}</strong></div>{% endfor %}
     </div>
     {% else %}
     <p class="empty">{% if language == 'de' %}In der aktuellen Mailcow-Historie wurden noch keine Ziele für gesendete Alias-Nachrichten gefunden.{% else %}No destinations for sent alias messages were found in the current Mailcow history yet.{% endif %}</p>
@@ -117,23 +118,23 @@
 {% else %}
 <section class="card empty-state-card statistics-disabled-state">
   {% if not stats_available %}
-    <span class="empty-state-icon" aria-hidden="true">▥</span>
+    <span class="empty-state-icon" aria-hidden="true">{{ icon('chart-no-axes-combined') }}</span>
     <h2>{% if language == 'de' %}Statistiken sind auf diesem Server nicht aktiviert{% else %}Statistics are not enabled on this server{% endif %}</h2>
     <p class="muted">{% if language == 'de' %}Die Statistikfunktion wurde serverseitig deaktiviert. Ein Administrator muss sie in der Moolias-Konfiguration aktivieren, bevor Postfächer sie nutzen können.{% else %}The statistics feature is disabled server-side. An administrator must enable it in the Moolias configuration before mailboxes can use it.{% endif %}</p>
   {% elif stats_error %}
-    <span class="empty-state-icon" aria-hidden="true">!</span>
+    <span class="empty-state-icon" aria-hidden="true">{{ icon('triangle-alert') }}</span>
     <h2>{% if language == 'de' %}Statistikstatus nicht verfügbar{% else %}Statistics status unavailable{% endif %}</h2>
     <p class="muted">{% if language == 'de' %}Moolias konnte den aktuellen Statistikmodus dieses Postfachs nicht aus Mailcow laden. Versuche es später erneut oder prüfe die Serververbindung.{% else %}Moolias could not load this mailbox's current statistics mode from Mailcow. Try again later or check the server connection.{% endif %}</p>
   {% elif stats_state and stats_state.conflict %}
-    <span class="empty-state-icon" aria-hidden="true">!</span>
+    <span class="empty-state-icon" aria-hidden="true">{{ icon('triangle-alert') }}</span>
     <h2>{% if language == 'de' %}Statistikmodus ist nicht eindeutig{% else %}Statistics mode is ambiguous{% endif %}</h2>
     <p class="muted">{% if language == 'de' %}Für dieses Postfach wurden widersprüchliche Statistik-Tags gefunden. Wähle in den Einstellungen einen eindeutigen Modus.{% else %}Conflicting statistics tags were found for this mailbox. Choose one clear mode in Settings.{% endif %}</p>
-    <button class="button primary" type="button" data-open-settings-section="statistics">{% if language == 'de' %}Einstellungen öffnen{% else %}Open settings{% endif %}</button>
+    <button class="button primary" type="button" data-open-settings-section="statistics">{{ icon('settings') }}{% if language == 'de' %}Einstellungen öffnen{% else %}Open settings{% endif %}</button>
   {% else %}
-    <span class="empty-state-icon" aria-hidden="true">▥</span>
+    <span class="empty-state-icon" aria-hidden="true">{{ icon('chart-no-axes-combined') }}</span>
     <h2>{% if language == 'de' %}Statistiken sind für dieses Postfach ausgeschaltet{% else %}Statistics are off for this mailbox{% endif %}</h2>
     <p class="muted">{% if language == 'de' %}Die Funktion ist auf dem Server verfügbar, aber für dieses Postfach ist aktuell kein Statistikmodus aktiviert. Du kannst ihn in den Einstellungen einschalten.{% else %}The feature is available on the server, but this mailbox currently has no statistics mode enabled. You can turn it on in Settings.{% endif %}</p>
-    <button class="button primary" type="button" data-open-settings-section="statistics">{% if language == 'de' %}Statistiken aktivieren{% else %}Enable statistics{% endif %}</button>
+    <button class="button primary" type="button" data-open-settings-section="statistics">{{ icon('settings') }}{% if language == 'de' %}Statistiken aktivieren{% else %}Enable statistics{% endif %}</button>
   {% endif %}
 </section>
 {% endif %}
