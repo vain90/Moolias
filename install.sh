@@ -39,6 +39,7 @@ main() {
   local access_tag=""
   local access_tag_managed=false
   local child_may_prompt=false
+  local -a child_env=()
 
   command -v awk >/dev/null 2>&1 || {
     echo "Moolias installer: required command not found: awk" >&2
@@ -563,6 +564,10 @@ main() {
       # Sender protection is already configured. A normal installer rerun must
       # preserve it instead of asking the child installer to install it again.
       sender_install_mode="no"
+    else
+      # An existing disabled installation is preserved as well. Operators can
+      # explicitly pass yes when they want to add sender protection on a rerun.
+      sender_install_mode="no"
     fi
   }
 
@@ -980,13 +985,12 @@ PY
   run_setup_wizard
   resolve_sender_install_mode
 
-  if [[ "$fresh_install" == true && "$wizard_enabled" != true ]]; then
-    if [[ ${MOOLIAS_ACCESS_TAG+x} ]]; then
-      access_tag="${MOOLIAS_ACCESS_TAG}"
-    elif [[ "$access_tag_managed" != true ]]; then
-      access_tag="moolias-access"
-      access_tag_managed=true
-    fi
+  if [[ ${MOOLIAS_ACCESS_TAG+x} ]]; then
+    access_tag="${MOOLIAS_ACCESS_TAG}"
+    access_tag_managed=true
+  elif [[ "$fresh_install" == true && "$access_tag_managed" != true ]]; then
+    access_tag="moolias-access"
+    access_tag_managed=true
   fi
 
   if [[ -z "$base_url" ]]; then
@@ -1003,33 +1007,38 @@ PY
   fi
 
   if [[ "$sender_install_mode" =~ ^(yes|y|true|1)$ ]]; then
-    local legacy_pcre="${mailcow_dir}/data/conf/postfix/blocked_sender_login.pcre"
+    legacy_pcre="${mailcow_dir}/data/conf/postfix/blocked_sender_login.pcre"
     if [[ -s "$legacy_pcre" ]] \
       && grep -Ev '^[[:space:]]*(#|$)' "$legacy_pcre" >/dev/null 2>&1; then
       child_may_prompt=true
     fi
   fi
 
+  child_env=(
+    "MOOLIAS_INSTALL_REF=${install_ref}"
+    "MOOLIAS_INSTALL_SENDER_PROTECTION=${sender_install_mode}"
+    "MOOLIAS_TLS_MODE=${tls_mode}"
+    "COMPOSE_PROGRESS=quiet"
+  )
+  [[ -n "$base_url" ]] && child_env+=("MOOLIAS_BASE_URL=${base_url}")
+  [[ -n "$api_key" ]] && child_env+=("MAILCOW_API_KEY=${api_key}")
+  [[ -n "$oauth_id" ]] && child_env+=("MAILCOW_OAUTH_CLIENT_ID=${oauth_id}")
+  [[ -n "$oauth_secret" ]] && child_env+=("MAILCOW_OAUTH_CLIENT_SECRET=${oauth_secret}")
+
   run_child_install() {
-    MOOLIAS_INSTALL_REF="$install_ref" \
-      MOOLIAS_INSTALL_SENDER_PROTECTION="$sender_install_mode" \
-      MOOLIAS_TLS_MODE="$tls_mode" \
-      ${base_url:+MOOLIAS_BASE_URL="$base_url"} \
-      ${api_key:+MAILCOW_API_KEY="$api_key"} \
-      ${oauth_id:+MAILCOW_OAUTH_CLIENT_ID="$oauth_id"} \
-      ${oauth_secret:+MAILCOW_OAUTH_CLIENT_SECRET="$oauth_secret"} \
-      COMPOSE_PROGRESS=quiet \
+    env "${child_env[@]}" \
       bash "$tmp_file" "$@" \
       >"$child_stdout" 2>"$child_stderr"
   }
 
   child_status=0
   if [[ "$wizard_enabled" == true && "$child_may_prompt" != true ]]; then
-    if ! run_progress \
+    set +e
+    run_progress \
       "Installing Moolias and applying Mailcow/ACME changes" \
-      run_child_install "$@"; then
-      child_status="$?"
-    fi
+      run_child_install "$@"
+    child_status="$?"
+    set -e
   else
     if [[ "$wizard_enabled" == true ]]; then
       printf '%s\n' \
