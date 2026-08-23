@@ -213,6 +213,27 @@ def test_recommended_mailcow_host_installer() -> None:
             assert not override_file.exists()
         else:
             assert override_file.read_bytes() == override_before
+
+        # Reproduce the real-host repair/rerun case: sender protection is already
+        # enabled in the persisted environment, while the public installer is run
+        # again without an explicit sender-protection choice. This must preserve
+        # the existing setup instead of passing "ask" into the older child path.
+        _run(
+            "sudo",
+            "sed",
+            "-i",
+            "s/^MOOLIAS_SENDER_PROTECTION=.*/MOOLIAS_SENDER_PROTECTION=true/",
+            str(INSTALL_DIR / ".env"),
+        )
+        rerun_command = [
+            item for item in command if item != "MOOLIAS_INSTALL_SENDER_PROTECTION=no"
+        ]
+        rerun = _run(*rerun_command, cwd=ROOT)
+        assert "Moolias installation complete" in rerun.stdout
+        assert "Mailcow API:       OK" in rerun.stdout
+        assert "Sender protection: enabled" in rerun.stdout
+        assert "MOOLIAS_INSTALL_SENDER_PROTECTION must be ask" not in rerun.stdout
+        assert "Moolias Mailcow Agent installed successfully" not in rerun.stdout
     finally:
         if (INSTALL_DIR / "compose.yml").exists():
             subprocess.run(
