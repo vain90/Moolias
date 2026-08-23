@@ -94,6 +94,7 @@ def test_recommended_mailcow_host_installer() -> None:
     network = _mailcow_network()
     ipv4_cidrs = _network_ipv4_cidrs(network)
     assert ipv4_cidrs
+    public_mailcow_url = f"http://{os.environ['MAILCOW_HOSTNAME']}:8080"
 
     command = [
         "sudo",
@@ -106,7 +107,7 @@ def test_recommended_mailcow_host_installer() -> None:
         "MOOLIAS_IMAGE_TAG=sender-agent-ci",
         "MOOLIAS_SKIP_PULL=true",
         f"MOOLIAS_BASE_URL=http://{MOOLIAS_HOSTNAME}:8080",
-        "MAILCOW_URL=http://nginx-mailcow",
+        f"MAILCOW_URL={public_mailcow_url}",
         f"MAILCOW_API_KEY={os.environ['MAILCOW_API_KEY']}",
         "MAILCOW_OAUTH_CLIENT_ID=integration-client",
         "MAILCOW_OAUTH_CLIENT_SECRET=integration-secret",
@@ -124,6 +125,7 @@ def test_recommended_mailcow_host_installer() -> None:
         for cidr in ipv4_cidrs:
             assert cidr in result.stdout
         assert 'Skip IP check for API' in result.stdout
+        assert "nginx-mailcow:8080" in result.stdout
         assert "Moolias installed successfully" in result.stdout
         assert "Mailcow API access from Moolias container: OK" in result.stdout
         assert "The Moolias application has no published host port." in result.stdout
@@ -162,6 +164,20 @@ def test_recommended_mailcow_host_installer() -> None:
             container_id,
         ).stdout.strip()
         assert health == "healthy"
+
+        runtime_urls = _installed_compose(
+            "exec",
+            "-T",
+            "moolias",
+            "python",
+            "-c",
+            (
+                "import os; "
+                "print(os.environ.get('MAILCOW_URL', '')); "
+                "print(os.environ.get('MAILCOW_PUBLIC_URL', ''))"
+            ),
+        ).stdout.splitlines()
+        assert runtime_urls == ["http://nginx-mailcow:8080", public_mailcow_url]
 
         response = _run(
             "curl",
