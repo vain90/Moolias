@@ -536,7 +536,11 @@ class StatsHistoryStore:
                 ).fetchone()
                 if existing is not None and existing["history_oldest_at"] is not None:
                     previous = int(existing["history_oldest_at"])
-                    usable_oldest = previous if usable_oldest is None else min(previous, usable_oldest)
+                    usable_oldest = (
+                        previous
+                        if usable_oldest is None
+                        else min(previous, usable_oldest)
+                    )
                 connection.execute(
                     """
                     INSERT INTO stats_history_coverage (
