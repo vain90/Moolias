@@ -34,6 +34,7 @@ from moolias.stats_mode import (
     normalise_tags,
     resolve_stats_mode,
 )
+from moolias.usage_evidence import UsageEvidenceEvent, UsageEvidenceStore
 
 LOGGER = logging.getLogger(__name__)
 HISTORY_PROBE_SIZES = (10, 25, 50, 100, 250, 500)
@@ -148,6 +149,7 @@ class UsageCollector:
         self.health_store = CollectorHealthStore(store.path)
         self.history_probe_store = HistoryProbeStore(store.path)
         self.dedup_store = DedupStore(store.path)
+        self.evidence_store = UsageEvidenceStore(store.path)
         self._reported_conflicts: set[str] = set()
         self._last_history: list[dict[str, Any]] | None = None
         self._last_health_warning_signature: tuple[str | None, bool] | None = None
@@ -368,6 +370,13 @@ class UsageCollector:
                 if not state.conflict
             }
         )
+        disabled = {
+            mailbox
+            for mailbox, state in states.items()
+            if not state.enabled and not state.conflict
+        }
+        await self.evidence_store.clear_mailboxes(disabled)
+
         eligible = {
             mailbox
             for mailbox, state in states.items()
@@ -376,7 +385,18 @@ class UsageCollector:
         if not eligible:
             return 0
 
-        history = await self._adaptive_rspamd_history(tracking_started_at)
+        pending_backfills = await self.evidence_store.pending_backfills(
+            eligible,
+            history_limit=self.settings.usage_history_count,
+        )
+        if pending_backfills:
+            history = await self.mailcow.get_rspamd_history(self.settings.usage_history_count)
+            LOGGER.info(
+                "Loading full Rspamd history for alias usage backfill of %d mailbox(es)",
+                len(pending_backfills),
+            )
+        else:
+            history = await self._adaptive_rspamd_history(tracking_started_at)
         self._last_history = history
 
         alias_targets: dict[str, str] = {}
@@ -395,6 +415,8 @@ class UsageCollector:
         received_events: list[UsageEvent] = []
         sent_events: list[UsageEvent] = []
         sender_events: list[SenderEvent] = []
+        backfill_evidence_events: list[UsageEvidenceEvent] = []
+        live_evidence_events: list[UsageEvidenceEvent] = []
         used_reserved_alias_ids: set[int] = set()
 
         for item in history:
@@ -403,15 +425,23 @@ class UsageCollector:
                 continue
 
             event_at = _event_timestamp(item)
-            if event_at is None or event_at < tracking_started_at:
+            if event_at is None:
                 continue
 
             recipients = _normalise_recipients(item.get("rcpt_smtp"))
             sender_identity = _sender_identity(item)
             for alias in recipients.intersection(alias_targets):
                 mailbox = alias_targets[alias]
+                alias_record = alias_records[alias]
+                if mailbox in pending_backfills:
+                    backfill_evidence_events.append(
+                        UsageEvidenceEvent(mailbox=mailbox, alias=alias, event_at=event_at)
+                    )
+                    if alias_record.is_reserved and not alias_record.is_reserved_used:
+                        used_reserved_alias_ids.add(alias_record.id)
+
                 mode_start = mode_starts.get(mailbox, event_at + 1)
-                if event_at < mode_start:
+                if event_at < tracking_started_at or event_at < mode_start:
                     continue
 
                 received_events.append(
@@ -422,7 +452,9 @@ class UsageCollector:
                         event_at=event_at,
                     )
                 )
-                alias_record = alias_records[alias]
+                live_evidence_events.append(
+                    UsageEvidenceEvent(mailbox=mailbox, alias=alias, event_at=event_at)
+                )
                 if alias_record.is_reserved and not alias_record.is_reserved_used:
                     used_reserved_alias_ids.add(alias_record.id)
 
@@ -449,8 +481,6 @@ class UsageCollector:
             authenticated_user = _normalise_address(item.get("user"))
             if authenticated_user not in eligible:
                 continue
-            if event_at < mode_starts.get(authenticated_user, event_at + 1):
-                continue
 
             # Prefer the visible MIME From address. Fall back to the SMTP envelope
             # sender because some clients or mail paths may rewrite one but not the other.
@@ -463,6 +493,24 @@ class UsageCollector:
                 sent_alias = sender_smtp
 
             if sent_alias:
+                alias_record = alias_records[sent_alias]
+                if authenticated_user in pending_backfills:
+                    backfill_evidence_events.append(
+                        UsageEvidenceEvent(
+                            mailbox=authenticated_user,
+                            alias=sent_alias,
+                            event_at=event_at,
+                        )
+                    )
+                    if alias_record.is_reserved and not alias_record.is_reserved_used:
+                        used_reserved_alias_ids.add(alias_record.id)
+
+                if event_at < tracking_started_at or event_at < mode_starts.get(
+                    authenticated_user,
+                    event_at + 1,
+                ):
+                    continue
+
                 sent_events.append(
                     UsageEvent(
                         event_key=_event_key("sent", item, sent_alias, event_at),
@@ -471,9 +519,42 @@ class UsageCollector:
                         event_at=event_at,
                     )
                 )
-                alias_record = alias_records[sent_alias]
+                live_evidence_events.append(
+                    UsageEvidenceEvent(
+                        mailbox=authenticated_user,
+                        alias=sent_alias,
+                        event_at=event_at,
+                    )
+                )
                 if alias_record.is_reserved and not alias_record.is_reserved_used:
                     used_reserved_alias_ids.add(alias_record.id)
+
+        await self.evidence_store.record_events(
+            backfill_evidence_events,
+            source="backfill",
+        )
+        await self.evidence_store.record_events(
+            live_evidence_events,
+            source="live",
+        )
+        if pending_backfills:
+            timestamps = [
+                timestamp
+                for item in history
+                if (timestamp := _event_timestamp(item)) is not None
+            ]
+            await self.evidence_store.complete_backfills(
+                pending_backfills,
+                oldest_history_at=min(timestamps) if timestamps else None,
+                newest_history_at=max(timestamps) if timestamps else None,
+                history_count=len(history),
+                history_limit=self.settings.usage_history_count,
+            )
+            LOGGER.info(
+                "Completed alias usage backfill for %d mailbox(es); %d evidence event(s) found",
+                len(pending_backfills),
+                len(backfill_evidence_events),
+            )
 
         received = await self.store.record_received(received_events)
         sent = await self.store.record_sent(sent_events)

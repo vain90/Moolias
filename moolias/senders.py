@@ -29,6 +29,7 @@ _STOPWORDS = frozenset(
         "test",
     }
 )
+_SHORT_BRAND_TOKENS = frozenset({"dm", "ing"})
 
 # Use tldextract's bundled Public Suffix List snapshot, including private suffixes
 # such as github.io. Sender matching must not cause network access at runtime merely
@@ -76,6 +77,12 @@ def alias_identity_tokens(alias_address: str, description: str) -> set[str]:
     return _identity_candidates(local_part) | _identity_candidates(description)
 
 
+def _short_brand_tokens(alias_address: str, description: str) -> set[str]:
+    local_part = alias_address.split("@", 1)[0]
+    raw_tokens = set(_TOKEN_RE.findall(_ascii(f"{local_part} {description}")))
+    return raw_tokens & _SHORT_BRAND_TOKENS
+
+
 def _canonical_domain(sender_domain: str) -> str | None:
     labels = sender_domain.strip().strip(".").split(".")
     if len(labels) < 2 or any(not label for label in labels):
@@ -119,6 +126,8 @@ def sender_match_token(
     registered_label, is_private = identity
     if is_private:
         return None
+    if registered_label in _short_brand_tokens(alias_address, description):
+        return registered_label
     matches = alias_identity_tokens(alias_address, description) & {registered_label}
     if not matches:
         return None

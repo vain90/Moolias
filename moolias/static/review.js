@@ -19,15 +19,15 @@
       poolSkipped: "Vorerst nicht zuordnen",
       poolMissingPurpose: "Bitte trage für jeden ausgewählten Alias einen Namen oder Zweck ein.",
       poolFailed: "Mindestens ein Offline-Alias konnte nicht zugeordnet werden. Die Ansicht wird neu geladen, damit du den aktuellen Stand siehst.",
-      unexpectedTitle: "Unerwartete Absender",
+      unexpectedTitle: "Absender prüfen",
       unexpectedIntro: (count) =>
         count === 1
-          ? "Ein aktiver Alias enthält mindestens einen nicht erwarteten Absender."
-          : `${count} aktive Aliase enthalten mindestens einen nicht erwarteten Absender.`,
-      unexpected: (count) => `${count} nicht erwartet`,
-      ignoreUnexpected: "Unerwartete Absender für diesen Alias ignorieren",
-      ignoreUnexpectedHint: "Absender und Statistiken bleiben sichtbar, aber dieser Alias wird nicht mehr als handlungsbedürftig gemeldet.",
-      ignoreUnexpectedFailed: "Die Einstellung für unerwartete Absender konnte nicht gespeichert werden.",
+          ? "Ein aktiver Alias hat mindestens einen nicht automatisch erkannten Absender."
+          : `${count} aktive Aliase haben mindestens einen nicht automatisch erkannten Absender.`,
+      unexpected: (count) => `${count} nicht erkannt`,
+      ignoreUnexpected: "Prüfung für diesen Alias ignorieren",
+      ignoreUnexpectedHint: "Wird nicht mehr als zu prüfen markiert. Absender und Statistiken bleiben sichtbar.",
+      ignoreUnexpectedFailed: "Die Einstellung für die Absenderprüfung konnte nicht gespeichert werden.",
       replace: "Alias ersetzen",
       healthTitle: "Statistik-Collector",
       healthStates: {

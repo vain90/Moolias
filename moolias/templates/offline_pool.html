@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Offline-Pool · Moolias{% endblock %}
+{% block content %}
+<header class="page-heading page-heading-actions">
+  <div>
+    <h1>Offline-Pool</h1>
+    <p class="muted">{% if language == 'de' %}Bereite zufällige Alias-Adressen vor und ordne sie erst dann zu, wenn du sie tatsächlich benutzt.{% else %}Prepare random alias addresses and assign them only when you actually use them.{% endif %}</p>
+  </div>
+  <div class="pool-create-menu" data-pool-create-menu>
+    <button class="button primary pool-create-trigger" type="button" data-pool-create-trigger aria-haspopup="menu" aria-expanded="false">
+      {{ icon('plus') }}
+      <span>{% if language == 'de' %}Offline-Alias{% else %}Offline alias{% endif %}</span>
+      {{ icon('chevron-down', 'ui-icon dropdown-chevron') }}
+    </button>
+    <div class="pool-create-popover" data-pool-create-popover role="menu" hidden>
+      {% for amount in [1, 5, 10] %}
+      <form method="post" action="/offline-pool/create" role="none">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="count" value="{{ amount }}">
+        <button class="button compact" type="submit" role="menuitem">{{ icon('plus') }}{{ amount }}</button>
+      </form>
+      {% endfor %}
+    </div>
+  </div>
+</header>
+
+<section class="metric-grid pool-metrics">
+  <div class="metric-card static-card"><span class="metric-icon blue" aria-hidden="true">{{ icon('archive') }}</span><strong>{{ reserved|length }}</strong><span>{% if language == 'de' %}Vorbereitet{% else %}Prepared{% endif %}</span><small>Offline-Pool</small></div>
+  <div class="metric-card static-card"><span class="metric-icon green" aria-hidden="true">{{ icon('circle-check') }}</span><strong>{{ (reserved|length) - (used_reserved|length) }}</strong><span>{% if language == 'de' %}Verfügbar{% else %}Available{% endif %}</span><small>{% if language == 'de' %}Noch unbenutzt{% else %}Unused{% endif %}</small></div>
+  <div class="metric-card static-card"><span class="metric-icon amber" aria-hidden="true">{{ icon('triangle-alert') }}</span><strong>{{ used_reserved|length }}</strong><span>{% if language == 'de' %}Benutzt{% else %}Used{% endif %}</span><small>{% if language == 'de' %}Noch zuordnen{% else %}Needs assignment{% endif %}</small></div>
+</section>
+
+<section class="card pool-card top-gap">
+  <div class="section-head pool-head">
+    <div>
+      <h2>{% if language == 'de' %}Vorbereitete Aliase{% else %}Prepared aliases{% endif %}</h2>
+      <p class="muted">{{ t.offline_pool_hint }}</p>
+    </div>
+  </div>
+
+  {% if reserved %}
+  <div class="alias-table-wrap pool-table-wrap">
+    <div class="alias-table-head pool-table-head" aria-hidden="true">
+      <span>{% if language == 'de' %}Alias-Adresse{% else %}Alias address{% endif %}</span>
+      <span>Status</span>
+      <span>{% if language == 'de' %}Nutzung{% else %}Usage{% endif %}</span>
+      <span>{% if language == 'de' %}Zuletzt benutzt{% else %}Last used{% endif %}</span>
+      <span></span>
+    </div>
+    <div class="alias-table-list pool-page-list">
+      {% for alias in reserved %}
+      {% set pool_stats = usage_stats.get(alias.address|lower, {}) if usage_stats_visible else {} %}
+      {% set pool_total = (pool_stats.received_count or 0) + (pool_stats.sent_count or 0) %}
+      {% set pool_used = alias.is_reserved_used or pool_total > 0 %}
+      {% set pool_senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
+      {% set pool_review_count = pool_senders|selectattr('expected', 'equalto', false)|list|length %}
+      <article
+        class="offline-pool-row alias-table-row pool-table-row {% if pool_used %}pool-item-used{% endif %}"
+        data-alias-id="{{ alias.id }}"
+        data-alias-address="{{ alias.address }}"
+        {% if pool_used %}data-used-pool-item{% endif %}
+      >
+        <div class="alias-cell-identity pool-address-cell">
+          <span class="service-badge tone-neutral" aria-hidden="true">{{ icon('at-sign') }}</span>
+          <div class="alias-info">
+            <code data-pool-address>{{ alias.address }}</code>
+            {% if pool_used and pool_senders %}
+            <details class="sender-stats">
+              <summary class="sender-stats-trigger">
+                {{ t.sender_stats_title }} <span class="sender-stats-count">{{ pool_senders|length }}</span>{% if pool_review_count %} <span class="sender-stats-alert">{{ pool_review_count }} {{ t.sender_stats_unexpected_short }}</span>{% endif %}
+              </summary>
+              <div class="sender-stats-list">
+                {% for sender in pool_senders %}
+                <div class="sender-stats-row {{ 'expected' if sender.expected else 'unexpected' }}">
+                  <div class="sender-stats-identity">
+                    <code>{{ sender.label }}</code>
+                    <span class="sender-review-state">
+                      {% if sender.review_source == 'manual' %}{{ t.sender_state_confirmed }}
+                      {% elif sender.review_source == 'automatic' %}{{ t.sender_state_automatic }}{% if sender.match_token %} · {{ sender.match_token }}{% endif %}
+                      {% elif sender.review_source == 'rspamd-spam' %}{% if language == 'de' %}Durch Rspamd zur Prüfung markiert{% else %}Flagged for review by Rspamd{% endif %}
+                      {% elif sender.review_source == 'manual-unexpected' %}{{ t.sender_state_manual_unexpected }}
+                      {% else %}{{ t.sender_state_unexpected }}{% endif %}
+                    </span>
+                    {% if sender.spam_count %}<span class="sender-review-state sender-spam-state">Rspamd: Spam{% if sender.spam_count > 1 %} · {{ sender.spam_count }} {% if language == 'de' %}Treffer{% else %}hits{% endif %}{% endif %}{% if sender.max_spam_score is not none %} · {% if sender.spam_count > 1 %}max. {% else %}Score {% endif %}{% if language == 'de' %}{{ ('%.1f'|format(sender.max_spam_score))|replace('.', ',') }}{% else %}{{ '%.1f'|format(sender.max_spam_score) }}{% endif %}{% endif %}</span>{% endif %}
+                  </div>
+                  <span class="sender-message-count">{{ sender.received_count }}</span>
+                  <form method="post" action="/offline-pool/{{ alias.id }}/sender-expectation" class="sender-review-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="sender_key" value="{{ sender.sender_key }}">
+                    {% if sender.review_source == 'manual' or sender.review_source == 'manual-unexpected' %}<input type="hidden" name="decision" value="clear"><button class="button compact ghost" type="submit">{{ t.sender_action_clear }}</button>
+                    {% elif sender.expected %}<input type="hidden" name="decision" value="unexpected"><button class="button compact ghost" type="submit">{{ t.sender_action_unexpected }}</button>
+                    {% else %}<input type="hidden" name="decision" value="expected"><button class="button compact" type="submit">{{ t.sender_action_expected }}</button>{% endif %}
+                  </form>
+                </div>
+                {% endfor %}
+              </div>
+              <p class="sender-stats-footnote">{{ t.sender_stats_all }}</p>
+            </details>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="alias-cell-status">
+          {% if pool_used %}<span class="status warning">{% if language == 'de' %}Zuordnen{% else %}Assign{% endif %}</span>{% else %}<span class="status on">{% if language == 'de' %}Verfügbar{% else %}Available{% endif %}</span>{% endif %}
+        </div>
+
+        <div class="alias-cell-usage">
+          {% if usage_stats_visible %}<strong>{{ pool_total }}</strong><small>{{ pool_stats.received_count or 0 }} ↓ · {{ pool_stats.sent_count or 0 }} ↑</small>{% else %}<span>–</span>{% endif %}
+        </div>
+
+        <div class="alias-cell-last-used">
+          {% if usage_stats_visible and pool_stats.last_used_at %}<time data-local-timestamp="{{ pool_stats.last_used_at }}">{{ pool_stats.last_used_at }}</time>{% elif usage_stats_visible %}<span class="muted">{% if language == 'de' %}Noch nie{% else %}Never{% endif %}</span>{% else %}<span class="muted">–</span>{% endif %}
+        </div>
+
+        <div class="pool-actions">
+          <button class="button compact primary pool-assign-button" type="button" data-open-assign-dialog="{{ alias.id }}">{{ t.assign }}</button>
+          <button class="button compact icon-only" type="button" data-copy="{{ alias.address }}" title="{{ t['copy'] }}" aria-label="{{ t['copy'] }}">{{ icon('copy') }}</button>
+          {% if not pool_used %}
+          <form method="post" action="/offline-pool/{{ alias.id }}/delete" data-confirm="{{ t.delete_confirm }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="button compact danger" type="submit">{{ t.delete }}</button>
+          </form>
+          {% endif %}
+        </div>
+      </article>
+      {% if pool_used %}
+      <div class="pool-item pool-item-used action-required-pool-marker" hidden>
+        <span data-pool-address>{{ alias.address }}</span>
+        <button type="button" data-open-assign-dialog="{{ alias.id }}"></button>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  <div class="pool-footer-actions">
+    <button class="button ghost" type="button" data-copy-pool>{{ icon('copy') }}{{ t.copy_all }}</button>
+    <a class="button ghost" href="/aliases/pool.txt" target="_blank" rel="noopener noreferrer">{{ t.plain_text }}</a>
+  </div>
+  {% else %}
+  <div class="overview-empty pool-empty">
+    <strong>{% if language == 'de' %}Der Offline-Pool ist leer{% else %}The offline pool is empty{% endif %}</strong>
+    <p class="muted">{% if language == 'de' %}Erzeuge oben eine oder mehrere vorbereitete Adressen.{% else %}Create one or more prepared addresses above.{% endif %}</p>
+  </div>
+  {% endif %}
+</section>
+
+{% for alias in reserved %}
+{% set pool_stats = usage_stats.get(alias.address|lower, {}) if usage_stats_visible else {} %}
+{% set pool_total = (pool_stats.received_count or 0) + (pool_stats.sent_count or 0) %}
+{% set pool_used = alias.is_reserved_used or pool_total > 0 %}
+{% set pool_senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
+<dialog class="assign-dialog assign-dialog-single" data-assign-dialog="{{ alias.id }}">
+  <div class="dialog-head">
+    <div><h2>{{ t.assign_prepared }}</h2><p class="muted">{{ t.assign_hint }}</p></div>
+    <button class="dialog-close" type="button" aria-label="{{ t.close }}" title="{{ t.close }}" data-close-dialog>{{ icon('x') }}</button>
+  </div>
+  <form method="post" action="/offline-pool/{{ alias.id }}/assign" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <code class="assign-address">{{ alias.address }}</code>
+    {% if pool_used %}
+    <div class="pool-assignment-usage">
+      <div class="usage-summary">
+        {% if pool_stats.received_count %}<span class="sender-stats-alert">{{ pool_stats.received_count }} {{ t.usage_received }}</span>{% endif %}
+        {% if pool_stats.sent_count %}<span class="sender-stats-alert">{{ pool_stats.sent_count }} {{ t.usage_sent }}</span>{% endif %}
+        {% if pool_stats.last_used_at %}<span>{{ t.usage_last_used }} <time data-local-timestamp="{{ pool_stats.last_used_at }}">{{ pool_stats.last_used_at }}</time></span>{% endif %}
+      </div>
+      {% if pool_senders %}
+      <div class="sender-stats-list pool-sender-list">
+        {% for sender in pool_senders %}<div class="sender-stats-row"><div class="sender-stats-identity"><code>{{ sender.label }}</code>{% if sender.spam_count %}<span class="sender-review-state sender-spam-state">Rspamd: Spam{% if sender.spam_count > 1 %} · {{ sender.spam_count }} {% if language == 'de' %}Treffer{% else %}hits{% endif %}{% endif %}{% if sender.max_spam_score is not none %} · {% if sender.spam_count > 1 %}max. {% else %}Score {% endif %}{% if language == 'de' %}{{ ('%.1f'|format(sender.max_spam_score))|replace('.', ',') }}{% else %}{{ '%.1f'|format(sender.max_spam_score) }}{% endif %}{% endif %}</span>{% endif %}</div><span class="sender-message-count">{{ sender.received_count }}</span></div>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    <label>{% if language == 'de' %}Alias Name / Zweck{% else %}Alias name / purpose{% endif %}<input name="description" maxlength="160" required placeholder="{{ t.used_for_placeholder }}"></label>
+    <label class="check-row"><input type="checkbox" name="sogo_visible" value="1"><span>{{ t.show_in_sogo }}</span></label>
+    <button class="button primary" type="submit">{{ t.assign }}</button>
+  </form>
+</dialog>
+{% endfor %}
+<script src="/static/pool-inline-assign.js?v=20260822-2" defer></script>
+<script src="/static/pool-create-menu.js?v=20260823-1" defer></script>
+{% endblock %}

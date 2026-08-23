@@ -14,6 +14,37 @@ def test_service_name_matches_registered_sender_domain():
     )
 
 
+def test_approved_short_brands_match_exact_registered_domain_labels():
+    assert sender_match_token(
+        "ing-bank-k7@example.org",
+        "ING - Bank",
+        "info.ing.de",
+    ) == "ing"
+    assert sender_match_token(
+        "dm-k7@example.org",
+        "DM",
+        "news.dm.de",
+    ) == "dm"
+
+
+def test_short_brand_exceptions_require_exact_alias_tokens():
+    assert not sender_matches_alias(
+        "bank-k7@example.org",
+        "Ingredients Bank",
+        "info.ing.de",
+    )
+    assert not sender_matches_alias(
+        "drogerie-k7@example.org",
+        "Drugstore",
+        "news.dm.de",
+    )
+    assert not sender_matches_alias(
+        "dmv-k7@example.org",
+        "DMV service",
+        "news.dm.de",
+    )
+
+
 def test_compound_brand_matches_complete_registered_domain_identity():
     alias = "takko-fashion-k7@example.org"
     description = "TAKKO Fashion - App"

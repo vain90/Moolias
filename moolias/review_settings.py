@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import sqlite3
 from pathlib import Path
 
@@ -15,11 +16,41 @@ from moolias.collector_health import (
 from moolias.mailcow import MailcowError
 from moolias.security import require_user, validate_csrf
 from moolias.sender_protection import router as sender_protection_router
+from moolias.stats_history_ui import router as stats_history_ui_router
 from moolias.stats_mode import StatsMode
 from moolias.usage import mailbox_stats_state
 
 router = APIRouter()
+router.include_router(stats_history_ui_router)
 router.include_router(sender_protection_router)
+
+_NAME_PREFIXES = {
+    "dr",
+    "dr.",
+    "prof",
+    "prof.",
+    "professor",
+    "herr",
+    "frau",
+    "mr",
+    "mr.",
+    "mrs",
+    "mrs.",
+    "ms",
+    "ms.",
+}
+
+
+def _mailbox_first_name(mailbox: dict) -> str:
+    full_name = re.sub(r"\s+", " ", str(mailbox.get("name") or "").strip())
+    if not full_name:
+        return ""
+
+    candidate = full_name.split(",", 1)[1].strip() if "," in full_name else full_name
+    parts = candidate.split()
+    while parts and parts[0].casefold() in _NAME_PREFIXES:
+        parts.pop(0)
+    return parts[0].strip(" ,") if parts else ""
 
 
 class AliasReviewSettingsStore:
@@ -110,6 +141,19 @@ def _store(request: Request) -> AliasReviewSettingsStore | None:
     return AliasReviewSettingsStore(stats_store.path)
 
 
+@router.get("/account/profile")
+async def get_account_profile(request: Request):
+    user = require_user(request)
+    try:
+        mailbox = await request.app.state.mailcow.get_mailbox(user)
+    except MailcowError as exc:
+        raise HTTPException(status_code=502, detail="Mailbox profile is unavailable") from exc
+    return {
+        "display_name": user,
+        "welcome_name": _mailbox_first_name(mailbox),
+    }
+
+
 @router.get("/aliases/review-settings")
 async def get_alias_review_settings(request: Request):
     user = require_user(request)
@@ -177,6 +221,34 @@ async def update_unexpected_monitoring(
     }
 
 
+@router.post("/offline-pool/{alias_id}/unexpected-monitoring")
+async def update_offline_unexpected_monitoring(
+    request: Request,
+    alias_id: int,
+    ignored: bool = Form(False),
+    csrf_token: str = Form(...),
+):
+    validate_csrf(request, csrf_token)
+    user = require_user(request)
+    store = _store(request)
+    if store is None:
+        raise HTTPException(status_code=409, detail="Usage statistics are disabled")
+
+    alias = await request.app.state.mailcow.get_alias(alias_id)
+    if (
+        not is_owned_alias(alias, user)
+        or not alias.is_reserved
+        or is_primary_mailbox_alias(alias, user)
+    ):
+        raise HTTPException(status_code=403, detail="Offline alias cannot be managed here")
+
+    await store.set_ignore_unexpected(user, alias.address, ignored)
+    return {
+        "alias": alias.address,
+        "ignored": ignored,
+    }
+
+
 @router.post("/aliases/{alias_id}/sender-domain-expectation")
 async def set_sender_domain_expectation(
     request: Request,
@@ -236,3 +308,13 @@ async def set_sender_domain_expectation(
         "domain": sender.sender_domain,
         "expected": True,
     }
+
+
+# Keep these imports late to avoid a module cycle: ui.py uses AliasReviewSettingsStore.
+from moolias.pool_ui import router as pool_ui_router  # noqa: E402
+from moolias.stats_history_install import install_history_state_enrichment  # noqa: E402
+from moolias.ui import router as ui_router  # noqa: E402
+
+install_history_state_enrichment()
+router.include_router(pool_ui_router)
+router.include_router(ui_router)

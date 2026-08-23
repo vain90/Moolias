@@ -113,7 +113,7 @@ def _login(client: TestClient) -> None:
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert response.headers["location"] == "/aliases"
+    assert response.headers["location"] == "/overview"
 
 
 async def _seed_sender_state(store) -> None:
@@ -173,7 +173,7 @@ async def _seed_sender_state(store) -> None:
 
 def _unexpected_count(html: str) -> int:
     match = re.search(
-        r'data-unexpected-filter[^>]*>\s*Unexpected\s*<span>(\d+)</span>',
+        r'data-unexpected-filter[^>]*>\s*Review\s*<span>(\d+)</span>',
         html,
         flags=re.DOTALL,
     )
@@ -209,7 +209,9 @@ def test_unexpected_filter_count_search_and_pagination_are_server_side(
         _login(client)
         asyncio.run(_seed_sender_state(app.state.stats_store))
 
-        response = client.get("/aliases?status=unexpected&per_page=10&page=2")
+        response = client.get(
+            "/aliases?status=unexpected&per_page=10&page=2&sort=last_used&direction=asc"
+        )
         assert response.status_code == 200
         html = response.text
         assert _unexpected_count(html) == 26

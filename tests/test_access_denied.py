@@ -98,7 +98,7 @@ def test_existing_session_is_revoked_when_access_tag_is_removed(monkeypatch):
             follow_redirects=False,
         )
         assert login_response.status_code == 303
-        assert login_response.headers["location"] == "/aliases"
+        assert login_response.headers["location"] == "/overview"
 
         mailcow.allowed = False
         response = client.get(

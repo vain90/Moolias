@@ -6,6 +6,12 @@
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   const root = document.documentElement;
 
+  const polishStylesheet = document.createElement("link");
+  polishStylesheet.rel = "stylesheet";
+  polishStylesheet.href = "/static/ui-polish.css?v=20260822-1";
+  polishStylesheet.dataset.uiPolishStyles = "";
+  document.head.append(polishStylesheet);
+
   const storedPreference = () => {
     try {
       const value = window.localStorage.getItem(STORAGE_KEY);

@@ -31,6 +31,11 @@
   margin-top: 20px;
 }
 
+.stats-processing-progress {
+  width: 100%;
+  margin-top: 16px;
+}
+
 .moolias-dialog-danger .button.primary,
 .moolias-dialog-danger .button.danger {
   border-color: var(--danger);

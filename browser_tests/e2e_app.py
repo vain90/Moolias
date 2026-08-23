@@ -12,6 +12,7 @@ import moolias.main as main_module
 from moolias.aliases import RESERVED_COMMENT, USED_RESERVED_COMMENT, AliasRecord
 from moolias.config import Settings
 from moolias.stats import SenderEvent, StatsStore, UsageEvent
+from moolias.usage_evidence import UsageEvidenceEvent, UsageEvidenceStore
 
 USER = "user@example.org"
 DOMAIN = "example.org"
@@ -107,13 +108,40 @@ class FakeMailcow:
         }
 
     async def get_domain(self, domain: str):
-        return {"domain": domain, "tags": list(self.domain_tags)}
+        return {
+            "domain": domain,
+            "tags": list(self.domain_tags),
+            "max_num_aliases_for_domain": 50,
+            "aliases_in_domain": len(self.aliases),
+            "aliases_left": max(0, 50 - len(self.aliases)),
+        }
 
     async def list_aliases(self) -> list[AliasRecord]:
         return [self.aliases[key] for key in sorted(self.aliases)]
 
     async def get_alias(self, alias_id: int) -> AliasRecord:
         return self.aliases[alias_id]
+
+    async def get_rspamd_history(self, count: int) -> list[dict]:
+        history = [
+            {
+                "action": "clean",
+                "user": USER,
+                "sender_mime": "amazon-k7@example.org",
+                "sender_smtp": "amazon-k7@example.org",
+                "rcpt_smtp": ["customer@example.net"],
+                "unix_time": 1787167900,
+            },
+            {
+                "action": "clean",
+                "user": USER,
+                "sender_mime": "amazon-k7@example.org",
+                "sender_smtp": "amazon-k7@example.org",
+                "rcpt_smtp": ["customer@example.net", "team@example.com"],
+                "unix_time": 1787167890,
+            },
+        ]
+        return history[:count]
 
     async def set_mailbox_tags(self, email: str, tags: list[str]) -> None:
         assert email == USER
@@ -242,6 +270,9 @@ app = main_module.create_app(SETTINGS)
 
 def _clear_statistics(path: Path) -> None:
     tables = (
+        "alias_icon_settings",
+        "usage_backfill_state",
+        "alias_usage_evidence",
         "sender_alias_settings",
         "sender_expectations",
         "sender_usage",
@@ -337,6 +368,25 @@ async def _seed_statistics(store: StatsStore) -> None:
                 started_at + 6,
             ),
         ]
+    )
+
+    evidence_store = UsageEvidenceStore(store.path)
+    await evidence_store.record_events(
+        [
+            UsageEvidenceEvent(USER, "amazon-k7@example.org", started_at + 2),
+            UsageEvidenceEvent(USER, "amazon-k7@example.org", started_at + 7),
+            UsageEvidenceEvent(USER, "github-m4@example.org", started_at + 4),
+            UsageEvidenceEvent(USER, "mond-segel-42@example.org", started_at + 5),
+        ],
+        source="live",
+    )
+    await evidence_store.complete_backfills(
+        {USER},
+        oldest_history_at=started_at - 3600,
+        newest_history_at=started_at + 7,
+        history_count=6,
+        history_limit=SETTINGS.usage_history_count,
+        completed_at=started_at + 8,
     )
 
 

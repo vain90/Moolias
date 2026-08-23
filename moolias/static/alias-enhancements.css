@@ -1,0 +1,52 @@
+.sort-controls[hidden] {
+  display: none !important;
+}
+
+.alias-sort-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 700;
+}
+
+.alias-sort-link:hover {
+  color: var(--text);
+}
+
+.alias-sort-link.current {
+  color: var(--accent-strong);
+}
+
+.alias-sort-arrow {
+  width: 12px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.alias-sort-link.current .alias-sort-arrow {
+  color: var(--accent-strong);
+}
+
+[data-copy] {
+  transition: background-color .28s ease, border-color .28s ease, color .28s ease;
+}
+
+.copy-success {
+  border-color: #a9dfc1 !important;
+  background: #eaf7f0 !important;
+  color: #177a4d !important;
+  font-weight: 850;
+}
+
+:root[data-theme="dark"] .copy-success {
+  border-color: #2b6d4c !important;
+  background: #163424 !important;
+  color: #78d6a5 !important;
+}

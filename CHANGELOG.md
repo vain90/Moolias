@@ -2,6 +2,43 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.0.0 - 2026-08-23
+
+### Added
+
+- redesigned application shell with dedicated Overview, Aliases, Offline Pool and Statistics views
+- overview dashboard with actionable status cards, recent aliases and an in-place `Action required` / `Handlungsbedarf` workflow
+- locally bundled Lucide UI icons throughout navigation, settings, cards and actions, including `chart-no-axes-combined` for statistics
+- new Moolias masked-mail branding with favicon, Apple touch icon and installable web-app assets for Apple, Android, Windows and other PWA-capable platforms
+- Mailcow-style language dropdown for the currently supported German and English interfaces, using native language names and locally rendered flags
+- compact offline-pool creation menu with `+1`, `+5` and `+10`
+- account popover with Mailcow alias quota and the number of aliases managed by Moolias
+- statistics overview with received/sent usage, recognition rate, active aliases, automatically detected senders and review data according to the selected privacy mode
+- optional backfill of available Mailcow/Rspamd history when increasing the statistics privacy/detail level
+- visible processing states while historical statistics are evaluated and while privacy downgrades remove or collapse stored details
+- Rspamd spam verdict safety brake for automatic sender recognition, while preserving explicit manual user decisions
+- targeted automatic recognition for short known brands such as ING and dm without relaxing the general conservative sender matcher
+- local service-logo support with manual per-alias override and a neutral fallback
+
+### Changed
+
+- successful OAuth login now opens the Overview instead of the Aliases page; the configured Mailcow redirect URI remains `/oauth/callback`
+- automatic action-required review opens on the Overview without navigating users away from it
+- appearance selection moved from the header into Settings
+- statistics-mode downgrades now require an explicit in-app confirmation before stored detail is reduced or deleted
+- the Mailcow alias quota indicator uses a CSP-compatible semantic meter instead of blocked inline width styling
+- offline-pool creation no longer offers batches of 20 aliases
+- UI controls, status cards and navigation use a consistent professional icon language instead of text-symbol placeholders
+- language selection is right-aligned in the authenticated header and shows only the active flag until opened
+
+### Fixed
+
+- Mailcow quota bars now reflect the actual used/limit ratio instead of appearing completely filled
+- statistics-mode changes now provide immediate visual feedback during potentially slow history evaluation, mode reduction and cleanup
+- action-required data loading now provides immediate feedback rather than making the page appear unresponsive
+- spacing between alias usage summaries and the unused-alias action is restored
+- the new Moolias branding assets are validated as real PNG/WebP files so broken binary assets cannot silently render as blank icons
+
 ## 0.2.0 - 2026-08-21
 
 ### Breaking changes

@@ -571,7 +571,7 @@ document.addEventListener('pointerdown', (event) => {
 });
 
 document.querySelector('[data-copy-pool]')?.addEventListener('click', async (event) => {
-  const addresses = [...document.querySelectorAll('.pool-item:not(.pool-item-used) [data-pool-address]')]
+  const addresses = [...document.querySelectorAll('.offline-pool-row:not(.pool-item-used) [data-pool-address]')]
     .map((element) => element.textContent.trim())
     .join('\n');
   await navigator.clipboard.writeText(addresses);

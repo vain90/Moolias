@@ -81,6 +81,8 @@ https://aliases.example.com/oauth/callback
 
 Replace `aliases.example.com` with the hostname you will use for Moolias, then copy the generated client ID and client secret into `.env`.
 
+Keep the mailcow OAuth redirect URI on `/oauth/callback`. Moolias processes the OAuth response at that endpoint and then sends the authenticated user to the **Overview** page. `/overview` itself is not an OAuth callback URL.
+
 ### 3. Create a mailcow API key
 
 Create a **read/write** API key in mailcow. Moolias needs it to create and manage aliases and, when usage-statistics self-service is enabled, to update the authenticated mailbox's statistics tags.
@@ -99,7 +101,7 @@ MOOLIAS_TRUSTED_HOSTS=aliases.example.com
 MAILCOW_URL=https://mail.example.com
 MAILCOW_API_KEY=<read-write-api-key>
 MAILCOW_OAUTH_CLIENT_ID=<oauth-client-id>
-MAILCOW_OAUTH_CLIENT_SECRET=<oauth-client-secret>
+MAILCOW_OAUTH_CLIENT_SECRET=<oauth-secret>
 ```
 
 Generate a strong session secret with:
@@ -119,7 +121,7 @@ docker compose up -d
 
 The repository Compose file publishes Moolias on host port `8080` by default. Put your normal HTTPS reverse proxy, such as Caddy, nginx or Traefik, in front of it and forward requests to Moolias.
 
-Then open your configured `MOOLIAS_BASE_URL` and sign in through mailcow.
+Then open your configured `MOOLIAS_BASE_URL` and sign in through mailcow. After successful authentication, Moolias opens the **Overview** page.
 
 ## Optional configuration
 
@@ -157,6 +159,8 @@ The default statistics policy uses the `moolias-stats` tag family and supports f
 | `full` | Counters plus full sender-address aggregates |
 
 A mailbox can override its domain's statistics mode; otherwise it inherits the domain setting. Users can change only their own statistics mode through Moolias.
+
+Increasing the detail level can optionally evaluate the still-available Mailcow/Rspamd history. Reducing the detail level requires confirmation because Moolias immediately collapses or deletes already stored details that the new privacy mode no longer permits. The interface shows a processing state while either operation is running.
 
 When sender detail is enabled, Moolias can flag sender identities that appear unrelated to an alias and let the user review them. This is a traceability feature, not spam classification or threat intelligence.
 

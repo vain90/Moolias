@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "moolias"
-version = "0.2.0"
+version = "1.0.0"
 description = "Self-hosted privacy alias manager for mailcow"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -28,6 +28,7 @@ dev = [
   "pytest-asyncio>=1.1,<2",
   "pytest-playwright>=0.7,<1",
   "ruff>=0.12,<1",
+  "simple-icons-pack==16.28.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -49,3 +50,4 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 "moolias/main.py" = ["B008"]
+"moolias/ui.py" = ["E731", "F401"]
