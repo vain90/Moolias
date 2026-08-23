@@ -69,7 +69,7 @@ def test_bootstrap_validates_api_before_its_final_summary():
 def test_bootstrap_reports_mailcow_api_rejection_reason():
     assert 'payload.get("msg", "")' in BOOTSTRAP
     assert "Mailcow API rejected the request:" in BOOTSTRAP
-    assert "If Mailcow reports a different source IP above" in BOOTSTRAP
+    assert "If Mailcow reports a source IP outside these networks" in BOOTSTRAP
 
 
 def test_bootstrap_suppresses_nested_success_blocks_and_never_reprints_agent_secret():

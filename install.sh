@@ -20,7 +20,7 @@ main() {
   local mailcow_conf="${mailcow_dir}/mailcow.conf"
   local install_dir="${MOOLIAS_INSTALL_DIR:-/opt/moolias}"
   local detected_network=""
-  local detected_ipv4_cidrs=""
+  local detected_cidrs=""
   local mailcow_http_port="80"
   local mailcow_internal_url=""
   local tls_status="not-managed"
@@ -222,7 +222,7 @@ main() {
     local pid=""
     local status=0
     local frame_index=0
-    local -a frames=('|' '/' '-' '\\')
+    local -a frames=('|' '/' '-' $'\\')
 
     if [[ "$wizard_enabled" != true ]]; then
       printf '%s...\n' "$label"
@@ -305,8 +305,7 @@ main() {
 
     while IFS= read -r subnet; do
       [[ -n "$subnet" ]] || continue
-      [[ "$subnet" == *:* ]] && continue
-      detected_ipv4_cidrs+="${detected_ipv4_cidrs:+ }${subnet}"
+      detected_cidrs+="${detected_cidrs:+ }${subnet}"
     done < <(
       docker network inspect \
         --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}' \
@@ -315,7 +314,7 @@ main() {
   }
 
   print_mailcow_api_allowlist_guidance() {
-    [[ -n "$detected_ipv4_cidrs" ]] || return 0
+    [[ -n "$detected_cidrs" ]] || return 0
 
     echo
     echo "Mailcow API access"
@@ -324,10 +323,10 @@ main() {
     echo "Internal Mailcow URL: ${mailcow_internal_url}"
     echo
     echo "Before entering the API key, create/use a READ/WRITE API key in Mailcow"
-    echo "and allow this Docker network:"
+    echo "and allow these Docker network CIDRs:"
 
     local cidr
-    for cidr in $detected_ipv4_cidrs; do
+    for cidr in $detected_cidrs; do
       printf '  %s\n' "$cidr"
     done
 
@@ -416,9 +415,9 @@ main() {
     if [[ -n "$mailcow_internal_url" ]]; then
       printf 'Internal Mailcow URL: %s\n' "$mailcow_internal_url" >&3
     fi
-    if [[ -n "$detected_ipv4_cidrs" ]]; then
+    if [[ -n "$detected_cidrs" ]]; then
       printf '\nAllow these networks on the API key:\n' >&3
-      for cidr in $detected_ipv4_cidrs; do
+      for cidr in $detected_cidrs; do
         printf '  %s\n' "$cidr" >&3
       done
     fi
@@ -756,13 +755,13 @@ PY
 
     echo >&2
     echo "Moolias installer: Mailcow API validation failed." >&2
-    if [[ -n "$detected_ipv4_cidrs" ]]; then
-      echo "The Mailcow read/write API key should allow:" >&2
+    if [[ -n "$detected_cidrs" ]]; then
+      echo "The Mailcow read/write API key should allow these Docker network CIDRs:" >&2
       local cidr
-      for cidr in $detected_ipv4_cidrs; do
+      for cidr in $detected_cidrs; do
         printf '  %s\n' "$cidr" >&2
       done
-      echo "If Mailcow reports a different source IP above, allow its actual Docker subnet instead." >&2
+      echo "If Mailcow reports a source IP outside these networks, allow its actual Docker subnet instead." >&2
     fi
     if [[ -n "$mailcow_internal_url" ]]; then
       echo "Internal Mailcow URL: ${mailcow_internal_url}" >&2
