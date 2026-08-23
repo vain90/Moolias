@@ -165,6 +165,13 @@
     window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
   };
 
+  const overviewActionCount = () => {
+    const value = document.querySelector("[data-action-count]")?.textContent?.trim();
+    if (value === undefined) return null;
+    const count = Number.parseInt(value, 10);
+    return Number.isFinite(count) ? count : null;
+  };
+
   const handleFreshLogin = async (api, summary) => {
     if (autoLoginHandled || !api?.open) return;
     let requested = false;
@@ -176,7 +183,8 @@
     }
     if (!requested) return;
     autoLoginHandled = true;
-    if ((summary?.total || 0) > 0) await openActionRequired();
+    const total = overviewActionCount() ?? summary?.total ?? 0;
+    if (total > 0) await openActionRequired();
   };
 
   const refresh = async () => {
