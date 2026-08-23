@@ -16,6 +16,8 @@ main() {
   local child_stdout_cleanup=""
   local child_stderr=""
   local child_stderr_cleanup=""
+  local tls_status_file=""
+  local tls_status_file_cleanup=""
   local mailcow_dir="${MAILCOW_DIR:-/opt/mailcow-dockerized}"
   local mailcow_conf="${mailcow_dir}/mailcow.conf"
   local install_dir="${MOOLIAS_INSTALL_DIR:-/opt/moolias}"
@@ -117,6 +119,13 @@ main() {
       1|true|yes|y|on) return 0 ;;
       *) return 1 ;;
     esac
+  }
+
+  record_tls_status() {
+    tls_status="$1"
+    if [[ -n "$tls_status_file" ]]; then
+      printf '%s\n' "$tls_status" > "$tls_status_file"
+    fi
   }
 
   open_tty() {
@@ -793,7 +802,7 @@ PY
     [[ -f "$env_file" ]] || return 0
     current_base_url="$(read_key_value "$env_file" MOOLIAS_BASE_URL || true)"
     [[ "$current_base_url" == https://* ]] || {
-      tls_status="not-required"
+      record_tls_status "not-required"
       return 0
     }
 
@@ -804,7 +813,7 @@ PY
 
     additional_san="$(read_key_value "$mailcow_conf" ADDITIONAL_SAN || true)"
     if ! printf ',%s,' "$additional_san" | grep -Fqi ",${hostname},"; then
-      tls_status="external-or-manual"
+      record_tls_status "external-or-manual"
       return 0
     fi
 
@@ -814,7 +823,7 @@ PY
     (( wait_seconds > 600 )) && wait_seconds=600
 
     if certificate_matches_host "$certificate" "$hostname"; then
-      tls_status="ok"
+      record_tls_status "ok"
       return 0
     fi
 
@@ -827,12 +836,12 @@ PY
           cd "$mailcow_dir"
           docker compose exec -T nginx-mailcow nginx -s reload >/dev/null 2>&1
         ) || true
-        tls_status="ok"
+        record_tls_status "ok"
         return 0
       fi
     done
 
-    tls_status="pending"
+    record_tls_status "pending"
   }
 
   print_final_summary() {
@@ -955,10 +964,12 @@ PY
   tmp_file="$(mktemp)"
   child_stdout="$(mktemp)"
   child_stderr="$(mktemp)"
+  tls_status_file="$(mktemp)"
   printf -v tmp_file_cleanup '%q' "$tmp_file"
   printf -v child_stdout_cleanup '%q' "$child_stdout"
   printf -v child_stderr_cleanup '%q' "$child_stderr"
-  trap "rm -f -- ${tmp_file_cleanup} ${child_stdout_cleanup} ${child_stderr_cleanup}" EXIT
+  printf -v tls_status_file_cleanup '%q' "$tls_status_file"
+  trap "rm -f -- ${tmp_file_cleanup} ${child_stdout_cleanup} ${child_stderr_cleanup} ${tls_status_file_cleanup}" EXIT
 
   if [[ -n "$source_dir" ]]; then
     [[ -f "${source_dir}/scripts/install.sh" ]] || {
@@ -1068,6 +1079,9 @@ PY
   run_progress "Applying final private-network and access settings" configure_post_install_env
   run_progress "Validating Mailcow API access" validate_mailcow_api_from_container
   run_progress "Checking Mailcow TLS certificate" wait_for_mailcow_tls
+  if [[ -s "$tls_status_file" ]]; then
+    tls_status="$(tail -n1 "$tls_status_file")"
+  fi
   print_final_summary
 }
 
