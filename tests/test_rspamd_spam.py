@@ -10,6 +10,7 @@ from moolias.rspamd_spam import (
     SpamEvidenceEvent,
     apply_spam_evidence_to_state,
     spam_events_from_captured_senders,
+    spam_events_from_history,
 )
 from moolias.stats import SenderEvent
 from moolias.stats_mode import StatsMode
@@ -59,6 +60,60 @@ def test_rspamd_action_controls_spam_brake_instead_of_raw_score() -> None:
     assert {event.detail_level for event in events} == {"domain", "full"}
     assert {event.score for event in events} == {0.5}
     assert {event.event_at for event in events} == {110}
+
+
+def test_history_spam_respects_backfill_coverage() -> None:
+    history = [
+        {
+            "action": "rewrite subject",
+            "message-id": "historical-spam",
+            "score": 8.4,
+            "sender_mime": "newsletter@amazon.de",
+            "rcpt_smtp": [ALIAS],
+            "unix_time": 90,
+        },
+        {
+            "action": "add header",
+            "message-id": "live-spam",
+            "score": 7.8,
+            "sender_mime": "newsletter@amazon.de",
+            "rcpt_smtp": [ALIAS],
+            "unix_time": 110,
+        },
+    ]
+    live_only = {
+        StatsMode.DOMAIN: SimpleNamespace(
+            live_started_at=100,
+            history_oldest_at=80,
+            completed_at=None,
+        )
+    }
+    completed_backfill = {
+        StatsMode.DOMAIN: SimpleNamespace(
+            live_started_at=100,
+            history_oldest_at=80,
+            completed_at=120,
+        )
+    }
+
+    live_events = spam_events_from_history(
+        history,
+        [ALIAS],
+        MAILBOX,
+        live_only,
+        {StatsMode.DOMAIN},
+    )
+    historical_events = spam_events_from_history(
+        history,
+        [ALIAS],
+        MAILBOX,
+        completed_backfill,
+        {StatsMode.DOMAIN},
+    )
+
+    assert [event.event_at for event in live_events] == [110]
+    assert [event.event_at for event in historical_events] == [90, 110]
+    assert {event.sender_key for event in historical_events} == {"amazon.de"}
 
 
 @pytest.mark.asyncio
