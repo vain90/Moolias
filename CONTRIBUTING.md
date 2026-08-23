@@ -21,12 +21,14 @@ ruff check .
 pytest -q
 ```
 
-For container testing:
+For container testing, use the explicit development Compose file:
 
 ```bash
-docker compose -f compose.local.yml build
-docker compose -f compose.local.yml up -d
+docker compose -f compose.dev.yml build
+docker compose -f compose.dev.yml up -d
 ```
+
+`compose.local.yml` is intentionally not shipped by the repository. Operators may use that filename for deployment-specific overrides; `update.sh` layers it on top of `compose.yml` when present.
 
 Never commit `.env`.
 
