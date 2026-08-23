@@ -6,6 +6,7 @@ main() {
   local raw_base="https://raw.githubusercontent.com/${repository}"
   local latest_url="https://github.com/${repository}/releases/latest"
   local requested_ref="${MOOLIAS_INSTALL_REF:-}"
+  local source_dir="${MOOLIAS_SOURCE_DIR:-}"
   local install_ref=""
   local latest_ref=""
   local final_url=""
@@ -174,6 +175,8 @@ PY
 
   if [[ -n "$requested_ref" ]]; then
     install_ref="$requested_ref"
+  elif [[ -n "$source_dir" ]]; then
+    install_ref="local-source"
   else
     final_url="$(
       curl --proto '=https' --tlsv1.2 -fsSL \
@@ -214,13 +217,21 @@ PY
   tmp_file="$(mktemp)"
   trap 'rm -f "$tmp_file"' EXIT
 
-  curl --proto '=https' --tlsv1.2 -fsSL \
-    "${raw_base}/${install_ref}/scripts/install.sh" \
-    -o "$tmp_file" \
-    || {
-      echo "Moolias installer: could not download installer from ${install_ref}." >&2
+  if [[ -n "$source_dir" ]]; then
+    [[ -f "${source_dir}/scripts/install.sh" ]] || {
+      echo "Moolias installer: local scripts/install.sh not found in ${source_dir}." >&2
       exit 1
     }
+    cp -a "${source_dir}/scripts/install.sh" "$tmp_file"
+  else
+    curl --proto '=https' --tlsv1.2 -fsSL \
+      "${raw_base}/${install_ref}/scripts/install.sh" \
+      -o "$tmp_file" \
+      || {
+        echo "Moolias installer: could not download installer from ${install_ref}." >&2
+        exit 1
+      }
+  fi
 
   bash -n "$tmp_file" || {
     echo "Moolias installer: downloaded installer failed syntax validation." >&2
