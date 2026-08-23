@@ -2,6 +2,20 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.1.4 - 2026-08-23
+
+### Changed
+
+- the recommended Mailcow-host installer now presents fresh installations as a six-step terminal setup wizard with one focused page at a time for URL, API, OAuth, access control, TLS and sender protection
+- fresh same-host installations recommend the `moolias-access` Mailcow tag and write `MOOLIAS_ACCESS_TAG=moolias-access` unless the operator opts out or supplies an explicit value
+- primary sender protection is now the recommended choice in the public setup flow and uses `Yes` as the default answer
+- long-running install, Mailcow/ACME, final configuration, API validation and TLS checks show active progress instead of leaving the terminal apparently idle
+- normal installer reruns preserve an existing enabled or disabled sender-protection choice unless the operator explicitly requests a change
+
+### Fixed
+
+- Mailcow API validation now preserves Mailcow's rejection reason, distinguishing an invalid API key from a source-IP allowlist failure and exposing the source IP reported by Mailcow when available
+
 ## 1.1.3 - 2026-08-23
 
 ### Changed
