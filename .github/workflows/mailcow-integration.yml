@@ -6,11 +6,16 @@ on:
   pull_request:
     paths:
       - "integration_tests/**"
+      - "moolias/mailcow.py"
+      - "moolias/aliases.py"
+      - "moolias/stats_mode.py"
+      - "moolias/config.py"
       - "moolias/mailcow_agent.py"
       - "moolias/sender_protocol.py"
       - "moolias/sender_protection.py"
       - "moolias/static/sender-protection.js"
       - "scripts/install-mailcow-agent.sh"
+      - "Dockerfile"
       - ".github/scripts/mailcow-feasibility.sh"
       - ".github/workflows/mailcow-integration.yml"
 
