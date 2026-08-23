@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-UPDATER_VERSION="0.1.2"
+UPDATER_VERSION="0.1.3"
 REPOSITORY="vain90/Moolias"
 IMAGE="ghcr.io/vain90/moolias"
 LATEST_RELEASE_URL="https://github.com/${REPOSITORY}/releases/latest"
@@ -156,24 +156,39 @@ fi
 
 cd "${SCRIPT_DIR}"
 
+COMPOSE_ARGS=()
+COMPOSE_DISPLAY=""
+
 if [[ -n "${MOOLIAS_COMPOSE_FILE:-}" ]]; then
-  COMPOSE_FILE="${MOOLIAS_COMPOSE_FILE}"
-elif [[ -f "compose.local.yml" ]]; then
-  COMPOSE_FILE="compose.local.yml"
+  [[ -f "${MOOLIAS_COMPOSE_FILE}" ]] || die "Compose file not found: ${MOOLIAS_COMPOSE_FILE}"
+  COMPOSE_ARGS=(-f "${MOOLIAS_COMPOSE_FILE}")
+  COMPOSE_DISPLAY="${MOOLIAS_COMPOSE_FILE}"
+elif [[ -f "compose.yml" && -f "compose.local.yml" ]]; then
+  COMPOSE_ARGS=(-f "compose.yml" -f "compose.local.yml")
+  COMPOSE_DISPLAY="compose.yml + compose.local.yml"
 elif [[ -f "compose.yml" ]]; then
-  COMPOSE_FILE="compose.yml"
+  COMPOSE_ARGS=(-f "compose.yml")
+  COMPOSE_DISPLAY="compose.yml"
+elif [[ -f "compose.local.yml" ]]; then
+  COMPOSE_ARGS=(-f "compose.local.yml")
+  COMPOSE_DISPLAY="compose.local.yml"
 else
   die "No compose.local.yml or compose.yml found in ${SCRIPT_DIR}"
 fi
 
-[[ -f "${COMPOSE_FILE}" ]] || die "Compose file not found: ${COMPOSE_FILE}"
 [[ -f ".env" ]] || die ".env not found in ${SCRIPT_DIR}"
 
 compose() {
-  MOOLIAS_TAG="${TARGET_TAG}" docker compose -f "${COMPOSE_FILE}" "$@"
+  MOOLIAS_TAG="${TARGET_TAG}" docker compose "${COMPOSE_ARGS[@]}" "$@"
 }
 
-RESOLVED_IMAGE="$(compose config --images 2>/dev/null | awk -v image="${IMAGE}:" 'index($0, image) == 1 { print; exit }')"
+COMPOSE_IMAGES=""
+if ! COMPOSE_IMAGES="$(compose config --images 2>&1)"; then
+  die "Docker Compose validation failed for ${COMPOSE_DISPLAY}:
+${COMPOSE_IMAGES}"
+fi
+
+RESOLVED_IMAGE="$(printf '%s\n' "${COMPOSE_IMAGES}" | awk -v image="${IMAGE}:" 'index($0, image) == 1 { print; exit }')"
 if [[ -z "${RESOLVED_IMAGE}" ]]; then
   die "The Moolias service does not use ${IMAGE}"
 fi
@@ -240,7 +255,7 @@ log ""
 log "Channel:   ${CHANNEL}"
 log "Installed: ${CURRENT_DISPLAY}"
 log "Target:    ${TARGET_DISPLAY}"
-log "Compose:   ${COMPOSE_FILE}"
+log "Compose:   ${COMPOSE_DISPLAY}"
 
 UPDATE_AVAILABLE=true
 TARGET_IMAGE_ID=""
