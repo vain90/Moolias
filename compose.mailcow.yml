@@ -7,11 +7,6 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      # Keep the public URL from .env for browser-facing OAuth redirects while
-      # server-side Mailcow requests stay on the private Docker network.
-      MAILCOW_PUBLIC_URL: ${MAILCOW_URL}
-      MAILCOW_URL: ${MAILCOW_INTERNAL_URL:-http://nginx-mailcow:8080}
     volumes:
       - moolias-data:/data
     networks:
