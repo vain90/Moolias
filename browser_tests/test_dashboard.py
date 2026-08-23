@@ -34,9 +34,10 @@ def _open_sender_dialog(page: Page, owner):
 
 def _login(page: Page, base_url: str) -> None:
     page.goto(f"{base_url}/oauth/callback?code=e2e&state=e2e")
-    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
-    expect(page.locator("[data-alias-results-region]")).to_be_visible()
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
     expect(page.locator("dialog[data-action-required-dialog][open]")).to_have_count(0)
+    page.goto(f"{base_url}/aliases")
+    expect(page.locator("[data-alias-results-region]")).to_be_visible()
 
 
 def _open_action_required(page: Page, base_url: str):
@@ -53,7 +54,15 @@ def _open_action_required(page: Page, base_url: str):
     return dialog
 
 
-def test_login_does_not_auto_open_action_required_and_overview_opens_it(
+def test_login_lands_on_overview_before_alias_management(page: Page, base_url: str) -> None:
+    page.goto(f"{base_url}/oauth/callback?code=e2e&state=e2e")
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
+    expect(page.locator('.side-nav-link[href="/overview"]')).to_have_attribute(
+        "aria-current", "page"
+    )
+
+
+def test_login_does_not_auto_open_action_required_without_login_marker(
     page: Page,
     base_url: str,
 ) -> None:
@@ -73,19 +82,23 @@ def test_login_does_not_auto_open_action_required_and_overview_opens_it(
     expect(page.locator("dialog[data-action-required-dialog][open]")).to_have_count(0)
 
 
-def test_fresh_login_auto_opens_action_required_once(page: Page, base_url: str) -> None:
+def test_fresh_login_auto_opens_action_required_on_overview_once(
+    page: Page,
+    base_url: str,
+) -> None:
     page.goto(f"{base_url}/", wait_until="networkidle")
     page.evaluate(
         "sessionStorage.setItem('moolias-action-required-after-login', '1')"
     )
     page.goto(f"{base_url}/oauth/callback?code=e2e&state=e2e")
 
-    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
     dialog = page.locator("dialog[data-action-required-dialog]")
     expect(dialog).to_be_visible(timeout=5000)
     expect(dialog).to_contain_text("Used offline aliases")
     expect(dialog).to_contain_text(USED_POOL)
     expect(dialog).to_contain_text("Unexpected senders")
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
 
     dialog.locator(".dialog-close").click()
     page.reload()
@@ -373,8 +386,10 @@ def test_copy_button_turns_green_then_returns_to_copy_icon(page: Page, base_url:
     )
 
     button = _alias_row(page, AMAZON).locator(".alias-copy-action")
-    original = button.text_content()
     before = button.evaluate("element => getComputedStyle(element).backgroundColor")
+    expect(button.locator("svg.ui-icon use")).to_have_attribute(
+        "href", "/static/ui-icons.svg#icon-copy"
+    )
     button.click()
     expect(button).to_have_text("✓")
     expect(button).to_have_class(re.compile(r"copy-success"))
@@ -383,7 +398,9 @@ def test_copy_button_turns_green_then_returns_to_copy_icon(page: Page, base_url:
 
     page.wait_for_timeout(1300)
     expect(button).not_to_have_class(re.compile(r"copy-success"))
-    expect(button).to_have_text(original or "⧉")
+    expect(button.locator("svg.ui-icon use")).to_have_attribute(
+        "href", "/static/ui-icons.svg#icon-copy"
+    )
 
 
 def test_overview_links_to_split_management_pages(page: Page, base_url: str) -> None:
@@ -448,16 +465,27 @@ def test_mobile_sidebar_stays_above_blurred_backdrop(page: Page, base_url: str) 
     assert sidebar_z > backdrop_z
 
 
-def test_offline_pool_uses_neutral_create_buttons_and_inline_assignment(
+def test_offline_pool_uses_primary_dropdown_for_supported_batch_sizes(
     page: Page,
     base_url: str,
 ) -> None:
     _login(page, base_url)
     page.goto(f"{base_url}/offline-pool")
 
-    add_one = page.locator('form:has(input[name="count"][value="1"]) button')
-    expect(add_one).to_be_visible()
-    assert "primary" not in (add_one.get_attribute("class") or "").split()
+    trigger = page.locator("[data-pool-create-trigger]")
+    expect(trigger).to_be_visible()
+    expect(trigger).to_have_class(re.compile(r"\bprimary\b"))
+    expect(trigger).to_contain_text("Offline alias")
+
+    popover = page.locator("[data-pool-create-popover]")
+    expect(popover).to_be_hidden()
+    trigger.click()
+    expect(popover).to_be_visible()
+    counts = popover.locator('input[name="count"]').evaluate_all(
+        "elements => elements.map((element) => element.value)"
+    )
+    assert counts == ["1", "5", "10"]
+    expect(popover.locator('input[name="count"][value="20"]')).to_have_count(0)
 
     item = _pool_item(page, UNUSED_POOL)
     details = item.locator('details[data-pool-inline-assign="10"]')
@@ -471,20 +499,33 @@ def test_offline_pool_uses_neutral_create_buttons_and_inline_assignment(
     expect(description).to_be_focused()
 
 
-def test_global_controls_and_statistics_wording_are_polished(
+def test_global_controls_use_lucide_icons_and_semantic_quota_meter(
     page: Page,
     base_url: str,
 ) -> None:
     _login(page, base_url)
+    page.goto(f"{base_url}/overview")
 
-    settings = page.locator(".header-icon-button[data-open-settings]")
-    expect(settings).to_be_visible()
-    font_size = settings.evaluate("element => parseFloat(getComputedStyle(element).fontSize)")
-    assert font_size >= 20
+    expect(page.locator('.side-nav-link[href="/statistics"] use')).to_have_attribute(
+        "href", "/static/ui-icons.svg#icon-chart-no-axes-combined"
+    )
+    expect(page.locator(".header-icon-button[data-open-settings] use")).to_have_attribute(
+        "href", "/static/ui-icons.svg#icon-settings"
+    )
+    expect(page.locator(".account-chevron use")).to_have_attribute(
+        "href", "/static/ui-icons.svg#icon-chevron-down"
+    )
 
-    chevron = page.locator(".account-chevron")
-    transform = chevron.evaluate("element => getComputedStyle(element).transform")
-    assert transform != "none"
+    page.locator("[data-account-button]").click()
+    popover = page.locator("[data-account-popover]")
+    expect(popover).to_be_visible()
+    expect(popover).to_contain_text("are managed by Moolias")
+    meter = popover.locator("meter.account-quota-meter")
+    expect(meter).to_be_visible()
+    used = float(meter.get_attribute("value") or "0")
+    limit = float(meter.get_attribute("max") or "0")
+    assert limit > 0
+    assert 0 <= used < limit
 
     page.goto(f"{base_url}/statistics")
     expect(page.locator("h1")).to_have_text("Statistics")
