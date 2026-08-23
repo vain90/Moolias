@@ -120,14 +120,14 @@
 
       const actions = document.createElement('div');
       actions.className = 'button-row moolias-dialog-actions stats-downgrade-actions';
-      const confirm = document.createElement('button');
-      confirm.className = 'button primary';
-      confirm.type = 'button';
-      confirm.textContent = text.downgradeConfirm;
       const cancel = document.createElement('button');
       cancel.className = 'button';
       cancel.type = 'button';
       cancel.textContent = text.cancel;
+      const confirm = document.createElement('button');
+      confirm.className = 'button primary';
+      confirm.type = 'button';
+      confirm.textContent = text.downgradeConfirm;
       actions.append(cancel, confirm);
 
       dialog.append(head, body, actions);
