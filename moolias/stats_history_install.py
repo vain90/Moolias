@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from moolias.rspamd_spam import (
+    enrich_ui_state_with_rspamd_spam,
+    install_rspamd_spam_collection,
+)
 from moolias.stats_history_state import enrich_ui_state_with_history
 
 
@@ -10,6 +14,7 @@ def install_history_state_enrichment() -> None:
     import moolias.alias_table_ui as alias_table_ui
     import moolias.ui as ui
 
+    install_rspamd_spam_collection()
     current = ui._load_ui_state
     if getattr(current, "_moolias_history_enriched", False):
         alias_table_ui._load_ui_state = current
@@ -17,7 +22,8 @@ def install_history_state_enrichment() -> None:
 
     async def history_aware_state(request):
         state = await current(request)
-        return await enrich_ui_state_with_history(request, state)
+        state = await enrich_ui_state_with_history(request, state)
+        return await enrich_ui_state_with_rspamd_spam(request, state)
 
     history_aware_state._moolias_history_enriched = True
     ui._load_ui_state = history_aware_state
