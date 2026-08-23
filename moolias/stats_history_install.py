@@ -23,6 +23,9 @@ def install_history_state_enrichment() -> None:
     async def history_aware_state(request):
         state = await current(request)
         state = await enrich_ui_state_with_history(request, state)
+        history_loader = getattr(request.app.state.mailcow, "get_rspamd_history", None)
+        if not callable(history_loader):
+            return state
         return await enrich_ui_state_with_rspamd_spam(request, state)
 
     history_aware_state._moolias_history_enriched = True
