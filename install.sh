@@ -22,6 +22,7 @@ main() {
   local mailcow_http_port="80"
   local mailcow_internal_url=""
   local tls_status="not-managed"
+  local sender_install_mode="${MOOLIAS_INSTALL_SENDER_PROTECTION:-ask}"
 
   command -v awk >/dev/null 2>&1 || {
     echo "Moolias installer: required command not found: awk" >&2
@@ -92,6 +93,13 @@ main() {
     chmod --reference="$file" "$tmp" 2>/dev/null || chmod 0600 "$tmp"
     chown --reference="$file" "$tmp" 2>/dev/null || true
     mv "$tmp" "$file"
+  }
+
+  is_true() {
+    case "${1,,}" in
+      1|true|yes|y|on) return 0 ;;
+      *) return 1 ;;
+    esac
   }
 
   discover_mailcow_environment() {
@@ -173,6 +181,29 @@ main() {
     echo
   }
 
+  resolve_sender_install_mode() {
+    local env_file="${install_dir}/.env"
+    local current=""
+
+    case "${sender_install_mode,,}" in
+      ask|yes|y|true|1|no|n|false|0) ;;
+      *)
+        echo "Moolias installer: MOOLIAS_INSTALL_SENDER_PROTECTION must be ask, yes or no." >&2
+        exit 1
+        ;;
+    esac
+
+    [[ "${sender_install_mode,,}" == "ask" ]] || return 0
+    [[ -f "$env_file" ]] || return 0
+
+    current="$(read_key_value "$env_file" MOOLIAS_SENDER_PROTECTION || true)"
+    if is_true "${current:-false}"; then
+      # Sender protection is already configured. A normal installer rerun must
+      # preserve it instead of asking the child installer to install it again.
+      sender_install_mode="no"
+    fi
+  }
+
   filter_installer_output() {
     awk '
       function divider(line) { return line ~ /^={20,}$/ }
@@ -215,6 +246,24 @@ main() {
     '
   }
 
+  print_child_failure() {
+    local path="$1"
+    [[ -s "$path" ]] || return 0
+
+    # Successful nginx validation/reload messages are noisy and may precede an
+    # unrelated later installer failure. Keep actual nginx errors, but omit only
+    # known warning/success chatter from the failure report.
+    awk '
+      /nginx: \[warn\]/ { next }
+      /\[warn\].*listen .* http2.*deprecated/ { next }
+      /\[warn\].*conflicting server name/ { next }
+      /nginx: the configuration file .* syntax is ok/ { next }
+      /nginx: configuration file .* test is successful/ { next }
+      /\[notice\].*signal process started/ { next }
+      { print }
+    ' "$path" >&2
+  }
+
   wait_for_moolias() {
     local container_id state
 
@@ -248,14 +297,12 @@ main() {
     set_key_value "$env_file" MAILCOW_INTERNAL_URL "$mailcow_internal_url"
 
     sender_protection="$(read_key_value "$env_file" MOOLIAS_SENDER_PROTECTION || true)"
-    case "${sender_protection,,}" in
-      1|true|yes|y|on)
-        set_key_value \
-          "$env_file" \
-          MOOLIAS_SENDER_AGENT_URL \
-          "${mailcow_internal_url}/moolias-agent"
-        ;;
-    esac
+    if is_true "${sender_protection:-false}"; then
+      set_key_value \
+        "$env_file" \
+        MOOLIAS_SENDER_AGENT_URL \
+        "${mailcow_internal_url}/moolias-agent"
+    fi
 
     (
       cd "$install_dir"
@@ -376,8 +423,7 @@ PY
     [[ -n "$hostname" ]] || return 0
 
     additional_san="$(read_key_value "$mailcow_conf" ADDITIONAL_SAN || true)"
-    if ! printf ',%s,' "$additional_san" \
-      | grep -Fqi ",${hostname},"; then
+    if ! printf ',%s,' "$additional_san" | grep -Fqi ",${hostname},"; then
       tls_status="external-or-manual"
       return 0
     fi
@@ -432,37 +478,23 @@ PY
     echo
     echo "Application:       healthy"
     echo "Mailcow API:       OK"
-    [[ -n "$mailcow_internal_url" ]] \
-      && echo "Internal routing:  ${mailcow_internal_url}"
+    [[ -n "$mailcow_internal_url" ]] && echo "Internal routing:  ${mailcow_internal_url}"
     echo "Version:           ${version:-unknown}"
 
-    case "${sender_protection,,}" in
-      1|true|yes|y|on)
-        echo "Sender protection: enabled"
-        echo "Agent secret:      saved automatically in ${env_file}"
-        echo "                   No copy/paste is required."
-        ;;
-      *)
-        echo "Sender protection: disabled"
-        ;;
-    esac
+    if is_true "${sender_protection:-false}"; then
+      echo "Sender protection: enabled"
+      echo "Agent secret:      saved automatically in ${env_file}"
+      echo "                   No copy/paste is required."
+    else
+      echo "Sender protection: disabled"
+    fi
 
     case "$tls_status" in
-      ok)
-        echo "TLS certificate:   OK"
-        ;;
-      pending)
-        echo "TLS certificate:   PENDING"
-        ;;
-      not-required)
-        echo "TLS certificate:   not required for HTTP deployment"
-        ;;
-      external-or-manual)
-        echo "TLS certificate:   managed externally/manually"
-        ;;
-      *)
-        echo "TLS certificate:   not checked"
-        ;;
+      ok) echo "TLS certificate:   OK" ;;
+      pending) echo "TLS certificate:   PENDING" ;;
+      not-required) echo "TLS certificate:   not required for HTTP deployment" ;;
+      external-or-manual) echo "TLS certificate:   managed externally/manually" ;;
+      *) echo "TLS certificate:   not checked" ;;
     esac
 
     echo
@@ -553,9 +585,11 @@ PY
 
   discover_mailcow_environment
   print_mailcow_api_allowlist_guidance
+  resolve_sender_install_mode
 
   set +e
   MOOLIAS_INSTALL_REF="$install_ref" \
+    MOOLIAS_INSTALL_SENDER_PROTECTION="$sender_install_mode" \
     COMPOSE_PROGRESS=quiet \
     bash "$tmp_file" "$@" \
       2>"$child_stderr" \
@@ -564,9 +598,7 @@ PY
   set -e
 
   if [[ "$child_status" -ne 0 ]]; then
-    if [[ -s "$child_stderr" ]]; then
-      cat "$child_stderr" >&2
-    fi
+    print_child_failure "$child_stderr"
     echo "Moolias installer: installation failed." >&2
     exit "$child_status"
   fi
