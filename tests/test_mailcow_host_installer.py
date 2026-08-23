@@ -1,6 +1,7 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+BOOTSTRAP = (ROOT / "install.sh").read_text(encoding="utf-8")
 INSTALLER = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
 COMPOSE = (ROOT / "compose.mailcow.yml").read_text(encoding="utf-8")
 
@@ -11,6 +12,14 @@ def test_mailcow_compose_has_no_published_application_port():
     assert "          - moolias-app" in COMPOSE
     assert "    external: true" in COMPOSE
     assert "MAILCOW_DOCKER_NETWORK" in COMPOSE
+
+
+def test_installer_bootstrap_prefers_stable_and_has_initial_release_fallback():
+    assert "releases/latest" in BOOTSTRAP
+    assert "compose.mailcow.yml" in BOOTSTRAP
+    assert 'install_ref="$latest_ref"' in BOOTSTRAP
+    assert 'install_ref="main"' in BOOTSTRAP
+    assert 'MOOLIAS_INSTALL_REF="$install_ref" bash "$tmp_file" "$@"' in BOOTSTRAP
 
 
 def test_installer_discovers_mailcow_network_instead_of_assuming_project_name():
@@ -40,6 +49,8 @@ def test_installer_keeps_secrets_off_standard_output():
 
 
 def test_installer_supports_curl_pipe_and_noninteractive_mode():
+    assert "main() {" in BOOTSTRAP
+    assert 'main "$@"' in BOOTSTRAP
     assert "main() {" in INSTALLER
     assert 'main "$@"' in INSTALLER
     assert "exec 3<>/dev/tty" in INSTALLER
