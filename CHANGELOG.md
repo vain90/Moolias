@@ -2,11 +2,12 @@
 
 All notable changes to Moolias are documented here.
 
-## Unreleased
+## 1.1.0 - 2026-08-23
 
 ### Added
 
 - guided `scripts/install.sh` for the recommended same-host Mailcow deployment under `/opt/moolias`
+- stable-aware root `install.sh` bootstrap that prefers the latest release and safely bridges the first installer release from `main`
 - dedicated `compose.mailcow.yml` that joins Mailcow's existing Docker network without publishing another host port
 - automatic Mailcow Docker-network discovery from the running `nginx-mailcow` service
 - installer-managed Mailcow nginx virtual host with validation, backups and support for Mailcow ACME or external TLS
