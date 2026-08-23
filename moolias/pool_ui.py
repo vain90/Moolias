@@ -137,8 +137,8 @@ async def create_offline_pool_aliases(
 ):
     validate_csrf(request, csrf_token)
     user = require_user(request)
-    if count not in {1, 5, 10, 20}:
-        raise HTTPException(status_code=400, detail="Pool size must be 1, 5, 10 or 20")
+    if count not in {1, 5, 10}:
+        raise HTTPException(status_code=400, detail="Pool size must be 1, 5 or 10")
     try:
         for _ in range(count):
             await _create_unique_reserved(request, user)
