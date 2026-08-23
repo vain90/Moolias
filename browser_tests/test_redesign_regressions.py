@@ -59,7 +59,11 @@ def test_alias_usage_evidence_links_to_aliases_without_proven_usage(
     expect(usage_card).to_contain_text("Alias usage")
     expect(usage_card).to_contain_text("2 / 3")
     expect(usage_card).to_contain_text("No usage proven")
-    expect(usage_card).to_contain_text("Rspamd history")
+    expect(usage_card).to_contain_text("Data since")
+    expect(usage_card).to_contain_text("Counts")
+    expect(usage_card).to_contain_text("Domains")
+    expect(usage_card).to_contain_text("Addresses")
+    expect(usage_card).not_to_contain_text("Rspamd history")
 
     usage_card.locator('a[href="/aliases?status=unused"]').click()
     expect(page).to_have_url(re.compile(r"/aliases\?status=unused$"))
