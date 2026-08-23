@@ -7,7 +7,9 @@ from playwright.sync_api import Page, expect
 
 def _login(page: Page, base_url: str) -> None:
     page.goto(f"{base_url}/oauth/callback?code=e2e&state=e2e")
-    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
+    page.goto(f"{base_url}/aliases")
+    expect(page.locator("[data-alias-results-region]")).to_be_visible()
 
 
 def _purposes(page: Page) -> list[str]:
