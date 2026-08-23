@@ -2,6 +2,22 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.1.2 - 2026-08-23
+
+### Changed
+
+- the recommended Mailcow-host bootstrap now keeps the public Mailcow URL separate from a dedicated internal backend URL instead of overriding `MAILCOW_URL` inside Compose
+- the internal Mailcow URL is derived from the real `HTTP_PORT` in `mailcow.conf` rather than assuming the disposable-CI port `8080`
+- the public installer now suppresses successful nested installer summaries and routine stderr noise, then prints one concise final status after validation
+- sender-protection secrets created by the integrated installer are stored automatically in `/opt/moolias/.env` and are no longer presented as a copy/paste step in the final user-facing flow
+- the bootstrap waits briefly for a Mailcow ACME certificate containing the Moolias hostname and reports TLS as `OK` or `PENDING` explicitly
+
+### Fixed
+
+- same-host installations using Mailcow's normal `HTTP_PORT=80` no longer fail their post-install API validation with `Connection refused`
+- Mailcow API calls and server-side OAuth token/profile requests can use `MAILCOW_INTERNAL_URL`, while browser-facing OAuth authorization continues to use the public `MAILCOW_URL`
+- the installer no longer announces a successful installation before its API and TLS checks have completed
+
 ## 1.1.1 - 2026-08-23
 
 ### Changed

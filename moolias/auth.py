@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from urllib.parse import urlencode
 
 import httpx
@@ -12,10 +11,6 @@ from moolias.security import new_token
 
 class OAuthError(RuntimeError):
     pass
-
-
-def _public_mailcow_url(settings: Settings) -> str:
-    return (os.environ.get("MAILCOW_PUBLIC_URL") or settings.mailcow_url).rstrip("/")
 
 
 def authorization_url(request: Request, settings: Settings) -> str:
@@ -30,14 +25,15 @@ def authorization_url(request: Request, settings: Settings) -> str:
             "state": state,
         }
     )
-    return f"{_public_mailcow_url(settings)}/oauth/authorize?{query}"
+    return f"{settings.mailcow_url}/oauth/authorize?{query}"
 
 
 async def exchange_code(settings: Settings, code: str) -> dict:
+    backend_url = settings.mailcow_backend_url
     async with httpx.AsyncClient(verify=settings.mailcow_verify_tls, timeout=15.0) as client:
         try:
             token_response = await client.post(
-                f"{settings.mailcow_url}/oauth/token",
+                f"{backend_url}/oauth/token",
                 data={
                     "grant_type": "authorization_code",
                     "code": code,
@@ -54,7 +50,7 @@ async def exchange_code(settings: Settings, code: str) -> dict:
                 raise OAuthError("mailcow did not return an access token")
 
             profile_response = await client.get(
-                f"{settings.mailcow_url}/oauth/profile",
+                f"{backend_url}/oauth/profile",
                 headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
             )
             profile_response.raise_for_status()
