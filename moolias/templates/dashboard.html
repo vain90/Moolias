@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon as ui_icon %}
 {% block title %}{% if language == 'de' %}Aliase{% else %}Aliases{% endif %} · Moolias{% endblock %}
 {% block content %}
 <header class="page-heading page-heading-actions">
@@ -6,7 +7,7 @@
     <h1>{% if language == 'de' %}Aliase{% else %}Aliases{% endif %}</h1>
     <p class="muted">{% if language == 'de' %}Verwalte deine Aliase und behalte Nutzung und Status im Blick.{% else %}Manage your aliases and keep usage and status in view.{% endif %}</p>
   </div>
-  <button class="button primary" type="button" data-open-create-alias>+ {% if language == 'de' %}Neuer Alias{% else %}New alias{% endif %}</button>
+  <button class="button primary" type="button" data-open-create-alias>{{ ui_icon('plus') }}{% if language == 'de' %}Neuer Alias{% else %}New alias{% endif %}</button>
 </header>
 
 {% if catch_all %}
@@ -30,7 +31,7 @@
         data-status="{{ status_filter }}"
         data-per-page="{{ per_page }}"
       >
-      <button class="search-clear" type="button" aria-label="{{ t.clear_search }}" title="{{ t.clear_search }}" data-search-clear {% if not search_query %}hidden{% endif %}>×</button>
+      <button class="search-clear" type="button" aria-label="{{ t.clear_search }}" title="{{ t.clear_search }}" data-search-clear {% if not search_query %}hidden{% endif %}>{{ ui_icon('x') }}</button>
     </div>
 
     <form method="get" action="/aliases" class="sort-controls">
@@ -75,7 +76,7 @@
         <span class="bulk-count" data-selected-count>{{ t.selected_count.format(count=0) }}</span>
       </div>
       <div class="bulk-actions">
-        <button class="button compact" type="button" data-bulk-action="copy" disabled>{{ t["copy"] }}</button>
+        <button class="button compact" type="button" data-bulk-action="copy" disabled>{{ ui_icon('copy') }}{{ t["copy"] }}</button>
         <button class="button compact" type="button" data-bulk-action="enable" disabled>{{ t.enable }}</button>
         <button class="button compact danger" type="button" data-bulk-action="disable" disabled>{{ t.disable }}</button>
         <button class="button compact" type="button" data-bulk-action="sogo-on" disabled>{{ t.bulk_sogo_show }}</button>
@@ -163,9 +164,9 @@
           </div>
 
           <div class="alias-actions">
-            <button class="button compact alias-copy-action" type="button" data-copy="{{ alias.address }}" title="{{ t['copy'] }}">⧉</button>
+            <button class="button compact icon-only alias-copy-action" type="button" data-copy="{{ alias.address }}" title="{{ t['copy'] }}" aria-label="{{ t['copy'] }}">{{ ui_icon('copy') }}</button>
             <details class="alias-edit-action">
-              <summary class="button compact" aria-label="{{ t.edit }}" title="{{ t.edit }}">⋮</summary>
+              <summary class="button compact icon-only" aria-label="{{ t.edit }}" title="{{ t.edit }}">{{ ui_icon('ellipsis-vertical') }}</summary>
               <div class="edit-panel">
                 <form method="post" action="/aliases/{{ alias.id }}/metadata" class="stack small">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -221,7 +222,7 @@
 <dialog class="assign-dialog create-alias-dialog" data-create-alias-dialog>
   <div class="dialog-head">
     <div><h2>{{ t.create_alias }}</h2><p class="muted">{% if language == 'de' %}Erstelle eine neue Adresse für einen bestimmten Zweck.{% else %}Create a new address for a specific purpose.{% endif %}</p></div>
-    <button class="dialog-close" type="button" data-close-create-alias aria-label="{{ t.close }}">×</button>
+    <button class="dialog-close" type="button" data-close-create-alias aria-label="{{ t.close }}">{{ ui_icon('x') }}</button>
   </div>
   <form method="post" action="/aliases" class="stack">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -236,7 +237,7 @@
     <label class="hidden" data-custom-local-part>{{ t.custom_address }}<div class="address-input"><input name="local_part" maxlength="63" placeholder="my-alias" autocomplete="off"><span>@{{ domain }}</span></div></label>
     <label class="check-row"><input type="checkbox" name="sogo_visible" value="1"><span>{{ t.show_in_sogo }}</span></label>
     <p class="hint">{{ t.sogo_create_hint }}</p>
-    <button class="button primary" type="submit">{{ t.create_alias_button }}</button>
+    <button class="button primary" type="submit">{{ ui_icon('plus') }}{{ t.create_alias_button }}</button>
   </form>
 </dialog>
 {% endblock %}
