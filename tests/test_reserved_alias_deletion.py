@@ -96,7 +96,7 @@ def make_client(monkeypatch, usage: AliasUsage | None):
         follow_redirects=False,
     )
     assert login.status_code == 303
-    assert login.headers["location"] == "/aliases"
+    assert login.headers["location"] == "/overview"
     return client, mailcow
 
 
