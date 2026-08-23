@@ -10,7 +10,7 @@ ARCHIVE = "archive-r8@example.org"
 
 def _login(page: Page, base_url: str) -> None:
     page.goto(f"{base_url}/oauth/callback?code=e2e&state=e2e")
-    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
 
 
 def test_offline_pool_controls_stay_aligned_and_marker_hidden(
