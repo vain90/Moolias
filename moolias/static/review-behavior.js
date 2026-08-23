@@ -6,10 +6,12 @@
     ? {
         actionRequired: "Handlungsbedarf",
         actionRequiredCount: (count) => `Handlungsbedarf (${count})`,
+        loading: "Handlungsbedarf wird geladen …",
       }
     : {
         actionRequired: "Action required",
         actionRequiredCount: (count) => `Action required (${count})`,
+        loading: "Loading action-required items …",
       };
 
   const LOGIN_AUTO_KEY = "moolias-action-required-after-login";
@@ -102,6 +104,24 @@
     }
   };
 
+  const showActionLoadingState = (dialog) => {
+    const content = dialog?.querySelector(".action-required-content");
+    if (!content) return;
+
+    const status = document.createElement("p");
+    status.className = "muted action-required-loading";
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    status.textContent = text.loading;
+
+    const progress = document.createElement("progress");
+    progress.className = "action-required-progress";
+    progress.setAttribute("aria-label", text.loading);
+    progress.style.width = "100%";
+
+    content.replaceChildren(status, progress);
+  };
+
   const openActionRequired = async () => {
     const api = window.MooliasActionRequired;
     if (!api?.open) return;
@@ -110,13 +130,16 @@
     const renderPromise = api.open();
     const dialog = document.querySelector("dialog[data-action-required-dialog]");
 
+    showActionLoadingState(dialog);
     if (dialog && !dialog.open) dialog.showModal();
 
     await Promise.all([poolPromise, renderPromise]);
 
     const hasUsedPoolItem = Boolean(document.querySelector(".pool-item.pool-item-used"));
     if (hasUsedPoolItem && dialog && !dialog.querySelector(".action-required-pool-form")) {
-      await api.open();
+      const rerenderPromise = api.open();
+      showActionLoadingState(dialog);
+      await rerenderPromise;
     }
   };
 
