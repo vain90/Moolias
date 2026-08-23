@@ -58,10 +58,10 @@ def test_action_required_dialog_shows_loading_feedback(
         () => {
           const originalFetch = window.fetch.bind(window);
           window.fetch = (input, init) => {
-            const url = typeof input === 'string' ? input : input.url;
+            const url = input instanceof Request ? input.url : String(input);
             if (url.includes('/aliases') && url.includes('status=unexpected')) {
               return new Promise((resolve, reject) => {
-                window.setTimeout(() => originalFetch(input, init).then(resolve, reject), 600);
+                window.setTimeout(() => originalFetch(input, init).then(resolve, reject), 1500);
               });
             }
             return originalFetch(input, init);
