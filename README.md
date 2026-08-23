@@ -101,7 +101,7 @@ MOOLIAS_TRUSTED_HOSTS=aliases.example.com
 MAILCOW_URL=https://mail.example.com
 MAILCOW_API_KEY=<read-write-api-key>
 MAILCOW_OAUTH_CLIENT_ID=<oauth-client-id>
-MAILCOW_OAUTH_CLIENT_SECRET=<oauth-client-secret>
+MAILCOW_OAUTH_CLIENT_SECRET=<oauth-secret>
 ```
 
 Generate a strong session secret with:
@@ -159,6 +159,8 @@ The default statistics policy uses the `moolias-stats` tag family and supports f
 | `full` | Counters plus full sender-address aggregates |
 
 A mailbox can override its domain's statistics mode; otherwise it inherits the domain setting. Users can change only their own statistics mode through Moolias.
+
+Increasing the detail level can optionally evaluate the still-available Mailcow/Rspamd history. Reducing the detail level requires confirmation because Moolias immediately collapses or deletes already stored details that the new privacy mode no longer permits. The interface shows a processing state while either operation is running.
 
 When sender detail is enabled, Moolias can flag sender identities that appear unrelated to an alias and let the user review them. This is a traceability feature, not spam classification or threat intelligence.
 
