@@ -10,7 +10,7 @@ def test_public_branding_and_language_dropdown(page: Page, base_url: str) -> Non
 
     logo = page.locator(".hero-brand-logo")
     expect(logo).to_be_visible()
-    expect(logo).to_have_attribute("src", re.compile(r"/static/icon-192\.png"))
+    expect(logo).to_have_attribute("src", re.compile(r"/static/icon-192\.webp"))
 
     dropdown = page.locator("details[data-language-dropdown]")
     expect(dropdown).to_be_visible()
@@ -42,7 +42,7 @@ def test_logged_in_shell_uses_moolias_logo(page: Page, base_url: str) -> None:
 
     logo = page.locator(".brand-mark-logo img")
     expect(logo).to_be_visible()
-    expect(logo).to_have_attribute("src", re.compile(r"/static/icon-192\.png"))
+    expect(logo).to_have_attribute("src", re.compile(r"/static/icon-192\.webp"))
 
     language_dropdown = page.locator("header .language-dropdown")
     expect(language_dropdown).to_be_visible()
@@ -68,13 +68,21 @@ def test_web_app_manifest_uses_moolias_icons(page: Page, base_url: str) -> None:
 
     icons = {item["sizes"]: item for item in manifest["icons"]}
     assert icons["180x180"]["src"] == "/static/icon-180.png"
-    assert icons["192x192"]["src"] == "/static/icon-192.png"
-    assert icons["512x512"]["src"] == "/static/icon-512.png"
+    assert icons["180x180"]["type"] == "image/png"
+    assert icons["192x192"]["src"] == "/static/icon-192.webp"
+    assert icons["192x192"]["type"] == "image/webp"
+    assert icons["512x512"]["src"] == "/static/icon-512.webp"
+    assert icons["512x512"]["type"] == "image/webp"
     assert "maskable" in icons["192x192"]["purpose"]
     assert "maskable" in icons["512x512"]["purpose"]
 
     for item in icons.values():
         icon_response = page.request.get(f"{base_url}{item['src']}")
         assert icon_response.ok
-        assert icon_response.headers["content-type"].startswith("image/png")
-        assert icon_response.body().startswith(b"\x89PNG\r\n\x1a\n")
+        assert icon_response.headers["content-type"].startswith(item["type"])
+        body = icon_response.body()
+        if item["type"] == "image/png":
+            assert body.startswith(b"\x89PNG\r\n\x1a\n")
+        else:
+            assert body.startswith(b"RIFF")
+            assert body[8:12] == b"WEBP"
