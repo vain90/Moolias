@@ -38,7 +38,7 @@
   </div>
 
   <div class="card statistics-card usage-profile-card">
-    <div class="section-head"><div><h2>{% if language == 'de' %}Alias-Nutzung{% else %}Alias usage{% endif %}</h2><p class="muted">{% if language == 'de' %}Für wie viele deiner Alias-Adressen eine Nutzung nachgewiesen werden konnte.{% else %}For how many of your alias addresses usage could be proven.{% endif %}</p></div></div>
+    <div class="section-head"><div><h2 title="{% if language == 'de' %}Der Nutzungsnachweis berücksichtigt die laufende Erfassung und die noch verfügbare Mailcow/Rspamd-Historie.{% else %}Usage evidence includes live collection and the Mailcow/Rspamd history that was still available.{% endif %}">{% if language == 'de' %}Alias-Nutzung{% else %}Alias usage{% endif %}</h2><p class="muted">{% if language == 'de' %}Für wie viele deiner Alias-Adressen eine Nutzung nachgewiesen werden konnte.{% else %}For how many of your alias addresses usage could be proven.{% endif %}</p></div></div>
     <div class="usage-profile-summary">
       <strong>{{ stats_summary.known_used }} / {{ assigned_total }}</strong>
       <span>{% if language == 'de' %}Aliase mit nachgewiesener Nutzung{% else %}aliases with proven usage{% endif %}</span>
@@ -55,30 +55,22 @@
 
     {% if statistics_coverage %}
     <div class="statistics-coverage">
-      <strong>{% if language == 'de' %}Datenabdeckung{% else %}Data coverage{% endif %}</strong>
+      <strong>{% if language == 'de' %}Daten seit{% else %}Data since{% endif %}</strong>
       <div class="statistics-coverage-items">
-        {% if statistics_coverage.basic %}<span>{% if language == 'de' %}Nachrichtenmengen ab{% else %}Message counts from{% endif %} <time data-local-timestamp="{{ statistics_coverage.basic }}">{{ statistics_coverage.basic }}</time></span>{% endif %}
-        {% if statistics_coverage.domain %}<span>{% if language == 'de' %}Domains ab{% else %}Domains from{% endif %} <time data-local-timestamp="{{ statistics_coverage.domain }}">{{ statistics_coverage.domain }}</time></span>{% endif %}
-        {% if statistics_coverage.full %}<span>{% if language == 'de' %}Einzeladressen ab{% else %}Individual addresses from{% endif %} <time data-local-timestamp="{{ statistics_coverage.full }}">{{ statistics_coverage.full }}</time></span>{% endif %}
+        {% if statistics_coverage.basic %}<span><b>{% if language == 'de' %}Mengen{% else %}Counts{% endif %}</b><time data-local-timestamp="{{ statistics_coverage.basic }}">{{ statistics_coverage.basic }}</time></span>{% endif %}
+        {% if statistics_coverage.domain %}<span><b>Domains</b><time data-local-timestamp="{{ statistics_coverage.domain }}">{{ statistics_coverage.domain }}</time></span>{% endif %}
+        {% if statistics_coverage.full %}<span><b>{% if language == 'de' %}Adressen{% else %}Addresses{% endif %}</b><time data-local-timestamp="{{ statistics_coverage.full }}">{{ statistics_coverage.full }}</time></span>{% endif %}
       </div>
       {% if statistics_history_error %}
-      <small>{% if language == 'de' %}Die historische Ergänzung konnte gerade nicht geladen werden. Moolias versucht es beim nächsten Aufruf erneut.{% else %}The historical supplementation could not be loaded right now. Moolias will try again on the next request.{% endif %}</small>
+      <small>{% if language == 'de' %}Historie derzeit nicht verfügbar.{% else %}History currently unavailable.{% endif %}</small>
       {% elif statistics_history_pending %}
-      <small>{% if language == 'de' %}Die verfügbare Mailcow/Rspamd-Historie wird gerade ausgewertet.{% else %}The available Mailcow/Rspamd history is being evaluated.{% endif %}</small>
-      {% else %}
-      <small>{% if language == 'de' %}Jeder Detailgrad hat seinen eigenen Erfassungszeitraum. Deshalb können sich die Startzeitpunkte nach einem Wechsel des Statistikmodus unterscheiden.{% else %}Each detail level has its own coverage period, so the start dates can differ after changing statistics mode.{% endif %}</small>
+      <small>{% if language == 'de' %}Historie wird ergänzt …{% else %}History is being added …{% endif %}</small>
       {% endif %}
     </div>
-    {% endif %}
-
-    {% if usage_backfill %}
-      {% if usage_backfill.oldest_history_at %}
-      <p class="hint usage-backfill-note">{% if language == 'de' %}Die verfügbare Rspamd-Historie wurde einmalig bis <time data-local-timestamp="{{ usage_backfill.oldest_history_at }}">{{ usage_backfill.oldest_history_at }}</time> rückwirkend auf Alias-Nutzung geprüft. Ältere Nutzung kann nicht ausgeschlossen werden.{% else %}The available Rspamd history was checked back to <time data-local-timestamp="{{ usage_backfill.oldest_history_at }}">{{ usage_backfill.oldest_history_at }}</time> for alias usage. Older usage cannot be ruled out.{% endif %}</p>
-      {% else %}
-      <p class="hint usage-backfill-note">{% if language == 'de' %}Die verfügbare Rspamd-Historie wurde einmalig auf Alias-Nutzung geprüft. Es waren keine älteren Einträge verfügbar.{% else %}The available Rspamd history was checked once for alias usage. No older entries were available.{% endif %}</p>
-      {% endif %}
-    {% else %}
-    <p class="hint usage-backfill-note">{% if language == 'de' %}Die rückwirkende Prüfung der verfügbaren Rspamd-Historie auf Alias-Nutzung wird automatisch beim nächsten Statistiklauf durchgeführt.{% else %}The available Rspamd history will be checked automatically for alias usage during the next statistics collection run.{% endif %}</p>
+    {% elif statistics_history_pending %}
+    <p class="hint statistics-history-status">{% if language == 'de' %}Historie wird ergänzt …{% else %}History is being added …{% endif %}</p>
+    {% elif statistics_history_error %}
+    <p class="hint statistics-history-status">{% if language == 'de' %}Historie derzeit nicht verfügbar.{% else %}History currently unavailable.{% endif %}</p>
     {% endif %}
   </div>
 </section>
