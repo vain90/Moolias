@@ -1,3 +1,4 @@
+{% from "_icons.html" import icon %}
 <!doctype html>
 <html lang="{{ language }}">
 <head>
@@ -23,6 +24,7 @@
   <link rel="stylesheet" href="/static/mobile.css">
   <link rel="stylesheet" href="/static/theme.css">
   <link rel="stylesheet" href="/static/shell.css">
+  <link rel="stylesheet" href="/static/ui-icons.css?v=20260823-1">
   <link rel="stylesheet" href="/static/ui-polish.css?v=20260822-2">
   <script src="/static/dialogs.js" defer></script>
   <script src="/static/app.js" defer></script>
@@ -59,19 +61,19 @@
 
       <nav class="side-nav" aria-label="{% if language == 'de' %}Hauptnavigation{% else %}Main navigation{% endif %}">
         <a class="side-nav-link {% if active_nav == 'overview' %}current{% endif %}" href="/overview" {% if active_nav == 'overview' %}aria-current="page"{% endif %}>
-          <span class="nav-icon" aria-hidden="true">⌂</span>
+          <span class="nav-icon" aria-hidden="true">{{ icon('layout-dashboard') }}</span>
           <span>{% if language == 'de' %}Übersicht{% else %}Overview{% endif %}</span>
         </a>
         <a class="side-nav-link {% if active_nav == 'aliases' %}current{% endif %}" href="/aliases" {% if active_nav == 'aliases' %}aria-current="page"{% endif %}>
-          <span class="nav-icon" aria-hidden="true">@</span>
+          <span class="nav-icon" aria-hidden="true">{{ icon('at-sign') }}</span>
           <span>{% if language == 'de' %}Aliase{% else %}Aliases{% endif %}</span>
         </a>
         <a class="side-nav-link {% if active_nav == 'pool' %}current{% endif %}" href="/offline-pool" {% if active_nav == 'pool' %}aria-current="page"{% endif %}>
-          <span class="nav-icon" aria-hidden="true">▣</span>
+          <span class="nav-icon" aria-hidden="true">{{ icon('archive') }}</span>
           <span>{% if language == 'de' %}Offline-Pool{% else %}Offline pool{% endif %}</span>
         </a>
         <a class="side-nav-link {% if active_nav == 'statistics' %}current{% endif %}" href="/statistics" {% if active_nav == 'statistics' %}aria-current="page"{% endif %}>
-          <span class="nav-icon" aria-hidden="true">▥</span>
+          <span class="nav-icon" aria-hidden="true">{{ icon('chart-no-axes-combined') }}</span>
           <span>{% if language == 'de' %}Statistiken{% else %}Statistics{% endif %}</span>
         </a>
       </nav>
@@ -84,14 +86,12 @@
               <span>{% if language == 'de' %}Mailcow-Aliase{% else %}Mailcow aliases{% endif %}</span>
               <strong>{{ mailcow_quota.used }} / {{ mailcow_quota.limit }}</strong>
             </div>
-            <div class="quota-track" aria-hidden="true">
-              <span style="width: {{ [100, (mailcow_quota.used * 100 / mailcow_quota.limit)|round(1)]|min }}%"></span>
-            </div>
+            <meter class="account-quota-meter" min="0" max="{{ mailcow_quota.limit }}" value="{{ [mailcow_quota.used, mailcow_quota.limit]|min }}" aria-label="{{ mailcow_quota.used }} / {{ mailcow_quota.limit }}"></meter>
             <small>
               {% if language == 'de' %}
-                {{ mailcow_quota.own }} davon gehören zu diesem Moolias-Konto.
+                {{ mailcow_quota.own }} davon werden von Moolias verwaltet.
               {% else %}
-                {{ mailcow_quota.own }} belong to this Moolias account.
+                {{ mailcow_quota.own }} are managed by Moolias.
               {% endif %}
             </small>
           </div>
@@ -109,7 +109,7 @@
           <form method="post" action="/logout" class="account-logout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit">
-              <span aria-hidden="true">↪</span>
+              {{ icon('log-out') }}
               <span>{{ t.sign_out }}</span>
             </button>
           </form>
@@ -117,14 +117,14 @@
         <button class="account-button" type="button" data-account-button aria-expanded="false">
           <span class="account-avatar">{{ user[:1]|upper }}</span>
           <span class="account-email">{{ user }}</span>
-          <span class="account-chevron" aria-hidden="true">⌄</span>
+          <span class="account-chevron" aria-hidden="true">{{ icon('chevron-down') }}</span>
         </button>
       </div>
     </aside>
 
     <div class="app-workspace">
       <header class="app-header">
-        <button class="mobile-nav-trigger" type="button" data-mobile-nav aria-label="Navigation">☰</button>
+        <button class="mobile-nav-trigger" type="button" data-mobile-nav aria-label="Navigation">{{ icon('menu') }}</button>
         <nav class="language-switch app-language" aria-label="{{ t.language }}">
           <a
             class="language-link {% if language == 'de' %}current{% endif %}"
@@ -139,8 +139,8 @@
           >EN</a>
         </nav>
         <div class="header-actions">
-          <button class="header-icon-button" type="button" data-open-settings aria-label="{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}" title="{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}">⚙</button>
-          <button class="header-icon-button help-trigger" type="button" data-open-help-dialog aria-label="{{ t.help_open }}" title="{{ t.help_open }}">?</button>
+          <button class="header-icon-button" type="button" data-open-settings aria-label="{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}" title="{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}">{{ icon('settings') }}</button>
+          <button class="header-icon-button help-trigger" type="button" data-open-help-dialog aria-label="{{ t.help_open }}" title="{{ t.help_open }}">{{ icon('circle-question-mark') }}</button>
         </div>
       </header>
 
@@ -155,7 +155,7 @@
       <div>
         <h2>{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}</h2>
       </div>
-      <button class="drawer-close" type="button" data-close-settings aria-label="{{ t.close }}">×</button>
+      <button class="drawer-close" type="button" data-close-settings aria-label="{{ t.close }}">{{ icon('x') }}</button>
     </div>
 
     <div class="settings-drawer-content">
@@ -165,9 +165,9 @@
           <h3>{% if language == 'de' %}Erscheinungsbild{% else %}Appearance{% endif %}</h3>
           <p class="muted">{% if language == 'de' %}Wähle, wie Moolias angezeigt werden soll.{% else %}Choose how Moolias should look.{% endif %}</p>
           <div class="theme-segments" role="group" aria-label="{% if language == 'de' %}Erscheinungsbild{% else %}Appearance{% endif %}">
-            <button type="button" data-theme-choice="light"><span aria-hidden="true">☀</span> {% if language == 'de' %}Hell{% else %}Light{% endif %}</button>
-            <button type="button" data-theme-choice="dark"><span aria-hidden="true">☾</span> {% if language == 'de' %}Dunkel{% else %}Dark{% endif %}</button>
-            <button type="button" data-theme-choice="system"><span aria-hidden="true">▣</span> System</button>
+            <button type="button" data-theme-choice="light">{{ icon('sun') }} {% if language == 'de' %}Hell{% else %}Light{% endif %}</button>
+            <button type="button" data-theme-choice="dark">{{ icon('moon') }} {% if language == 'de' %}Dunkel{% else %}Dark{% endif %}</button>
+            <button type="button" data-theme-choice="system">{{ icon('monitor') }} System</button>
           </div>
           <label class="sr-only">
             {% if language == 'de' %}Erscheinungsbild{% else %}Appearance{% endif %}
@@ -242,7 +242,7 @@
     </div>
 
     <div class="settings-drawer-foot">
-      <span aria-hidden="true">ⓘ</span>
+      {{ icon('info') }}
       <span>{% if language == 'de' %}Darstellung und Schutz werden automatisch gespeichert. Statistikmodi werden über „Speichern“ übernommen.{% else %}Appearance and protection are saved automatically. Statistics modes are applied with Save.{% endif %}</span>
     </div>
   </aside>
@@ -253,7 +253,7 @@
         <h2>{{ t.help_title }}</h2>
         <p class="muted">{{ t.help_intro }}</p>
       </div>
-      <button class="dialog-close" type="button" aria-label="{{ t.close }}" title="{{ t.close }}" data-close-help-dialog>×</button>
+      <button class="dialog-close" type="button" aria-label="{{ t.close }}" title="{{ t.close }}" data-close-help-dialog>{{ icon('x') }}</button>
     </div>
     <div class="help-content">
       <section><h3>{{ t.help_aliases_title }}</h3><p>{{ t.help_aliases_body }}</p></section>
@@ -261,6 +261,10 @@
       <section><h3>{{ t.help_offline_title }}</h3><p>{{ t.help_offline_body }}</p></section>
       <section><h3>{{ t.help_sogo_title }}</h3><p>{{ t.help_sogo_body }}</p></section>
       <section><h3>{{ t.help_storage_title }}</h3><p>{{ t.help_storage_body }}</p></section>
+      <section>
+        <h3>{% if language == 'de' %}UI-Symbole{% else %}UI icons{% endif %}</h3>
+        <p>{% if language == 'de' %}Die Bedienelemente verwenden lokal gebündelte Symbole aus Lucide Icons (ISC; einzelne von Feather abgeleitete Symbole MIT). Details stehen in THIRD_PARTY_NOTICES.md.{% else %}Interface controls use locally bundled symbols from Lucide Icons (ISC; selected Feather-derived symbols MIT). See THIRD_PARTY_NOTICES.md for details.{% endif %}</p>
+      </section>
     </div>
   </dialog>
 {% else %}
