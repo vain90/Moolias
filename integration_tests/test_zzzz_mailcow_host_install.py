@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -27,6 +26,10 @@ def _run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str
 
 def _mailcow_compose(*args: str) -> subprocess.CompletedProcess[str]:
     return _run("docker", "compose", *args, cwd=Path(os.environ["MAILCOW_DIR"]))
+
+
+def _installed_compose(*args: str) -> subprocess.CompletedProcess[str]:
+    return _run("sudo", "docker", "compose", *args, cwd=INSTALL_DIR)
 
 
 def _mailcow_network() -> str:
@@ -103,14 +106,7 @@ def test_recommended_mailcow_host_installer() -> None:
         assert (INSTALL_DIR / ".moolias-mailcow-install").is_file()
         assert stat.S_IMODE((INSTALL_DIR / ".env").stat().st_mode) == 0o600
 
-        container_id = _run(
-            "docker",
-            "compose",
-            "ps",
-            "-q",
-            "moolias",
-            cwd=INSTALL_DIR,
-        ).stdout.strip()
+        container_id = _installed_compose("ps", "-q", "moolias").stdout.strip()
         assert container_id
 
         port_bindings = _run(
@@ -166,7 +162,7 @@ def test_recommended_mailcow_host_installer() -> None:
     finally:
         if (INSTALL_DIR / "compose.yml").exists():
             subprocess.run(
-                ["docker", "compose", "down", "-v", "--remove-orphans"],
+                ["sudo", "docker", "compose", "down", "-v", "--remove-orphans"],
                 cwd=INSTALL_DIR,
                 check=False,
                 stdout=subprocess.DEVNULL,
@@ -190,4 +186,3 @@ def test_recommended_mailcow_host_installer() -> None:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        shutil.rmtree(INSTALL_DIR, ignore_errors=True)
