@@ -11,6 +11,7 @@ main() {
   local latest_ref=""
   local final_url=""
   local tmp_file=""
+  local tmp_file_cleanup=""
   local mailcow_dir="${MAILCOW_DIR:-/opt/mailcow-dockerized}"
   local install_dir="${MOOLIAS_INSTALL_DIR:-/opt/moolias}"
   local detected_network=""
@@ -74,6 +75,9 @@ Mailcow API access
 ============================================================
 Moolias will run inside Mailcow's Docker network:
   ${detected_network}
+
+The recommended same-host deployment keeps browser-facing OAuth on the public
+Mailcow URL while backend API/OAuth requests use nginx-mailcow:8080 directly.
 
 Before entering the Mailcow API key, configure a READ/WRITE API key in
 Mailcow and allow the following IPv4 CIDR network(s):
@@ -215,7 +219,8 @@ PY
   fi
 
   tmp_file="$(mktemp)"
-  trap 'rm -f "$tmp_file"' EXIT
+  printf -v tmp_file_cleanup '%q' "$tmp_file"
+  trap "rm -f -- ${tmp_file_cleanup}" EXIT
 
   if [[ -n "$source_dir" ]]; then
     [[ -f "${source_dir}/scripts/install.sh" ]] || {
