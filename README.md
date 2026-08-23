@@ -81,6 +81,8 @@ https://aliases.example.com/oauth/callback
 
 Replace `aliases.example.com` with the hostname you will use for Moolias, then copy the generated client ID and client secret into `.env`.
 
+Keep the mailcow OAuth redirect URI on `/oauth/callback`. Moolias processes the OAuth response at that endpoint and then sends the authenticated user to the **Overview** page. `/overview` itself is not an OAuth callback URL.
+
 ### 3. Create a mailcow API key
 
 Create a **read/write** API key in mailcow. Moolias needs it to create and manage aliases and, when usage-statistics self-service is enabled, to update the authenticated mailbox's statistics tags.
@@ -119,7 +121,7 @@ docker compose up -d
 
 The repository Compose file publishes Moolias on host port `8080` by default. Put your normal HTTPS reverse proxy, such as Caddy, nginx or Traefik, in front of it and forward requests to Moolias.
 
-Then open your configured `MOOLIAS_BASE_URL` and sign in through mailcow.
+Then open your configured `MOOLIAS_BASE_URL` and sign in through mailcow. After successful authentication, Moolias opens the **Overview** page.
 
 ## Optional configuration
 
