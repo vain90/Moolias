@@ -14,11 +14,23 @@ def test_container_image_rollback_is_still_kept():
     assert 'docker tag "${CURRENT_IMAGE_ID}" "${IMAGE}:previous"' in UPDATER
 
 
+def test_repository_reserves_compose_local_for_operator_overrides():
+    assert not (ROOT / "compose.local.yml").exists()
+    assert (ROOT / "compose.dev.yml").exists()
+
+
 def test_updater_layers_base_and_local_compose_files():
     assert 'elif [[ -f "compose.yml" && -f "compose.local.yml" ]]; then' in UPDATER
     assert 'COMPOSE_ARGS=(-f "compose.yml" -f "compose.local.yml")' in UPDATER
     assert 'COMPOSE_DISPLAY="compose.yml + compose.local.yml"' in UPDATER
     assert 'docker compose "${COMPOSE_ARGS[@]}" "$@"' in UPDATER
+
+
+def test_updater_ignores_legacy_stock_development_compose_file():
+    assert "is_legacy_stock_dev_compose()" in UPDATER
+    assert 'image: moolias:local' in UPDATER
+    assert 'COMPOSE_ARGS=(-f "compose.yml")' in UPDATER
+    assert 'legacy development compose.local.yml ignored' in UPDATER
 
 
 def test_updater_keeps_explicit_compose_file_override():
@@ -31,5 +43,5 @@ def test_compose_validation_errors_are_not_silenced():
     assert 'Docker Compose validation failed for ${COMPOSE_DISPLAY}' in UPDATER
 
 
-def test_updater_version_is_0_1_3():
-    assert 'UPDATER_VERSION="0.1.3"' in UPDATER
+def test_updater_version_is_0_1_4():
+    assert 'UPDATER_VERSION="0.1.4"' in UPDATER
