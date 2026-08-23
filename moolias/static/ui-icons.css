@@ -126,8 +126,8 @@
   box-shadow: 0 16px 42px rgba(16, 24, 40, .16);
 }
 .public-language .language-dropdown-menu {
-  right: auto;
-  left: 0;
+  right: 0;
+  left: auto;
 }
 .language-dropdown-option {
   min-height: 38px;
