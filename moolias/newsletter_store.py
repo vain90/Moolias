@@ -49,6 +49,17 @@ class Newsletter:
     def one_click_available(self) -> bool:
         return any(link.one_click for link in self.links)
 
+    @property
+    def resumed_after_unsubscribe(self) -> bool:
+        return (
+            self.unsubscribed_at is not None
+            and self.last_seen_at > self.unsubscribed_at
+        )
+
+    @property
+    def is_unsubscribed(self) -> bool:
+        return self.unsubscribed_at is not None and not self.resumed_after_unsubscribe
+
 
 @dataclass(frozen=True, slots=True)
 class NewsletterObservation:
@@ -234,7 +245,7 @@ class NewsletterStore:
 
             row = connection.execute(
                 """
-                SELECT id, unsubscribed_at
+                SELECT id
                 FROM newsletters
                 WHERE mailbox = ? AND recipient_alias = ? AND identity_key = ?
                 """,
@@ -269,14 +280,8 @@ class NewsletterStore:
                     ),
                 )
                 newsletter_id = int(cursor.lastrowid)
-                unsubscribed_at = None
             else:
                 newsletter_id = int(row["id"])
-                unsubscribed_at = (
-                    int(row["unsubscribed_at"])
-                    if row["unsubscribed_at"] is not None
-                    else None
-                )
 
             event_key = self._event_key(observation)
             inserted = connection.execute(
@@ -291,7 +296,6 @@ class NewsletterStore:
                 (event_key, newsletter_id, message_id, event_at),
             ).rowcount
 
-            clear_unsubscribed = unsubscribed_at is not None and event_at > unsubscribed_at
             connection.execute(
                 """
                 UPDATE newsletters
@@ -304,8 +308,7 @@ class NewsletterStore:
                     latest_message_id = CASE
                         WHEN ? >= last_seen_at THEN ?
                         ELSE latest_message_id
-                    END,
-                    unsubscribed_at = CASE WHEN ? THEN NULL ELSE unsubscribed_at END
+                    END
                 WHERE id = ?
                 """,
                 (
@@ -319,7 +322,6 @@ class NewsletterStore:
                     1 if inserted else 0,
                     event_at,
                     message_id,
-                    1 if clear_unsubscribed else 0,
                     newsletter_id,
                 ),
             )
