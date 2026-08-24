@@ -176,6 +176,15 @@
     },
   };
 
+  const ensureAliasDescriptionStyles = () => {
+    if (document.querySelector('link[data-alias-description-styles]')) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "/static/alias-descriptions.css?v=20260824-1";
+    link.dataset.aliasDescriptionStyles = "1";
+    document.head.append(link);
+  };
+
   const setLabelCaption = (label, text) => {
     [...label.childNodes]
       .filter((node) => node.nodeType === Node.TEXT_NODE)
@@ -281,6 +290,8 @@
   const enhanceAliasDescriptions = async () => {
     if (!document.body.classList.contains("app-body")) return;
     if (!document.querySelector("[data-create-alias-dialog], [data-assign-dialog], .alias-row")) return;
+
+    ensureAliasDescriptionStyles();
 
     const language = document.documentElement.lang?.toLowerCase().startsWith("de") ? "de" : "en";
     const copy = aliasDescriptionCopy[language];
