@@ -44,18 +44,18 @@
       <h2>{% if language == 'de' %}Für dieses Postfach deaktiviert{% else %}Disabled for this mailbox{% endif %}</h2>
       <p class="muted">
         {% if language == 'de' %}
-          Die Newsletter-Verwaltung ist auf dem Server verfügbar, aber für dieses Postfach nicht aktiviert. Du kannst deine Auswahl jederzeit in den Einstellungen ändern.
+          Die Newsletter-Verwaltung ist serverseitig verfügbar, aber die wirksame Mailcow-Tag-Einstellung dieses Postfachs ist „Aus“. Wie bei der Statistik kannst du in den Einstellungen die Domain-Vorgabe übernehmen oder sie für dein Postfach überschreiben.
         {% else %}
-          Newsletter management is available on the server but is not enabled for this mailbox. You can change your choice at any time in Settings.
+          Newsletter management is available server-side, but this mailbox's effective Mailcow tag policy is Off. As with statistics, you can inherit the domain default or override it for your mailbox in Settings.
         {% endif %}
       </p>
     {% else %}
       <h2>{% if language == 'de' %}Newsletter-Verwaltung ist serverseitig deaktiviert{% else %}Newsletter management is disabled server-side{% endif %}</h2>
       <p class="muted">
         {% if language == 'de' %}
-          Ein Administrator muss die Newsletter-Verwaltung und den Mailcow Newsletter Agent in der Moolias-Serverkonfiguration aktivieren. Die persönliche Einstellung des Postfachs ist solange gesperrt.
+          Ein Administrator muss die Newsletter-Verwaltung und den Mailcow Newsletter Agent in der Moolias-Serverkonfiguration aktivieren. Die Newsletter-Tag-Einstellung kann solange nicht geändert werden.
         {% else %}
-          An administrator must enable newsletter management and the Mailcow newsletter agent in the Moolias server configuration. The mailbox setting remains locked until then.
+          An administrator must enable newsletter management and the Mailcow newsletter agent in the Moolias server configuration. The newsletter tag setting cannot be changed until then.
         {% endif %}
       </p>
     {% endif %}
