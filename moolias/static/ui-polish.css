@@ -387,6 +387,11 @@
   line-height: 1.15;
 }
 
+.statistics-metrics .metric-inline-link {
+  display: inline-block;
+  white-space: nowrap;
+}
+
 .statistics-coverage {
   display: flex;
   align-items: center;

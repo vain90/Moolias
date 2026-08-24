@@ -16,6 +16,7 @@
   <script src="/static/theme.js"></script>
   <link rel="stylesheet" href="/static/app.css">
   <link rel="stylesheet" href="/static/help.css">
+  <link rel="stylesheet" href="/static/tour.css?v=20260824-1">
   <link rel="stylesheet" href="/static/stats.css">
   <link rel="stylesheet" href="/static/collector-health.css">
   <link rel="stylesheet" href="/static/review.css">
@@ -37,6 +38,7 @@
   <script src="/static/sender-protection.js" defer></script>
   <script src="/static/ui-icons-runtime.js?v=20260823-1" defer></script>
   <script src="/static/shell.js" defer></script>
+  <script src="/static/tour.js?v=20260824-1" defer></script>
 </head>
 <body
   class="{% if user is defined %}app-body{% else %}public-body{% endif %}"
@@ -44,6 +46,7 @@
   data-stats-effective="{% if stats_confirmation_mode is defined and stats_confirmation_mode %}{{ stats_confirmation_mode }}{% elif stats_state is defined and stats_state %}{{ stats_state.effective.value }}{% endif %}"
   data-stats-domain="{% if stats_state is defined and stats_state and stats_state.domain_default %}{{ stats_state.domain_default.value }}{% else %}off{% endif %}"
   {% if csrf_token is defined %}data-csrf-token="{{ csrf_token }}"{% endif %}
+  {% if user is defined %}data-tour-user="{{ user|e }}"{% endif %}
 >
 {% if user is defined %}
   <div class="app-frame">
@@ -186,7 +189,9 @@
         <div class="settings-section-body">
           <h3>{{ t.usage_settings_title }}</h3>
           {% if not stats_available %}
-            <p class="muted">{{ t.usage_settings_unavailable }}</p>
+            <p class="muted"><strong>{% if language == 'de' %}Nutzungsstatistik ist serverseitig deaktiviert.{% else %}Usage statistics are disabled server-side.{% endif %}</strong></p>
+            <p class="muted">{% if language == 'de' %}Ein Administrator muss die Statistikfunktion in der Moolias-Serverkonfiguration aktivieren, bevor du einen Statistikmodus auswählen kannst.{% else %}An administrator must enable statistics in the Moolias server configuration before you can select a statistics mode.{% endif %}</p>
+            <a class="button compact" href="https://github.com/vain90/Moolias/blob/main/docs/statistics.md" target="_blank" rel="noopener noreferrer">{% if language == 'de' %}So aktivierst du Statistiken{% else %}How to enable statistics{% endif %}</a>
           {% elif stats_error or not stats_state %}
             <p class="muted">{{ t.usage_settings_unavailable }}</p>
           {% else %}
@@ -251,21 +256,43 @@
   <dialog class="help-dialog" data-help-dialog>
     <div class="dialog-head">
       <div>
-        <h2>{{ t.help_title }}</h2>
-        <p class="muted">{{ t.help_intro }}</p>
+        <h2>{% if language == 'de' %}Moolias einfach erklärt{% else %}Moolias, simply explained{% endif %}</h2>
+        <p class="muted">{% if language == 'de' %}Deine echte Mailbox-Adresse soll möglichst privat bleiben. Moolias gibt dir für jeden Dienst eine eigene Adresse, die trotzdem in dein normales Postfach zustellt.{% else %}Your real mailbox address should stay as private as possible. Moolias gives each service its own address while mail still arrives in your normal mailbox.{% endif %}</p>
       </div>
       <button class="dialog-close" type="button" aria-label="{{ t.close }}" title="{{ t.close }}" data-close-help-dialog>{{ icon('x') }}</button>
     </div>
     <div class="help-content">
-      <section><h3>{{ t.help_aliases_title }}</h3><p>{{ t.help_aliases_body }}</p></section>
-      <section><h3>{{ t.help_leaks_title }}</h3><p>{{ t.help_leaks_body }}</p></section>
-      <section><h3>{{ t.help_offline_title }}</h3><p>{{ t.help_offline_body }}</p></section>
-      <section><h3>{{ t.help_sogo_title }}</h3><p>{{ t.help_sogo_body }}</p></section>
-      <section><h3>{{ t.help_storage_title }}</h3><p>{{ t.help_storage_body }}</p></section>
       <section>
-        <h3>{% if language == 'de' %}UI-Symbole{% else %}UI icons{% endif %}</h3>
-        <p>{% if language == 'de' %}Die Bedienelemente verwenden lokal gebündelte Symbole aus Lucide Icons (ISC; einzelne von Feather abgeleitete Symbole MIT). Details stehen in THIRD_PARTY_NOTICES.md.{% else %}Interface controls use locally bundled symbols from Lucide Icons (ISC; selected Feather-derived symbols MIT). See THIRD_PARTY_NOTICES.md for details.{% endif %}</p>
+        <h3>{% if language == 'de' %}Warum überhaupt Aliase?{% else %}Why use aliases at all?{% endif %}</h3>
+        <p>{% if language == 'de' %}Gib Shops, Apps und Newslettern nicht deine echte Adresse. Wird eine Alias-Adresse weitergegeben, geleakt oder mit Spam belastet, bleibt deine Hauptadresse davon unberührt.{% else %}Do not give shops, apps and newsletters your real address. If an alias is shared, leaked or starts receiving spam, your primary address remains unaffected.{% endif %}</p>
       </section>
+      <section>
+        <h3>{% if language == 'de' %}Ein Dienst, ein Alias{% else %}One service, one alias{% endif %}</h3>
+        <p>{% if language == 'de' %}Erstelle zum Beispiel je eine Adresse für Amazon, deine Versicherung oder einen Newsletter. Der Zweck in Moolias hilft dir später sofort zu erkennen, wem du die Adresse gegeben hast.{% else %}Create a separate address for Amazon, your insurer or a newsletter. The purpose stored in Moolias lets you immediately see who received that address.{% endif %}</p>
+      </section>
+      <section>
+        <h3>{% if language == 'de' %}Wenn ein Alias problematisch wird{% else %}When an alias becomes a problem{% endif %}</h3>
+        <p>{% if language == 'de' %}Du kannst nur diesen Alias deaktivieren oder ersetzen. Alle anderen Adressen und dein eigentliches Postfach funktionieren weiter.{% else %}Disable or replace only that alias. All other addresses and your actual mailbox keep working.{% endif %}</p>
+      </section>
+      <section>
+        <h3>Offline-Pool</h3>
+        <p>{% if language == 'de' %}Bereite einige zufällige Adressen vor, zum Beispiel für unterwegs. Nach der ersten Nutzung ordnest du später nur noch den Zweck zu; die Adresse bleibt gleich.{% else %}Prepare a few random addresses for times when you are away. After first use, assign the purpose later; the address itself stays the same.{% endif %}</p>
+      </section>
+      <section>
+        <h3>{% if language == 'de' %}Mit einem Alias senden{% else %}Sending with an alias{% endif %}</h3>
+        <p>{% if language == 'de' %}Wenn du einen Alias auch als Absender verwenden möchtest, kannst du ihn in SOGo sichtbar machen. Für reinen Empfang ist das nicht nötig.{% else %}If you also want to send from an alias, make it visible in SOGo. This is not required for receive-only aliases.{% endif %}</p>
+      </section>
+      <section>
+        <h3>{% if language == 'de' %}Statistiken und Hinweise{% else %}Statistics and review hints{% endif %}</h3>
+        <p>{% if language == 'de' %}Statistiken sind optional. Je nach gewähltem Datenschutzmodus kann Moolias Nutzung zählen und Absender zur Prüfung markieren. „Nicht erkannt“ ist ein Hinweis und kein automatisches Spam-Urteil.{% else %}Statistics are optional. Depending on the privacy mode, Moolias can count usage and flag senders for review. “Unrecognized” is a hint, not an automatic spam verdict.{% endif %}</p>
+      </section>
+      <section>
+        <h3>{% if language == 'de' %}Wo liegen die Daten?{% else %}Where is the data stored?{% endif %}</h3>
+        <p>{% if language == 'de' %}Mailcow bleibt die Quelle für deine Alias-Adressen und deren Status. Nur optionale Statistik- und Prüfdaten werden von Moolias zusätzlich lokal gespeichert.{% else %}Mailcow remains the source for your alias addresses and their status. Only optional statistics and review data are additionally stored locally by Moolias.{% endif %}</p>
+      </section>
+      <div class="button-row top-gap">
+        <button class="button primary" type="button" data-start-tour>{{ icon('play') }}{% if language == 'de' %}Geführte Tour starten{% else %}Start guided tour{% endif %}</button>
+      </div>
     </div>
   </dialog>
 {% else %}

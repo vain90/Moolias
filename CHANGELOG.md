@@ -2,6 +2,26 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.1.7 - 2026-08-24
+
+### Added
+
+- a concise 13-step guided onboarding tour for non-technical users, with a plain-language help dialog that can restart the tour at any time
+- browser E2E coverage that walks every onboarding step on desktop and mobile and verifies that both the highlighted target and tour popover stay inside the visible viewport
+
+### Changed
+
+- statistics guidance now clearly distinguishes server-disabled, mailbox-disabled and temporarily unavailable states and links administrators to the activation documentation where appropriate
+- onboarding copy now adapts to whether usage statistics and primary-address protection are actually enabled by the administrator instead of presenting optional server features as universally available
+- action-required and settings guidance now describes primary-address protection and sender-review features conditionally, according to the features enabled on the server
+- tour scrolling now only moves the page when necessary, keeps header controls in place and reserves room for the mobile tour popover instead of centering every target unconditionally
+
+### Fixed
+
+- the alias-creation steps no longer scroll the `New alias` button away from the top of the page when it is already visible
+- the tour popover now has a safe initial viewport position before dynamic placement, avoiding a transient off-screen jump between steps on long pages
+- the narrow statistics review action remains readable on small layouts
+
 ## 1.1.6 - 2026-08-24
 
 ### Fixed
