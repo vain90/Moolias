@@ -27,12 +27,42 @@
     });
   });
 
-  page.querySelectorAll("[data-newsletter-unsubscribe-form]").forEach((form) => {
-    form.addEventListener("submit", (event) => {
-      const message = document.documentElement.lang === "de"
-        ? "Diesen Newsletter jetzt direkt abmelden?"
-        : "Unsubscribe from this newsletter now?";
-      if (!window.confirm(message)) event.preventDefault();
+  const search = page.querySelector("[data-newsletter-search]");
+  const clear = page.querySelector("[data-newsletter-search-clear]");
+  let searchTimer = null;
+
+  const navigateSearch = (value) => {
+    const url = new URL(window.location.href);
+    const query = value.trim();
+    if (query) url.searchParams.set("q", query);
+    else url.searchParams.delete("q");
+    url.searchParams.delete("page");
+    window.location.assign(url.toString());
+  };
+
+  if (search) {
+    search.addEventListener("input", () => {
+      if (clear) clear.hidden = !search.value;
+      if (searchTimer) window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => navigateSearch(search.value), 350);
     });
+
+    search.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      if (searchTimer) window.clearTimeout(searchTimer);
+      navigateSearch(search.value);
+    });
+  }
+
+  clear?.addEventListener("click", () => {
+    if (searchTimer) window.clearTimeout(searchTimer);
+    if (search) search.value = "";
+    clear.hidden = true;
+    navigateSearch("");
+  });
+
+  page.querySelectorAll("[data-newsletter-page-size]").forEach((select) => {
+    select.addEventListener("change", () => select.form?.submit());
   });
 })();
