@@ -21,7 +21,7 @@ All notable changes to Moolias are documented here.
 
 ### Removed
 
-- legacy Cowcloak reservation-marker recognition; only Moolias markers are interpreted as internal metadata
+- legacy reservation-marker recognition; only Moolias markers are interpreted as internal metadata
 
 ## 1.1.7 - 2026-08-24
 
