@@ -13,20 +13,52 @@ def _login(page: Page, base_url: str) -> None:
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
 
 
+def _expect_target_and_popover_in_view(page: Page) -> None:
+    tour = page.locator(".tour-popover")
+    viewport = page.viewport_size
+    assert viewport is not None
+
+    popover_box = tour.bounding_box()
+    assert popover_box is not None
+    assert popover_box["x"] >= -1
+    assert popover_box["y"] >= -1
+    assert popover_box["x"] + popover_box["width"] <= viewport["width"] + 1
+    assert popover_box["y"] + popover_box["height"] <= viewport["height"] + 1
+
+    selector = tour.get_attribute("data-tour-target") or ""
+    if not selector:
+        return
+
+    target = page.locator(selector).first
+    expect(target).to_be_visible()
+    target_box = target.bounding_box()
+    assert target_box is not None
+
+    visible_top = max(0.0, target_box["y"])
+    visible_bottom = min(
+        float(viewport["height"]),
+        target_box["y"] + target_box["height"],
+    )
+    assert visible_bottom - visible_top >= min(32.0, target_box["height"])
+
+    if target_box["height"] <= viewport["height"] * 0.5:
+        assert target_box["y"] >= 55
+        assert target_box["y"] + target_box["height"] <= viewport["height"] - 8
+
+
 def _expect_step(page: Page, number: int, title: str) -> None:
     tour = page.locator(".tour-popover")
     expect(tour).to_be_visible()
     expect(tour).to_contain_text(f"Schritt {number} / 13")
     expect(tour).to_contain_text(title)
+    _expect_target_and_popover_in_view(page)
 
 
 def _next(page: Page) -> None:
     page.locator(".tour-popover").get_by_role("button", name="Weiter").click()
 
 
-def test_first_visit_offers_and_completes_guided_tour(page: Page, base_url: str) -> None:
-    _login(page, base_url)
-
+def _run_complete_tour(page: Page, base_url: str) -> None:
     invite = page.locator("[data-tour-invite]")
     expect(invite).to_be_visible()
     expect(invite).to_contain_text("Neu bei Moolias?")
@@ -39,10 +71,15 @@ def test_first_visit_offers_and_completes_guided_tour(page: Page, base_url: str)
 
     _next(page)
     _expect_step(page, 3, "Hauptadresse schützen")
+    expect(page.locator(".tour-popover")).to_contain_text("Administrator")
 
     _next(page)
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
     _expect_step(page, 4, "Für jeden Dienst ein Alias")
+
+    create_button_box = page.locator("[data-open-create-alias]").bounding_box()
+    assert create_button_box is not None
+    assert create_button_box["y"] < 260
 
     _next(page)
     _expect_step(page, 5, "Neuen Alias erstellen")
@@ -60,6 +97,7 @@ def test_first_visit_offers_and_completes_guided_tour(page: Page, base_url: str)
     _next(page)
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/statistics(?:[?#].*)?$"))
     _expect_step(page, 9, "Optionale Nutzungsstatistiken")
+    expect(page.locator(".tour-popover")).to_contain_text("Administrator")
 
     _next(page)
     _expect_step(page, 10, "Nicht erkannte Absender")
@@ -70,12 +108,25 @@ def test_first_visit_offers_and_completes_guided_tour(page: Page, base_url: str)
 
     _next(page)
     _expect_step(page, 12, "Einstellungen")
+    expect(page.locator(".tour-popover")).to_contain_text("Administrator")
 
     _next(page)
     _expect_step(page, 13, "Hilfe ist immer erreichbar")
 
     page.locator(".tour-popover").get_by_role("button", name="Fertig").click()
     expect(page.locator(".tour-popover")).not_to_be_visible()
+
+
+def test_first_visit_offers_and_completes_guided_tour(page: Page, base_url: str) -> None:
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _login(page, base_url)
+    _run_complete_tour(page, base_url)
+
+
+def test_mobile_guided_tour_keeps_targets_in_view(page: Page, base_url: str) -> None:
+    page.set_viewport_size({"width": 390, "height": 844})
+    _login(page, base_url)
+    _run_complete_tour(page, base_url)
 
 
 def test_help_explains_aliases_and_can_restart_tour(page: Page, base_url: str) -> None:
