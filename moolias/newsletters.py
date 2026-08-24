@@ -9,6 +9,7 @@ import secrets
 import socket
 import ssl
 import time
+from email.header import decode_header, make_header
 from email.utils import parseaddr
 from pathlib import Path
 from typing import Any
@@ -30,7 +31,7 @@ from moolias.sender_protocol import (
     TIMESTAMP_HEADER,
     request_signature,
 )
-from moolias.ui import _load_ui_state, _template_context
+from moolias.ui import PAGE_SIZES, _load_ui_state, _pagination_items, _template_context
 
 LOGGER = logging.getLogger(__name__)
 router = APIRouter()
@@ -38,6 +39,7 @@ TEMPLATES = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "tem
 CLEAN_ACTIONS = frozenset({"clean", "no action", "accept"})
 AUTH_SYMBOLS = frozenset({"R_DKIM_ALLOW", "DMARC_POLICY_ALLOW"})
 NEWSLETTER_SYMBOLS = frozenset({"MAILLIST", "HAS_LIST_UNSUB"})
+NEWSLETTER_STATUS_FILTERS = frozenset({"all", "active", "unsubscribed"})
 MAX_UNSUBSCRIBE_URL_LENGTH = 8192
 MAX_RESPONSE_HEADER_BYTES = 65536
 MAX_HEADER_LOOKUPS_PER_SCAN = 50
@@ -132,6 +134,16 @@ def _agent_url(settings: Any) -> str:
     return f"{settings.mailcow_url.rstrip('/')}/moolias-newsletter-agent"
 
 
+def _decode_header_text(value: str) -> str:
+    value = value.strip()
+    if not value:
+        return ""
+    try:
+        return str(make_header(decode_header(value))).strip()
+    except (LookupError, UnicodeError, ValueError):
+        return value
+
+
 def _normalise_symbol(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
@@ -169,7 +181,7 @@ def _sender(item: dict[str, Any]) -> tuple[str, str]:
     if isinstance(raw, list):
         raw = raw[0] if raw else ""
     name, address = parseaddr(str(raw))
-    return name.strip(), address.strip().casefold()
+    return _decode_header_text(name), address.strip().casefold()
 
 
 def _message_id(item: dict[str, Any]) -> str:
@@ -381,7 +393,7 @@ class NewsletterCollector:
             return True
 
         header_name, header_address = parseaddr(str(headers.get("from") or ""))
-        sender_name = header_name.strip() or history_name
+        sender_name = _decode_header_text(header_name) or history_name
         sender_address = header_address.strip().casefold() or history_address
         if "@" not in sender_address:
             sender_address = history_address
@@ -542,6 +554,13 @@ async def _one_click_post(url: str) -> int:
     raise OSError(str(last_error or "Unsubscribe request failed"))
 
 
+def _query_int(request: Request, name: str, default: int) -> int:
+    try:
+        return int(request.query_params.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
 @router.get("/newsletters", response_class=HTMLResponse)
 async def newsletters_page(request: Request):
     user = require_user(request)
@@ -551,6 +570,24 @@ async def newsletters_page(request: Request):
     collector_error: str | None = None
     collector_last_success: int | None = None
 
+    search_query = str(request.query_params.get("q") or "").strip()[:160]
+    status_filter = str(request.query_params.get("status") or "all").strip().casefold()
+    if status_filter not in NEWSLETTER_STATUS_FILTERS:
+        status_filter = "all"
+    per_page = _query_int(request, "per_page", 25)
+    if per_page not in PAGE_SIZES:
+        per_page = 25
+    page = max(1, _query_int(request, "page", 1))
+
+    newsletter_alias_labels: dict[int, dict[str, str]] = {}
+    newsletter_sender_names: dict[int, str] = {}
+    status_counts = {"all": 0, "active": 0, "unsubscribed": 0}
+    filtered_total = 0
+    total_pages = 1
+    pagination_items: list[int | None] = [1]
+    range_start = 0
+    range_end = 0
+
     if settings.newsletter_management:
         store, collector = await _runtime(request)
         collector.track(user)
@@ -558,9 +595,63 @@ async def newsletters_page(request: Request):
             await collector.scan_mailbox(user)
         except Exception as exc:
             LOGGER.warning("Immediate newsletter scan failed for %s: %s", user, exc)
-        newsletters = await store.list_for_mailbox(user)
+        all_newsletters = await store.list_for_mailbox(user)
         collector_error = collector.last_error
         collector_last_success = collector.last_success_at
+
+        alias_by_address = {
+            alias.address.casefold(): alias
+            for alias in state.get("assigned_all", [])
+        }
+        for newsletter in all_newsletters:
+            alias = alias_by_address.get(newsletter.recipient_alias.casefold())
+            alias_name = alias.name.strip() if alias is not None else ""
+            newsletter_alias_labels[newsletter.id] = {
+                "name": alias_name,
+                "address": newsletter.recipient_alias,
+            }
+            newsletter_sender_names[newsletter.id] = (
+                _decode_header_text(newsletter.sender_name)
+                or newsletter.sender_address
+            )
+
+        status_counts = {
+            "all": len(all_newsletters),
+            "active": sum(not item.is_unsubscribed for item in all_newsletters),
+            "unsubscribed": sum(item.is_unsubscribed for item in all_newsletters),
+        }
+
+        filtered = all_newsletters
+        if status_filter == "active":
+            filtered = [item for item in filtered if not item.is_unsubscribed]
+        elif status_filter == "unsubscribed":
+            filtered = [item for item in filtered if item.is_unsubscribed]
+
+        if search_query:
+            needle = search_query.casefold()
+            filtered = [
+                item
+                for item in filtered
+                if needle
+                in " ".join(
+                    (
+                        newsletter_sender_names[item.id],
+                        item.sender_address,
+                        newsletter_alias_labels[item.id]["name"],
+                        item.recipient_alias,
+                        item.list_id or "",
+                    )
+                ).casefold()
+            ]
+
+        filtered_total = len(filtered)
+        total_pages = max(1, (filtered_total + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
+        newsletters = filtered[offset : offset + per_page]
+        pagination_items = _pagination_items(page, total_pages)
+        range_start = offset + 1 if filtered_total else 0
+        range_end = min(offset + per_page, filtered_total)
 
     return TEMPLATES.TemplateResponse(
         request,
@@ -570,6 +661,19 @@ async def newsletters_page(request: Request):
             active_nav="newsletters",
             newsletter_enabled=settings.newsletter_management,
             newsletters=newsletters,
+            newsletter_alias_labels=newsletter_alias_labels,
+            newsletter_sender_names=newsletter_sender_names,
+            newsletter_search_query=search_query,
+            newsletter_status_filter=status_filter,
+            newsletter_status_counts=status_counts,
+            newsletter_filtered_total=filtered_total,
+            newsletter_page=page,
+            newsletter_per_page=per_page,
+            newsletter_page_sizes=PAGE_SIZES,
+            newsletter_total_pages=total_pages,
+            newsletter_pagination_items=pagination_items,
+            newsletter_range_start=range_start,
+            newsletter_range_end=range_end,
             newsletter_collector_error=collector_error,
             newsletter_collector_last_success=collector_last_success,
             **state,
@@ -615,7 +719,27 @@ async def unsubscribe_newsletter(
             await _one_click_post(link.url)
         except (OSError, ValueError):
             continue
+        # RFC 8058 gives us a reliable transport-level success signal only when the
+        # remote endpoint accepts the POST with a 2xx response. Keep the timestamp so
+        # later messages can be highlighted instead of silently reactivating the row.
         await store.mark_unsubscribed(newsletter_id, user)
         return RedirectResponse("/newsletters?unsubscribed=1", status_code=303)
 
     return RedirectResponse("/newsletters?unsubscribe_error=1", status_code=303)
+
+
+async def mark_newsletter_unsubscribed(
+    request: Request,
+    newsletter_id: int,
+    csrf_token: str,
+):
+    validate_csrf(request, csrf_token)
+    user = require_user(request)
+    if not request.app.state.settings.newsletter_management:
+        raise HTTPException(status_code=409, detail="Newsletter management is disabled")
+    store, _ = await _runtime(request)
+    newsletter = await store.get(newsletter_id, user)
+    if newsletter is None:
+        raise HTTPException(status_code=404, detail="Newsletter does not exist")
+    await store.mark_unsubscribed(newsletter_id, user)
+    return RedirectResponse("/newsletters?marked_unsubscribed=1", status_code=303)
