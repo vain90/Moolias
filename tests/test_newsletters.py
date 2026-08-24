@@ -5,12 +5,20 @@ import socket
 import pytest
 
 from moolias.newsletters import (
+    _decode_header_text,
     _dkim_covers_one_click,
     _history_candidate,
     _public_https_target,
     _symbols,
     _unsubscribe_targets,
 )
+
+
+def test_encoded_sender_name_is_decoded_for_display():
+    assert (
+        _decode_header_text("=?UTF-8?Q?HUK24_AG_-_Digital=2E_Einfach=2E_G=C3=BCnstiger=2E?=")
+        == "HUK24 AG - Digital. Einfach. Günstiger."
+    )
 
 
 def test_unsubscribe_targets_prefers_https_and_keeps_mailto():
