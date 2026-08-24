@@ -11,7 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from moolias import __version__
 from moolias.mailcow_agent import AgentAuthenticator, AgentConfigurationError
-from moolias.sender_protocol import NONCE_HEADER, PROTOCOL_VERSION, SIGNATURE_HEADER, TIMESTAMP_HEADER
+from moolias.sender_protocol import (
+    NONCE_HEADER,
+    PROTOCOL_VERSION,
+    SIGNATURE_HEADER,
+    TIMESTAMP_HEADER,
+)
 
 DEFAULT_DOVEADM_HOST = "dovecot-mailcow:12345"
 MAX_DOVEADM_OUTPUT = 512 * 1024
@@ -207,7 +212,10 @@ def create_newsletter_agent_app(
             mailbox = _normalise_mailbox(payload.mailbox)
             message_id = _normalise_message_id(payload.message_id)
         except (ValidationError, ValueError) as exc:
-            raise HTTPException(status_code=400, detail="Invalid newsletter header request") from exc
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid newsletter header request",
+            ) from exc
 
         try:
             result = await reader.fetch_headers(mailbox, message_id)
