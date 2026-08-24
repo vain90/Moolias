@@ -2,6 +2,27 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.1.8 - 2026-08-24
+
+### Added
+
+- optional per-alias private descriptions backed by Mailcow's `private_comment`, while the public comment remains the alias name
+- description editing when creating or editing aliases and when assigning Offline-Pool aliases
+- a dedicated description column in the alias table with ellipsis previews, full-text info popovers and a compact mobile-only info control
+- private-description hints for conservative sender recognition without giving description text the same trust weight as the alias name
+
+### Changed
+
+- only `[moolias:...]` entries in Mailcow private comments are treated as internal Moolias metadata; all other private-comment text is exposed as the user-facing description
+- Moolias marker updates preserve human description text and unrelated Moolias markers instead of replacing the complete private comment
+- alias replacement carries both the public alias name and private description to the replacement alias
+- alias editing now labels the public comment simply as `Alias Name`, shows the alias address explicitly and presents the description as a full-width multiline field
+- the alias table separates `Alias Name / Alias-Adresse` from `Beschreibung`; empty descriptions show a dash and mobile layouts hide the preview text while retaining access to the full description
+
+### Removed
+
+- legacy Cowcloak reservation-marker recognition; only Moolias markers are interpreted as internal metadata
+
 ## 1.1.7 - 2026-08-24
 
 ### Added
