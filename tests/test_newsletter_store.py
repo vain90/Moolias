@@ -103,3 +103,35 @@ async def test_new_message_after_unsubscribe_reactivates_newsletter(tmp_path):
     newsletter = await store.get(newsletter_id, "user@example.org")
     assert newsletter is not None
     assert newsletter.unsubscribed_at is None
+
+
+async def test_from_now_watermark_ignores_older_history_and_header_lookup(tmp_path):
+    store = NewsletterStore(tmp_path / "newsletters.sqlite3")
+    await store.initialize()
+    await store.set_history_since("user@example.org", 1_780_000_010)
+
+    old_item = observation(1, url="https://example.net/unsubscribe/old")
+    assert await store.record(old_item) == 0
+    assert await store.headers_checked(old_item) is True
+    assert await store.list_for_mailbox("user@example.org") == []
+
+    new_item = observation(11, url="https://example.net/unsubscribe/new")
+    newsletter_id = await store.record(new_item)
+    assert newsletter_id > 0
+    assert await store.headers_checked(new_item) is False
+    newsletters = await store.list_for_mailbox("user@example.org")
+    assert len(newsletters) == 1
+    assert newsletters[0].latest_link is not None
+    assert newsletters[0].latest_link.url.endswith("/new")
+
+
+async def test_backfill_watermark_allows_available_history(tmp_path):
+    store = NewsletterStore(tmp_path / "newsletters.sqlite3")
+    await store.initialize()
+    await store.set_history_since("user@example.org", 0)
+
+    old_item = observation(1)
+    newsletter_id = await store.record(old_item)
+    assert newsletter_id > 0
+    assert await store.headers_checked(old_item) is False
+    assert await store.history_since("user@example.org") == 0
