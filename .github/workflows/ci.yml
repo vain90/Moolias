@@ -35,6 +35,7 @@ jobs:
       - run: node --check moolias/static/stats-mode.js
       - run: node --check moolias/static/sender-protection.js
       - run: node --check moolias/static/newsletters.js
+      - run: node --check moolias/static/newsletter-settings.js
       - run: node --check moolias/static/ui-icons-runtime.js
       - run: node --check moolias/static/pool-create-menu.js
       - run: node --check moolias/static/tour.js
