@@ -49,7 +49,10 @@ def test_statistics_page_distinguishes_server_and_mailbox_disabled_states():
 
 
 def test_guided_tour_explains_admin_control_for_optional_features():
-    assert "Auf diesem Server hat dein Administrator den Hauptadressenschutz nicht aktiviert" in TOUR
+    assert (
+        "Auf diesem Server hat dein Administrator den Hauptadressenschutz nicht aktiviert"
+        in TOUR
+    )
     assert "Auf diesem Server sind Nutzungsstatistiken vom Administrator deaktiviert" in TOUR
     assert "Statistikmodus und Hauptadressenschutz sind dort nur nutzbar" in TOUR
     assert "Your administrator has not enabled primary-address protection" in TOUR
