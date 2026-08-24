@@ -47,6 +47,7 @@
 .tour-overlay-full {
   background: rgba(16, 24, 40, .48);
   backdrop-filter: blur(1px);
+  pointer-events: auto;
 }
 
 .tour-overlay-full .tour-shade {
@@ -65,7 +66,7 @@
   border: 2px solid var(--accent);
   border-radius: 12px;
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
-  pointer-events: none;
+  pointer-events: auto;
   transition: top .16s ease, left .16s ease, width .16s ease, height .16s ease;
 }
 
