@@ -131,6 +131,12 @@ class NewsletterStore:
 
                 CREATE INDEX IF NOT EXISTS newsletter_links_newsletter_seen_idx
                     ON newsletter_unsubscribe_links (newsletter_id, last_seen_at DESC, id DESC);
+
+                CREATE TABLE IF NOT EXISTS newsletter_mailbox_scan_policy (
+                    mailbox TEXT PRIMARY KEY COLLATE NOCASE,
+                    history_since INTEGER NOT NULL CHECK (history_since >= 0),
+                    updated_at INTEGER NOT NULL
+                );
                 """
             )
             message_columns = {
@@ -155,6 +161,41 @@ class NewsletterStore:
                 observation.message_id.strip(),
             )
         )
+
+    async def history_since(self, mailbox: str) -> int | None:
+        return await asyncio.to_thread(self._history_since, mailbox)
+
+    def _history_since(self, mailbox: str) -> int | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT history_since
+                FROM newsletter_mailbox_scan_policy
+                WHERE mailbox = ?
+                """,
+                (mailbox.strip().casefold(),),
+            ).fetchone()
+        return int(row["history_since"]) if row is not None else None
+
+    async def set_history_since(self, mailbox: str, history_since: int) -> None:
+        await asyncio.to_thread(self._set_history_since, mailbox, history_since)
+
+    def _set_history_since(self, mailbox: str, history_since: int) -> None:
+        value = max(0, int(history_since))
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO newsletter_mailbox_scan_policy (
+                    mailbox,
+                    history_since,
+                    updated_at
+                ) VALUES (?, ?, ?)
+                ON CONFLICT(mailbox) DO UPDATE SET
+                    history_since = excluded.history_since,
+                    updated_at = excluded.updated_at
+                """,
+                (mailbox.strip().casefold(), value, int(time.time())),
+            )
 
     async def record(self, observation: NewsletterObservation) -> int:
         return await asyncio.to_thread(self._record, observation)
