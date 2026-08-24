@@ -117,6 +117,26 @@ def resolve_newsletter_mode(
     )
 
 
+async def mailbox_newsletter_state(
+    settings: Any,
+    mailcow: Any,
+    email: str,
+) -> NewsletterModeState:
+    if not settings.newsletter_management:
+        return resolve_newsletter_mode([], [], settings.newsletter_tag)
+
+    mailbox = await mailcow.get_mailbox(email)
+    domain_name = str(
+        mailbox.get("domain") or email.rsplit("@", 1)[-1]
+    ).strip().casefold()
+    domain = await mailcow.get_domain(domain_name)
+    return resolve_newsletter_mode(
+        mailbox.get("tags"),
+        domain.get("tags"),
+        settings.newsletter_tag,
+    )
+
+
 def replace_mailbox_newsletter_tags(
     existing_tags: Iterable[str] | str | None,
     base_tag: str,
