@@ -33,7 +33,7 @@ Mailcow nginx ── Mailcow Docker network ── moolias-app:8000
 
 The Moolias application publishes **no host port** in this mode.
 
-The `moolias-data` volume is persistent application state and is required even when usage statistics are disabled. Moolias stores mailbox-specific application preferences there; optional statistics and Newsletter Management add their own data when enabled.
+The `moolias-data` volume is persistent application state and is required even when usage statistics are disabled. Normal application/UI state may be stored there; optional statistics and Newsletter Management add their own data when enabled.
 
 ## Before you install
 
@@ -131,11 +131,17 @@ If sender protection is installed, the installer likewise writes a private agent
 MOOLIAS_SENDER_AGENT_URL=http://nginx-mailcow:80/moolias-agent
 ```
 
+If Newsletter Management is installed, its restricted agent likewise uses Mailcow nginx, normally through:
+
+```dotenv
+MOOLIAS_NEWSLETTER_AGENT_URL=http://nginx-mailcow:80/moolias-newsletter-agent
+```
+
 Standalone deployments may leave `MAILCOW_INTERNAL_URL` empty; Moolias then falls back to `MAILCOW_URL` for backend requests.
 
 ## What the installer changes
 
-The installer deliberately has a narrow scope.
+The main installer deliberately has a narrow scope.
 
 It creates or manages:
 
@@ -156,6 +162,8 @@ It does **not**:
 - mount Mailcow configuration or database files into the Moolias application;
 - expose a new application port on the host;
 - reuse Mailcow database credentials.
+
+Optional sidecar installers manage their own narrowly scoped Mailcow configuration and Compose override blocks; those changes are documented in the corresponding feature documentation.
 
 Browser-facing OAuth stays on the normal public Mailcow URL. Server-side API/OAuth traffic uses Mailcow nginx on the private Docker network when Moolias is installed on the Mailcow host.
 
@@ -234,6 +242,40 @@ If you skip it, Moolias works normally and sender protection can be installed la
 
 See [Primary sender protection](sender-protection.md) for its security model and Postfix behavior.
 
+## Optional Newsletter Management
+
+Newsletter Management needs a separate restricted sidecar because the Moolias web application deliberately has no access to Dovecot mail storage or the Docker socket. The sidecar exposes only exact mailbox + Message-ID newsletter-header lookups through Mailcow nginx.
+
+Install it on the Mailcow host after the normal Moolias installation. Download the installer first and then run it as root:
+
+```bash
+curl -fsSLo /tmp/install-moolias-newsletter-agent.sh \
+  https://raw.githubusercontent.com/vain90/Moolias/main/scripts/install-newsletter-agent.sh
+sudo bash /tmp/install-moolias-newsletter-agent.sh
+rm -f /tmp/install-moolias-newsletter-agent.sh
+```
+
+The installer updates `/opt/moolias/.env` with the generated agent secret, agent URL and:
+
+```dotenv
+MOOLIAS_NEWSLETTER_MANAGEMENT=true
+```
+
+The global switch only makes the feature available. It does **not** automatically enable Newsletter Management for every mailbox. The effective mailbox state follows Mailcow tags, analogous to usage statistics. With the default tag family:
+
+```text
+moolias-newsletter       = enabled
+moolias-newsletter-off   = disabled
+```
+
+A mailbox tag overrides the domain tag; without a mailbox newsletter tag, the domain setting is inherited. With neither tag, the safe default is off. An administrator can therefore enable `moolias-newsletter` on a domain as the default, or users can explicitly select **On**, **Off**, or **Use domain setting** for their own mailbox in Moolias Settings.
+
+When a Moolias settings change makes the effective state switch from off to on, Moolias asks whether still-available historical Rspamd/Dovecot data should also be evaluated or whether detection should start only from that point forward. There is no extra prompt at login.
+
+Turning `MOOLIAS_NEWSLETTER_MANAGEMENT=false` later disables the feature server-wide and greys out the mailbox control, but it does not delete Mailcow newsletter tags or already stored newsletter metadata.
+
+See [Newsletter management](newsletter-management.md) for the complete policy, privacy and security model.
+
 ## Re-running the installer
 
 The installer is intended to be safe to run again.
@@ -255,15 +297,15 @@ The updater uses the local `compose.yml`, pulls the latest stable image, waits f
 
 ## Backup
 
-Aliases remain stored in Mailcow.
+Aliases and Newsletter Management policy tags remain stored in Mailcow.
 
-Always back up the persistent Moolias `/data` volume. The default local state database is:
+Always back up the persistent Moolias `/data` volume. The default local application/statistics database is:
 
 ```text
 /data/moolias-stats.sqlite3
 ```
 
-Despite its historical name, this SQLite file is also used for mailbox-specific Moolias settings and is required even when `MOOLIAS_USAGE_STATS=false`. If Newsletter Management is enabled, also include its default metadata database:
+Despite its historical name, this SQLite file may also contain normal application/UI state and remains required even when `MOOLIAS_USAGE_STATS=false`. If Newsletter Management is enabled, also include its default metadata and collector-state database:
 
 ```text
 /data/moolias-newsletters.sqlite3
@@ -308,7 +350,7 @@ MOOLIAS_TLS_WAIT_SECONDS=90
 
 ## Standalone deployment
 
-Moolias still supports installation on another Docker host. The repository `compose.yml` publishes the configured host port and can be placed behind Caddy, nginx, Traefik or another reverse proxy.
+Moolias still supports installation on another Docker host. The repository `compose.yml` publishes the configured host port and can be placed behind Caddy, nginx, Traefik or another HTTPS reverse proxy.
 
 Use the standalone method when:
 
@@ -316,4 +358,4 @@ Use the standalone method when:
 - an existing container platform should run Moolias;
 - Mailcow's nginx/ACME stack should not serve the Moolias hostname.
 
-The application behavior and updater are the same in both deployment modes.
+The application behavior and updater are the same in both deployment modes. Newsletter Management still requires its restricted agent to be installed on the Mailcow host because Dovecot remains the source of original newsletter headers.
