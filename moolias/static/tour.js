@@ -317,7 +317,7 @@
 
     target = step.target ? document.querySelector(step.target) : null;
     if (target) {
-      target.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+      target.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
     }
 
     overlay = document.createElement("div");
