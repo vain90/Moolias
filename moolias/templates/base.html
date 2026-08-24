@@ -38,6 +38,7 @@
   <script src="/static/stats-mode.js" defer></script>
   <script src="/static/sender-protection.js" defer></script>
   <script src="/static/newsletters.js" defer></script>
+  <script src="/static/newsletter-settings.js" defer></script>
   <script src="/static/ui-icons-runtime.js?v=20260823-1" defer></script>
   <script src="/static/shell.js" defer></script>
   <script src="/static/tour.js?v=20260824-1" defer></script>
@@ -78,7 +79,7 @@
           <span class="nav-icon" aria-hidden="true">{{ icon('archive') }}</span>
           <span>{% if language == 'de' %}Offline-Pool{% else %}Offline pool{% endif %}</span>
         </a>
-        <a class="side-nav-link {% if active_nav == 'newsletters' %}current{% endif %}" href="/newsletters" {% if active_nav == 'newsletters' %}aria-current="page"{% endif %}>
+        <a class="side-nav-link {% if active_nav == 'newsletters' %}current{% endif %}" href="/newsletters" data-newsletter-nav hidden {% if active_nav == 'newsletters' %}aria-current="page"{% endif %}>
           <span class="nav-icon" aria-hidden="true">{{ icon('inbox') }}</span>
           <span>{% if language == 'de' %}Newsletter{% else %}Newsletters{% endif %}</span>
         </a>
@@ -251,13 +252,63 @@
           <p class="hint" data-sender-protection-message aria-live="polite"></p>
         </div>
       </section>
+
+      <section class="settings-section newsletter-settings" data-newsletter-setting>
+        <div class="settings-section-number">4</div>
+        <div class="settings-section-body">
+          <div class="setting-toggle-head">
+            <div>
+              <h3>{% if language == 'de' %}Newsletter-Verwaltung{% else %}Newsletter management{% endif %}</h3>
+              <p class="muted">{% if language == 'de' %}Erkennt Newsletter für dieses Postfach und stellt verfügbare Abmeldemöglichkeiten bereit. Die Auswahl gilt nur für dein eigenes Postfach.{% else %}Detects newsletters for this mailbox and exposes available unsubscribe options. This choice applies only to your mailbox.{% endif %}</p>
+            </div>
+            <form method="post" action="/account/newsletter-management" class="settings-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="return_to" value="{{ return_to }}">
+              <label class="switch-control">
+                <input type="checkbox" role="switch" name="enabled" value="true" data-newsletter-toggle disabled aria-label="{% if language == 'de' %}Newsletter-Verwaltung für dieses Postfach{% else %}Newsletter management for this mailbox{% endif %}">
+                <span aria-hidden="true"></span>
+              </label>
+              <button class="button compact" type="submit" data-newsletter-save disabled>{{ t.save }}</button>
+            </form>
+          </div>
+          <p class="settings-state" data-newsletter-setting-state>{% if language == 'de' %}Status wird geladen …{% else %}Loading status …{% endif %}</p>
+          <p class="hint">{% if language == 'de' %}Wenn ein Administrator die Funktion serverseitig deaktiviert, kann sie hier nicht eingeschaltet werden. Eine vorhandene persönliche Auswahl bleibt gespeichert.{% else %}If an administrator disables the feature server-side, it cannot be enabled here. An existing personal choice remains saved.{% endif %}</p>
+        </div>
+      </section>
     </div>
 
     <div class="settings-drawer-foot">
       {{ icon('info') }}
-      <span>{% if language == 'de' %}Darstellung und Schutz werden automatisch gespeichert. Statistikmodi werden über „Speichern“ übernommen.{% else %}Appearance and protection are saved automatically. Statistics modes are applied with Save.{% endif %}</span>
+      <span>{% if language == 'de' %}Darstellung und Schutz werden automatisch gespeichert. Statistikmodus und Newsletter-Auswahl werden über „Speichern“ übernommen.{% else %}Appearance and protection are saved automatically. Statistics mode and newsletter choice are applied with Save.{% endif %}</span>
     </div>
   </aside>
+
+  <dialog class="help-dialog newsletter-opt-in-dialog" data-newsletter-opt-in-dialog hidden>
+    <div class="dialog-head">
+      <div>
+        <h2>{% if language == 'de' %}Newsletter-Verwaltung aktivieren?{% else %}Enable newsletter management?{% endif %}</h2>
+        <p class="muted">{% if language == 'de' %}Der Administrator hat die Newsletter-Funktion auf diesem Moolias-Server freigeschaltet. Du entscheidest selbst, ob sie für dein Postfach verwendet werden soll.{% else %}The administrator has enabled newsletter management on this Moolias server. You decide whether it should be used for your mailbox.{% endif %}</p>
+      </div>
+    </div>
+    <div class="help-content">
+      <section>
+        <h3>{% if language == 'de' %}Was passiert beim Aktivieren?{% else %}What happens when you enable it?{% endif %}</h3>
+        <p>{% if language == 'de' %}Moolias prüft passende Rspamd-Einträge für dein Postfach und liest nur die benötigten Newsletter- und Abmelde-Header über den eingeschränkten Mailcow-Agent. Die Entscheidung wird pro Postfach gespeichert und kann später in den Einstellungen geändert werden.{% else %}Moolias checks matching Rspamd entries for your mailbox and reads only the required newsletter and unsubscribe headers through the restricted Mailcow agent. The choice is stored per mailbox and can be changed later in Settings.{% endif %}</p>
+      </section>
+      <div class="button-row top-gap">
+        <form method="post" action="/account/newsletter-management">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="return_to" value="{{ return_to }}">
+          <button class="button primary" type="submit" name="enabled" value="true">{% if language == 'de' %}Für mein Postfach aktivieren{% else %}Enable for my mailbox{% endif %}</button>
+        </form>
+        <form method="post" action="/account/newsletter-management">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="return_to" value="{{ return_to }}">
+          <button class="button" type="submit" name="enabled" value="false">{% if language == 'de' %}Nicht aktivieren{% else %}Do not enable{% endif %}</button>
+        </form>
+      </div>
+    </div>
+  </dialog>
 
   <dialog class="help-dialog" data-help-dialog>
     <div class="dialog-head">
@@ -294,7 +345,7 @@
       </section>
       <section>
         <h3>{% if language == 'de' %}Wo liegen die Daten?{% else %}Where is the data stored?{% endif %}</h3>
-        <p>{% if language == 'de' %}Mailcow bleibt die Quelle für deine Alias-Adressen und deren Status. Nur optionale Statistik- und Prüfdaten werden von Moolias zusätzlich lokal gespeichert.{% else %}Mailcow remains the source for your alias addresses and their status. Only optional statistics and review data are additionally stored locally by Moolias.{% endif %}</p>
+        <p>{% if language == 'de' %}Mailcow bleibt die Quelle für deine Alias-Adressen und deren Status. Moolias speichert lokale Postfach-Einstellungen dauerhaft in seiner SQLite-Datenbank; optionale Statistik- und Newsletter-Daten kommen nur bei aktivierten Funktionen hinzu.{% else %}Mailcow remains the source of truth for alias addresses and their status. Moolias persistently stores local mailbox settings in its SQLite database; optional statistics and newsletter data are added only when those features are enabled.{% endif %}</p>
       </section>
       <div class="button-row top-gap">
         <button class="button primary" type="button" data-start-tour>{{ icon('play') }}{% if language == 'de' %}Geführte Tour starten{% else %}Start guided tour{% endif %}</button>
