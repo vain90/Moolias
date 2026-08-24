@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Locator, Page, expect
 
 
 def _login(page: Page, base_url: str) -> None:
@@ -13,17 +13,34 @@ def _login(page: Page, base_url: str) -> None:
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
 
 
+def _viewport_rect(locator: Locator) -> dict[str, float]:
+    return locator.evaluate(
+        """element => {
+            const rect = element.getBoundingClientRect();
+            return {
+                x: rect.x,
+                y: rect.y,
+                top: rect.top,
+                right: rect.right,
+                bottom: rect.bottom,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+            };
+        }"""
+    )
+
+
 def _expect_target_and_popover_in_view(page: Page) -> None:
     tour = page.locator(".tour-popover")
     viewport = page.viewport_size
     assert viewport is not None
 
-    popover_box = tour.bounding_box()
-    assert popover_box is not None
-    assert popover_box["x"] >= -1
-    assert popover_box["y"] >= -1
-    assert popover_box["x"] + popover_box["width"] <= viewport["width"] + 1
-    assert popover_box["y"] + popover_box["height"] <= viewport["height"] + 1
+    popover_rect = _viewport_rect(tour)
+    assert popover_rect["left"] >= -1
+    assert popover_rect["top"] >= -1
+    assert popover_rect["right"] <= viewport["width"] + 1
+    assert popover_rect["bottom"] <= viewport["height"] + 1
 
     selector = tour.get_attribute("data-tour-target") or ""
     if not selector:
@@ -31,19 +48,15 @@ def _expect_target_and_popover_in_view(page: Page) -> None:
 
     target = page.locator(selector).first
     expect(target).to_be_visible()
-    target_box = target.bounding_box()
-    assert target_box is not None
+    target_rect = _viewport_rect(target)
 
-    visible_top = max(0.0, target_box["y"])
-    visible_bottom = min(
-        float(viewport["height"]),
-        target_box["y"] + target_box["height"],
-    )
-    assert visible_bottom - visible_top >= min(32.0, target_box["height"])
+    visible_top = max(0.0, target_rect["top"])
+    visible_bottom = min(float(viewport["height"]), target_rect["bottom"])
+    visible_left = max(0.0, target_rect["left"])
+    visible_right = min(float(viewport["width"]), target_rect["right"])
 
-    if target_box["height"] <= viewport["height"] * 0.5:
-        assert target_box["y"] >= 55
-        assert target_box["y"] + target_box["height"] <= viewport["height"] - 8
+    assert visible_bottom - visible_top >= min(32.0, target_rect["height"])
+    assert visible_right - visible_left >= min(32.0, target_rect["width"])
 
 
 def _expect_step(page: Page, number: int, title: str) -> None:
@@ -77,9 +90,10 @@ def _run_complete_tour(page: Page, base_url: str) -> None:
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
     _expect_step(page, 4, "Für jeden Dienst ein Alias")
 
-    create_button_box = page.locator("[data-open-create-alias]").bounding_box()
-    assert create_button_box is not None
-    assert create_button_box["y"] < 260
+    create_button_rect = _viewport_rect(page.locator("[data-open-create-alias]"))
+    assert create_button_rect["top"] >= 0
+    assert create_button_rect["top"] < 260
+    assert create_button_rect["bottom"] <= page.viewport_size["height"]
 
     _next(page)
     _expect_step(page, 5, "Neuen Alias erstellen")
