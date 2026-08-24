@@ -17,7 +17,7 @@ A detected sender remains visible even when Moolias cannot recover a usable HTTP
 Moolias deliberately does not scan complete message bodies.
 
 1. Moolias reads the configured Rspamd history window through the existing Mailcow API integration.
-2. A message is considered a candidate only when Rspamd recorded `HAS_LIST_UNSUB`, the message was accepted without a spam action, and Rspamd has an authentication signal such as DKIM or DMARC allow.
+2. A message is considered a candidate when Rspamd recorded the mailing-list signal `MAILLIST` or the header signal `HAS_LIST_UNSUB`, the message was accepted without a spam action, and Rspamd has an authentication signal such as DKIM or DMARC allow. Rspamd history may expose symbols either as structured data or as scored strings such as `MAILLIST(-0.18)[generic]`; Moolias normalises both forms.
 3. Moolias associates the Rspamd SMTP recipient with the authenticated user's mailbox or one of that user's Mailcow aliases.
 4. The restricted Newsletter Agent asks Dovecot for a fixed set of headers for the exact mailbox and Message-ID.
 5. Moolias extracts HTTPS and `mailto:` targets from `List-Unsubscribe` and checks `List-Unsubscribe-Post` for RFC 8058 one-click support.
