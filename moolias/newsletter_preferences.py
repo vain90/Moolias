@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-import sqlite3
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from moolias import newsletters as newsletter_core
-from moolias.mailbox_settings import MailboxSettingsStore
+from moolias.mailcow import MailcowError
+from moolias.newsletter_mode import (
+    NewsletterModeSource,
+    NewsletterModeState,
+    replace_mailbox_newsletter_tags,
+    resolve_newsletter_mode,
+)
 from moolias.security import require_user, validate_csrf
 from moolias.ui import _load_ui_state, _template_context
 
 router = APIRouter()
+NEWSLETTER_MODE_SELECTIONS = {"inherit", "off", "on"}
 
 
 def _safe_return_to(value: str | None, fallback: str = "/overview") -> str:
@@ -25,17 +31,10 @@ def _safe_return_to(value: str | None, fallback: str = "/overview") -> str:
     return value
 
 
-def _store(request: Request) -> MailboxSettingsStore:
-    return MailboxSettingsStore(request.app.state.settings.usage_db_path)
-
-
 def _untrack(request: Request, mailbox: str) -> None:
     collector = getattr(request.app.state, "newsletter_collector", None)
-    if collector is None:
-        return
-    # The core collector keeps only an in-memory set of mailboxes. Removing an
-    # opted-out mailbox here stops future scheduled scans without deleting data.
-    collector._tracked_mailboxes.discard(mailbox.casefold())
+    if collector is not None:
+        collector._tracked_mailboxes.discard(mailbox.casefold())
 
 
 async def _track(request: Request, mailbox: str) -> None:
@@ -43,69 +42,130 @@ async def _track(request: Request, mailbox: str) -> None:
     collector.track(mailbox)
 
 
-async def _preference(request: Request, mailbox: str) -> bool | None:
-    try:
-        return await _store(request).newsletter_enabled(mailbox)
-    except sqlite3.Error as exc:
-        raise HTTPException(
-            status_code=503,
-            detail="Mailbox settings database is unavailable",
-        ) from exc
+async def mailbox_newsletter_state(
+    request: Request,
+    mailbox_address: str,
+) -> NewsletterModeState:
+    settings = request.app.state.settings
+    if not settings.newsletter_management:
+        return resolve_newsletter_mode([], [], settings.newsletter_tag)
+
+    mailcow = request.app.state.mailcow
+    mailbox = await mailcow.get_mailbox(mailbox_address)
+    domain_name = str(
+        mailbox.get("domain") or mailbox_address.rsplit("@", 1)[-1]
+    ).strip().lower()
+    domain = await mailcow.get_domain(domain_name)
+    return resolve_newsletter_mode(
+        mailbox.get("tags"),
+        domain.get("tags"),
+        settings.newsletter_tag,
+    )
 
 
-async def _require_enabled(request: Request, mailbox: str) -> None:
+def _selection(state: NewsletterModeState) -> str:
+    if state.conflict and state.conflict_source is NewsletterModeSource.MAILBOX:
+        return "conflict"
+    if state.mailbox_override is not None:
+        return state.mailbox_override.value
+    return "inherit"
+
+
+async def _require_enabled(request: Request, mailbox: str) -> NewsletterModeState:
     if not request.app.state.settings.newsletter_management:
         raise HTTPException(
             status_code=409,
             detail="Newsletter management is disabled server-side",
         )
-    if await _preference(request, mailbox) is not True:
+    try:
+        state = await mailbox_newsletter_state(request, mailbox)
+    except MailcowError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Newsletter policy is unavailable",
+        ) from exc
+    if state.conflict or not state.enabled:
         raise HTTPException(
             status_code=409,
             detail="Newsletter management is disabled for this mailbox",
         )
+    return state
 
 
 @router.get("/account/newsletter-management")
 async def get_newsletter_management_setting(request: Request):
     user = require_user(request)
     server_enabled = request.app.state.settings.newsletter_management
-    preference = await _preference(request, user)
-    effective_enabled = server_enabled and preference is True
+    try:
+        state = await mailbox_newsletter_state(request, user)
+    except MailcowError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Newsletter policy is unavailable",
+        ) from exc
+
+    effective_enabled = server_enabled and not state.conflict and state.enabled
     if effective_enabled:
         await _track(request, user)
     else:
         _untrack(request, user)
+
     return {
         "server_enabled": server_enabled,
-        "preference": preference,
         "effective_enabled": effective_enabled,
+        "selection": _selection(state),
+        "effective": state.effective.value,
+        "source": state.source.value,
+        "mailbox_override": (
+            state.mailbox_override.value if state.mailbox_override is not None else None
+        ),
+        "domain_default": (
+            state.domain_default.value if state.domain_default is not None else None
+        ),
+        "conflict": state.conflict,
+        "conflict_source": (
+            state.conflict_source.value if state.conflict_source is not None else None
+        ),
     }
 
 
 @router.post("/account/newsletter-management")
 async def update_newsletter_management_setting(
     request: Request,
-    enabled: bool = Form(False),
+    mode: str = Form(...),
     csrf_token: str = Form(...),
     return_to: str = Form("/overview"),
 ):
     validate_csrf(request, csrf_token)
     user = require_user(request)
-    if not request.app.state.settings.newsletter_management:
+    settings = request.app.state.settings
+    if not settings.newsletter_management:
         raise HTTPException(
             status_code=409,
             detail="Newsletter management is disabled server-side",
         )
+    if mode not in NEWSLETTER_MODE_SELECTIONS:
+        raise HTTPException(status_code=400, detail="Unknown newsletter mode")
+
+    mailcow = request.app.state.mailcow
     try:
-        await _store(request).set_newsletter_enabled(user, enabled)
-    except sqlite3.Error as exc:
+        mailbox = await mailcow.get_mailbox(user)
+        tags = replace_mailbox_newsletter_tags(
+            mailbox.get("tags"),
+            settings.newsletter_tag,
+            mode,
+        )
+        await mailcow.set_mailbox_tags(user, tags)
+        state = await mailbox_newsletter_state(request, user)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except MailcowError as exc:
         raise HTTPException(
-            status_code=503,
-            detail="Mailbox settings database is unavailable",
+            status_code=502,
+            detail="Newsletter policy could not be updated",
         ) from exc
 
-    if enabled:
+    if not state.conflict and state.enabled:
         await _track(request, user)
     else:
         _untrack(request, user)
@@ -116,12 +176,19 @@ async def update_newsletter_management_setting(
 async def newsletters_page(request: Request):
     user = require_user(request)
     server_enabled = request.app.state.settings.newsletter_management
-    preference = await _preference(request, user)
-    if server_enabled and preference is True:
+    try:
+        state = await mailbox_newsletter_state(request, user)
+    except MailcowError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Newsletter policy is unavailable",
+        ) from exc
+
+    if server_enabled and not state.conflict and state.enabled:
         return await newsletter_core.newsletters_page(request)
 
     _untrack(request, user)
-    state = await _load_ui_state(request)
+    ui_state = await _load_ui_state(request)
     return newsletter_core.TEMPLATES.TemplateResponse(
         request,
         "newsletters.html",
@@ -130,11 +197,12 @@ async def newsletters_page(request: Request):
             active_nav="newsletters",
             newsletter_enabled=False,
             newsletter_server_enabled=server_enabled,
-            newsletter_user_preference=preference,
+            newsletter_mode_state=state,
+            newsletter_mode_selection=_selection(state),
             newsletters=[],
             newsletter_collector_error=None,
             newsletter_collector_last_success=None,
-            **state,
+            **ui_state,
         ),
     )
 
