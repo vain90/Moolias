@@ -63,6 +63,7 @@ class NewsletterObservation:
     unsubscribe_url: str | None = None
     unsubscribe_mailto: str | None = None
     one_click: bool = False
+    headers_resolved: bool = False
 
 
 class NewsletterStore:
@@ -234,8 +235,8 @@ class NewsletterStore:
             connection.execute(
                 """
                 UPDATE newsletters
-                SET sender_name = ?,
-                    sender_address = ?,
+                SET sender_name = CASE WHEN ? THEN ? ELSE sender_name END,
+                    sender_address = CASE WHEN ? THEN ? ELSE sender_address END,
                     list_id = COALESCE(?, list_id),
                     first_seen_at = MIN(first_seen_at, ?),
                     last_seen_at = MAX(last_seen_at, ?),
@@ -248,7 +249,9 @@ class NewsletterStore:
                 WHERE id = ?
                 """,
                 (
+                    1 if observation.headers_resolved else 0,
                     observation.sender_name.strip(),
+                    1 if observation.headers_resolved else 0,
                     sender_address,
                     observation.list_id.strip() if observation.list_id else None,
                     event_at,
