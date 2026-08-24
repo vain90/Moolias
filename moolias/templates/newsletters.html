@@ -40,14 +40,25 @@
 
   {% if not newsletter_enabled %}
   <div class="newsletter-empty panel">
-    <h2>{% if language == 'de' %}Newsletter-Verwaltung ist deaktiviert{% else %}Newsletter management is disabled{% endif %}</h2>
-    <p class="muted">
-      {% if language == 'de' %}
-        Ein Administrator muss die Newsletter-Verwaltung und den Mailcow Newsletter Agent aktivieren.
-      {% else %}
-        An administrator must enable newsletter management and the Mailcow newsletter agent.
-      {% endif %}
-    </p>
+    {% if newsletter_server_enabled is defined and newsletter_server_enabled %}
+      <h2>{% if language == 'de' %}Für dieses Postfach deaktiviert{% else %}Disabled for this mailbox{% endif %}</h2>
+      <p class="muted">
+        {% if language == 'de' %}
+          Die Newsletter-Verwaltung ist auf dem Server verfügbar, aber für dieses Postfach nicht aktiviert. Du kannst deine Auswahl jederzeit in den Einstellungen ändern.
+        {% else %}
+          Newsletter management is available on the server but is not enabled for this mailbox. You can change your choice at any time in Settings.
+        {% endif %}
+      </p>
+    {% else %}
+      <h2>{% if language == 'de' %}Newsletter-Verwaltung ist serverseitig deaktiviert{% else %}Newsletter management is disabled server-side{% endif %}</h2>
+      <p class="muted">
+        {% if language == 'de' %}
+          Ein Administrator muss die Newsletter-Verwaltung und den Mailcow Newsletter Agent in der Moolias-Serverkonfiguration aktivieren. Die persönliche Einstellung des Postfachs ist solange gesperrt.
+        {% else %}
+          An administrator must enable newsletter management and the Mailcow newsletter agent in the Moolias server configuration. The mailbox setting remains locked until then.
+        {% endif %}
+      </p>
+    {% endif %}
   </div>
   {% else %}
     {% if newsletter_collector_error %}
