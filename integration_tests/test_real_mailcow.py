@@ -292,8 +292,22 @@ async def test_zz_newsletter_agent_reads_headers_through_remote_doveadm(
             "MOOLIAS_DOVEADM_PASSWORD": DOVEADM_PASSWORD,
         }
     )
+    preserved_env = ",".join(
+        (
+            "MAILCOW_DIR",
+            "MOOLIAS_DIR",
+            "MOOLIAS_AGENT_IMAGE",
+            "MOOLIAS_NEWSLETTER_AGENT_SECRET",
+            "MOOLIAS_DOVEADM_PASSWORD",
+        )
+    )
     subprocess.run(
-        ["bash", str(repository_root / "scripts" / "install-newsletter-agent.sh")],
+        [
+            "sudo",
+            f"--preserve-env={preserved_env}",
+            "bash",
+            str(repository_root / "scripts" / "install-newsletter-agent.sh"),
+        ],
         cwd=repository_root,
         env=installer_env,
         check=True,
