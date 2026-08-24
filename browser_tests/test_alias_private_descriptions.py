@@ -34,12 +34,12 @@ def test_alias_description_edit_and_table_preview(page: Page, base_url: str) -> 
     expect(panel.locator("[data-alias-edit-address] code")).to_have_text(
         "amazon-k7@example.org"
     )
-    expect(panel.locator('[name="description"]').locator("xpath=..")) .to_contain_text(
-        "Alias Name"
-    )
+    expect(
+        panel.locator('[name="description"]').locator("xpath=..")
+    ).to_contain_text("Alias Name")
     description = panel.locator('textarea[name="private_description"]')
     expect(description).to_be_visible()
-    expect(description.locator("xpath=..")) .to_contain_text("Beschreibung")
+    expect(description.locator("xpath=..")).to_contain_text("Beschreibung")
     expect(panel).not_to_contain_text("privaten Mailcow-Kommentar")
 
     textarea_box = description.bounding_box()
@@ -87,8 +87,8 @@ def test_offline_pool_assignment_accepts_description(page: Page, base_url: str) 
 
     name = dialog.locator('input[name="description"]')
     description = dialog.locator('textarea[name="private_description"]')
-    expect(name.locator("xpath=..")) .to_contain_text("Alias Name")
-    expect(description.locator("xpath=..")) .to_contain_text("Beschreibung")
+    expect(name.locator("xpath=..")).to_contain_text("Alias Name")
+    expect(description.locator("xpath=..")).to_contain_text("Beschreibung")
 
     name.fill("Hotel")
     description.fill("Geschäftsreise und Hotelrechnungen")
