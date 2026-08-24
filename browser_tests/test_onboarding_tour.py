@@ -13,7 +13,18 @@ def _login(page: Page, base_url: str) -> None:
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
 
 
-def test_first_visit_offers_guided_tour_and_tour_crosses_pages(page: Page, base_url: str) -> None:
+def _expect_step(page: Page, number: int, title: str) -> None:
+    tour = page.locator(".tour-popover")
+    expect(tour).to_be_visible()
+    expect(tour).to_contain_text(f"Schritt {number} / 13")
+    expect(tour).to_contain_text(title)
+
+
+def _next(page: Page) -> None:
+    page.locator(".tour-popover").get_by_role("button", name="Weiter").click()
+
+
+def test_first_visit_offers_and_completes_guided_tour(page: Page, base_url: str) -> None:
     _login(page, base_url)
 
     invite = page.locator("[data-tour-invite]")
@@ -21,27 +32,50 @@ def test_first_visit_offers_guided_tour_and_tour_crosses_pages(page: Page, base_
     expect(invite).to_contain_text("Neu bei Moolias?")
 
     invite.locator("[data-start-tour-invite]").click()
-    tour = page.locator(".tour-popover")
-    expect(tour).to_be_visible()
-    expect(tour).to_contain_text("Schritt 1 / 13")
-    expect(tour).to_contain_text("Warum Moolias?")
+    _expect_step(page, 1, "Warum Moolias?")
 
-    tour.get_by_role("button", name="Weiter").click()
-    expect(tour).to_contain_text("Schritt 2 / 13")
-    expect(tour).to_contain_text("Deine Übersicht")
+    _next(page)
+    _expect_step(page, 2, "Deine Übersicht")
 
-    tour.get_by_role("button", name="Weiter").click()
-    expect(tour).to_contain_text("Schritt 3 / 13")
-    expect(tour).to_contain_text("Hauptadresse schützen")
+    _next(page)
+    _expect_step(page, 3, "Hauptadresse schützen")
 
-    tour.get_by_role("button", name="Weiter").click()
+    _next(page)
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
-    tour = page.locator(".tour-popover")
-    expect(tour).to_contain_text("Schritt 4 / 13")
-    expect(tour).to_contain_text("Für jeden Dienst ein Alias")
+    _expect_step(page, 4, "Für jeden Dienst ein Alias")
 
-    tour.get_by_role("button", name="Überspringen").click()
-    expect(tour).not_to_be_visible()
+    _next(page)
+    _expect_step(page, 5, "Neuen Alias erstellen")
+
+    _next(page)
+    _expect_step(page, 6, "Aliase verwalten")
+
+    _next(page)
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/offline-pool(?:[?#].*)?$"))
+    _expect_step(page, 7, "Offline-Pool")
+
+    _next(page)
+    _expect_step(page, 8, "Später den Zweck zuordnen")
+
+    _next(page)
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/statistics(?:[?#].*)?$"))
+    _expect_step(page, 9, "Optionale Nutzungsstatistiken")
+
+    _next(page)
+    _expect_step(page, 10, "Nicht erkannte Absender")
+
+    _next(page)
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
+    _expect_step(page, 11, "Handlungsbedarf")
+
+    _next(page)
+    _expect_step(page, 12, "Einstellungen")
+
+    _next(page)
+    _expect_step(page, 13, "Hilfe ist immer erreichbar")
+
+    page.locator(".tour-popover").get_by_role("button", name="Fertig").click()
+    expect(page.locator(".tour-popover")).not_to_be_visible()
 
 
 def test_help_explains_aliases_and_can_restart_tour(page: Page, base_url: str) -> None:
@@ -59,4 +93,4 @@ def test_help_explains_aliases_and_can_restart_tour(page: Page, base_url: str) -
 
     help_dialog.locator("[data-start-tour]").click()
     expect(help_dialog).not_to_be_visible()
-    expect(page.locator(".tour-popover")).to_contain_text("Schritt 1 / 13")
+    _expect_step(page, 1, "Warum Moolias?")
