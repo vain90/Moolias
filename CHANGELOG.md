@@ -2,6 +2,14 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.1.6 - 2026-08-24
+
+### Fixed
+
+- Mailcow ACME is now recreated after `ADDITIONAL_SAN` changes so the running `acme-mailcow` container receives the new SAN list instead of keeping stale environment values
+- the dedicated Moolias nginx virtual host now serves Mailcow's `/.well-known/acme-challenge/` path directly from `/web` and keeps HTTPS redirect logic out of that challenge location, allowing HTTP-01 validation for the Moolias hostname
+- the guided bootstrap now preserves the TLS check result across the progress-spinner subprocess so the final summary reports `OK`, `PENDING`, external/manual or not-required instead of incorrectly falling back to `not checked`
+
 ## 1.1.5 - 2026-08-24
 
 ### Fixed
