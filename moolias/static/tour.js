@@ -21,6 +21,15 @@
       skip: "Überspringen",
       finish: "Fertig",
       step: "Schritt",
+      protectionStateDisabled: "nicht aktiviert",
+      protectionStateAgentRequired: "agent erforderlich",
+      protectionBodyGeneric: "Diese optionale Funktion muss dein Administrator serverseitig aktivieren. Ist der Schutz verfügbar, verhindert er, dass deine echte Mailbox-Adresse versehentlich als Absender verwendet wird. Empfangen kannst du darüber weiterhin ganz normal.",
+      protectionBodyDisabled: "Auf diesem Server hat dein Administrator den Hauptadressenschutz nicht aktiviert. Wird die Funktion später freigeschaltet, kannst du hier verhindern, dass deine echte Mailbox-Adresse versehentlich als Absender verwendet wird.",
+      protectionBodyAgentRequired: "Der Hauptadressenschutz ist serverseitig vorgesehen, aber der benötigte Mailcow-Agent fehlt noch. Dein Administrator muss ihn installieren, bevor du den Schutz verwenden kannst.",
+      statsBodyDisabled: "Auf diesem Server sind Nutzungsstatistiken vom Administrator deaktiviert. Deshalb kannst du aktuell keinen Statistikmodus auswählen. Wird die Funktion freigeschaltet, kann Moolias Nutzung zählen und – je nach Datenschutzmodus – zusätzliche Details anzeigen.",
+      sendersTitleDisabled: "Wenn Statistiken aktiv sind",
+      sendersBodyDisabled: "Mit aktivierten Statistiken und einem passenden Datenschutzmodus kann Moolias Absender zur Prüfung markieren, wenn sie nicht eindeutig zum bekannten Alias-Zweck passen. Das ist ein Hinweis und kein automatisches Spam-Urteil.",
+      settingsBody: "Über das Zahnrad änderst du das Erscheinungsbild. Statistikmodus und Hauptadressenschutz sind dort nur nutzbar, wenn dein Administrator die jeweilige Funktion serverseitig aktiviert hat.",
       steps: [
         {
           path: "/overview",
@@ -31,13 +40,13 @@
           path: "/overview",
           target: ".overview-metrics",
           title: "Deine Übersicht",
-          body: "Hier siehst du auf einen Blick deine Aliase, den Offline-Vorrat und den Schutz deiner Hauptadresse. Die Karten führen direkt zu den jeweiligen Bereichen.",
+          body: "Hier siehst du auf einen Blick deine Aliase, den Offline-Vorrat und – falls serverseitig aktiviert – den Schutz deiner Hauptadresse. Die Karten führen direkt zu den jeweiligen Bereichen.",
         },
         {
           path: "/overview",
           target: "[data-primary-protection-card]",
           title: "Hauptadresse schützen",
-          body: "Ist der Schutz aktiv, kann deine echte Mailbox-Adresse nicht versehentlich als Absender verwendet werden. Empfangen kannst du darüber weiterhin ganz normal.",
+          body: "Diese optionale Funktion muss dein Administrator serverseitig aktivieren. Ist der Schutz verfügbar, kann deine echte Mailbox-Adresse nicht versehentlich als Absender verwendet werden.",
         },
         {
           path: "/aliases",
@@ -79,19 +88,19 @@
           path: "/statistics",
           target: ".statistics-metrics, .statistics-disabled-state",
           title: "Nicht erkannte Absender",
-          body: "Passt ein Absender nicht eindeutig zum bekannten Alias-Zweck, kann Moolias ihn zur Prüfung markieren. Das ist ein Hinweis für dich und ausdrücklich kein automatisches Spam-Urteil.",
+          body: "Passt ein Absender nicht eindeutig zum bekannten Alias-Zweck, kann Moolias ihn in den passenden Statistikmodi zur Prüfung markieren. Das ist ein Hinweis für dich und ausdrücklich kein automatisches Spam-Urteil.",
         },
         {
           path: "/overview",
           target: "[data-action-rail]",
           title: "Handlungsbedarf",
-          body: "Hier sammelt Moolias Dinge, die deine Aufmerksamkeit verdienen: etwa eine ungeschützte Hauptadresse, benutzte Offline-Aliase oder Absender, die du prüfen solltest.",
+          body: "Hier sammelt Moolias Dinge, die deine Aufmerksamkeit verdienen. Je nach aktivierten Funktionen sind das zum Beispiel benutzte Offline-Aliase, eine ungeschützte Hauptadresse oder Absender, die du prüfen solltest.",
         },
         {
           path: "/overview",
           target: "[data-open-settings]",
           title: "Einstellungen",
-          body: "Über das Zahnrad änderst du Darstellung, Statistikmodus und – falls installiert – den Schutz deiner Hauptadresse. Änderungen werden dort direkt erklärt.",
+          body: "Über das Zahnrad änderst du das Erscheinungsbild. Zusätzliche Optionen hängen davon ab, welche Funktionen dein Administrator serverseitig freigeschaltet hat.",
         },
         {
           path: "/overview",
@@ -111,6 +120,15 @@
       skip: "Skip",
       finish: "Done",
       step: "Step",
+      protectionStateDisabled: "not enabled",
+      protectionStateAgentRequired: "agent required",
+      protectionBodyGeneric: "This optional feature must be enabled server-side by your administrator. When available, it prevents your real mailbox address from accidentally being used as a sender while receiving mail continues normally.",
+      protectionBodyDisabled: "Your administrator has not enabled primary-address protection on this server. If the feature is enabled later, you can use it here to prevent your real mailbox address from accidentally being used as a sender.",
+      protectionBodyAgentRequired: "Primary-address protection is enabled server-side, but the required Mailcow agent is still missing. Your administrator must install it before you can use the protection.",
+      statsBodyDisabled: "Usage statistics are disabled by the administrator on this server, so you cannot currently select a statistics mode. If the feature is enabled later, Moolias can count usage and show additional details depending on the privacy mode.",
+      sendersTitleDisabled: "When statistics are enabled",
+      sendersBodyDisabled: "With statistics enabled and a suitable privacy mode, Moolias can flag senders for review when they do not clearly match the known alias purpose. This is a hint, not an automatic spam verdict.",
+      settingsBody: "Use the gear to change appearance. Statistics mode and primary-address protection are available there only when your administrator has enabled the corresponding server-side feature.",
       steps: [
         {
           path: "/overview",
@@ -121,13 +139,13 @@
           path: "/overview",
           target: ".overview-metrics",
           title: "Your overview",
-          body: "See your aliases, offline pool and primary-address protection at a glance. The cards take you directly to the corresponding areas.",
+          body: "See your aliases, offline pool and – when enabled server-side – primary-address protection at a glance. The cards take you directly to the corresponding areas.",
         },
         {
           path: "/overview",
           target: "[data-primary-protection-card]",
           title: "Protect your primary address",
-          body: "When protection is enabled, your real mailbox address cannot accidentally be used as a sender. Receiving mail through it continues to work normally.",
+          body: "This optional feature must be enabled server-side by your administrator. When available, it prevents your real mailbox address from accidentally being used as a sender.",
         },
         {
           path: "/aliases",
@@ -169,19 +187,19 @@
           path: "/statistics",
           target: ".statistics-metrics, .statistics-disabled-state",
           title: "Unrecognized senders",
-          body: "If a sender does not clearly match an alias purpose, Moolias can flag it for your review. This is a hint for you, not an automatic spam verdict.",
+          body: "If a sender does not clearly match an alias purpose, Moolias can flag it for your review in the appropriate statistics modes. This is a hint, not an automatic spam verdict.",
         },
         {
           path: "/overview",
           target: "[data-action-rail]",
           title: "Action required",
-          body: "Moolias collects items that deserve your attention here, such as an unprotected primary address, used offline aliases or senders that should be reviewed.",
+          body: "Moolias collects things that deserve your attention here. Depending on the enabled features, these can include used offline aliases, an unprotected primary address or senders that should be reviewed.",
         },
         {
           path: "/overview",
           target: "[data-open-settings]",
           title: "Settings",
-          body: "Use the gear to change appearance, statistics mode and – when installed – primary-address protection. The settings explain what each option changes.",
+          body: "Use the gear to change appearance. Additional options depend on which features your administrator has enabled server-side.",
         },
         {
           path: "/overview",
@@ -200,8 +218,43 @@
   let target = null;
 
   const currentPath = () => window.location.pathname.replace(/\/+$/, "") || "/";
-
   const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
+
+  const statisticsServerEnabled = () => !document.querySelector(
+    '.settings-usage-section a[href*="docs/statistics.md"]',
+  );
+
+  const primaryProtectionStatus = () => {
+    const state = document.querySelector("[data-sender-protection-state]")?.textContent
+      ?.trim()
+      .toLowerCase() || "";
+    if (!state) return "unknown";
+    if (state === copy.protectionStateDisabled) return "disabled";
+    if (state === copy.protectionStateAgentRequired) return "agent-required";
+    return "available";
+  };
+
+  const resolveStep = (index) => {
+    const step = { ...copy.steps[index] };
+
+    if (index === 2) {
+      const status = primaryProtectionStatus();
+      if (status === "disabled") step.body = copy.protectionBodyDisabled;
+      else if (status === "agent-required") step.body = copy.protectionBodyAgentRequired;
+      else step.body = copy.protectionBodyGeneric;
+    }
+
+    if (!statisticsServerEnabled()) {
+      if (index === 8) step.body = copy.statsBodyDisabled;
+      if (index === 9) {
+        step.title = copy.sendersTitleDisabled;
+        step.body = copy.sendersBodyDisabled;
+      }
+    }
+
+    if (index === 11) step.body = copy.settingsBody;
+    return step;
+  };
 
   const removeTourUi = () => {
     overlay?.remove();
@@ -227,6 +280,46 @@
     element.style.left = `${Math.max(0, left)}px`;
     element.style.width = `${Math.max(0, width)}px`;
     element.style.height = `${Math.max(0, height)}px`;
+  };
+
+  const ensureTargetVisible = (element) => {
+    const viewportHeight = window.innerHeight;
+    const topInset = window.innerWidth <= 980 ? 82 : 88;
+    const mobile = window.innerWidth <= 640;
+    const bottomInset = mobile
+      ? Math.min(330, Math.max(210, Math.round(viewportHeight * 0.42)))
+      : 28;
+    const availableHeight = Math.max(120, viewportHeight - topInset - bottomInset);
+    const rect = element.getBoundingClientRect();
+
+    if (mobile) {
+      const desiredTop = topInset;
+      if (
+        rect.top < desiredTop - 4
+        || rect.top > desiredTop + 90
+        || rect.bottom > viewportHeight - bottomInset
+      ) {
+        window.scrollBy({ top: rect.top - desiredTop, left: 0, behavior: "auto" });
+      }
+      return;
+    }
+
+    if (rect.height > availableHeight) {
+      if (Math.abs(rect.top - topInset) > 4) {
+        window.scrollBy({ top: rect.top - topInset, left: 0, behavior: "auto" });
+      }
+      return;
+    }
+
+    if (rect.top < topInset) {
+      window.scrollBy({ top: rect.top - topInset, left: 0, behavior: "auto" });
+      return;
+    }
+
+    const safeBottom = viewportHeight - bottomInset;
+    if (rect.bottom > safeBottom) {
+      window.scrollBy({ top: rect.bottom - safeBottom, left: 0, behavior: "auto" });
+    }
   };
 
   const positionUi = () => {
@@ -303,10 +396,10 @@
       return;
     }
 
-    const step = copy.steps[index];
-    if (currentPath() !== step.path) {
+    const baseStep = copy.steps[index];
+    if (currentPath() !== baseStep.path) {
       sessionStorage.setItem(activeKey, String(index));
-      window.location.assign(step.path);
+      window.location.assign(baseStep.path);
       return;
     }
 
@@ -315,10 +408,9 @@
     removeTourUi();
     document.documentElement.classList.add("tour-open");
 
+    const step = resolveStep(index);
     target = step.target ? document.querySelector(step.target) : null;
-    if (target) {
-      target.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
-    }
+    if (target) ensureTargetVisible(target);
 
     overlay = document.createElement("div");
     overlay.className = "tour-overlay";
@@ -335,6 +427,7 @@
 
     popover = document.createElement("section");
     popover.className = "tour-popover";
+    popover.dataset.tourTarget = step.target || "";
     popover.setAttribute("role", "dialog");
     popover.setAttribute("aria-modal", "true");
     popover.setAttribute("aria-label", step.title);
@@ -439,7 +532,10 @@
     button.addEventListener("click", startTour);
   });
 
-  window.addEventListener("resize", positionUi);
+  window.addEventListener("resize", () => {
+    if (target) ensureTargetVisible(target);
+    positionUi();
+  });
   window.addEventListener("scroll", positionUi, true);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && activeIndex !== null) completeTour();
