@@ -33,6 +33,8 @@ Mailcow nginx ── Mailcow Docker network ── moolias-app:8000
 
 The Moolias application publishes **no host port** in this mode.
 
+The `moolias-data` volume is persistent application state and is required even when usage statistics are disabled. Moolias stores mailbox-specific application preferences there; optional statistics and Newsletter Management add their own data when enabled.
+
 ## Before you install
 
 You need:
@@ -255,15 +257,21 @@ The updater uses the local `compose.yml`, pulls the latest stable image, waits f
 
 Aliases remain stored in Mailcow.
 
-When usage statistics are enabled, back up the Moolias `/data` volume as well. The default SQLite database is:
+Always back up the persistent Moolias `/data` volume. The default local state database is:
 
 ```text
 /data/moolias-stats.sqlite3
 ```
 
-Use a SQLite-consistent backup rather than copying a live database file while WAL mode is active.
+Despite its historical name, this SQLite file is also used for mailbox-specific Moolias settings and is required even when `MOOLIAS_USAGE_STATS=false`. If Newsletter Management is enabled, also include its default metadata database:
 
-Also back up `/opt/moolias/.env`; it contains the Mailcow API key, OAuth secret and Moolias session secret.
+```text
+/data/moolias-newsletters.sqlite3
+```
+
+Use a SQLite-consistent backup rather than copying live database files while WAL mode is active.
+
+Also back up `/opt/moolias/.env`; it contains the Mailcow API key, OAuth secret, Moolias session secret and optional feature secrets.
 
 ## Non-interactive installation
 
