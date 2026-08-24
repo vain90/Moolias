@@ -11,6 +11,7 @@ from moolias.mailcow import MailcowError
 from moolias.newsletter_mode import (
     NewsletterModeSource,
     NewsletterModeState,
+    mailbox_newsletter_state as resolve_mailbox_newsletter_state,
     replace_mailbox_newsletter_tags,
     resolve_newsletter_mode,
 )
@@ -52,20 +53,10 @@ async def mailbox_newsletter_state(
     request: Request,
     mailbox_address: str,
 ) -> NewsletterModeState:
-    settings = request.app.state.settings
-    if not settings.newsletter_management:
-        return resolve_newsletter_mode([], [], settings.newsletter_tag)
-
-    mailcow = request.app.state.mailcow
-    mailbox = await mailcow.get_mailbox(mailbox_address)
-    domain_name = str(
-        mailbox.get("domain") or mailbox_address.rsplit("@", 1)[-1]
-    ).strip().lower()
-    domain = await mailcow.get_domain(domain_name)
-    return resolve_newsletter_mode(
-        mailbox.get("tags"),
-        domain.get("tags"),
-        settings.newsletter_tag,
+    return await resolve_mailbox_newsletter_state(
+        request.app.state.settings,
+        request.app.state.mailcow,
+        mailbox_address,
     )
 
 
