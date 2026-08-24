@@ -109,10 +109,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_optional_features(self) -> "Settings":
+        if not self.usage_db_path:
+            raise ValueError(
+                "MOOLIAS_USAGE_DB_PATH must be set because Moolias stores persistent "
+                "mailbox settings there even when usage statistics are disabled"
+            )
         if self.usage_stats and not self.usage_tag:
             raise ValueError("MOOLIAS_USAGE_TAG must be set when usage statistics are enabled")
-        if self.usage_stats and not self.usage_db_path:
-            raise ValueError("MOOLIAS_USAGE_DB_PATH must be set when usage statistics are enabled")
         if self.newsletter_management and not self.newsletter_db_path:
             raise ValueError(
                 "MOOLIAS_NEWSLETTER_DB_PATH must be set when newsletter management is enabled"
