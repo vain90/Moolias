@@ -2,7 +2,7 @@
   "use strict";
 
   const german = (document.documentElement.lang || "").toLowerCase().startsWith("de");
-  const fieldLabel = german ? "Alias Name / Zweck" : "Alias name / purpose";
+  const fieldLabel = german ? "Alias Name" : "Alias name";
 
   document.querySelectorAll(".offline-pool-row [data-open-assign-dialog]").forEach((button) => {
     const aliasId = button.dataset.openAssignDialog;
@@ -35,6 +35,7 @@
         .filter((node) => node.nodeType === Node.TEXT_NODE)
         .forEach((node) => node.remove());
       const caption = document.createElement("span");
+      caption.dataset.fieldCaption = "1";
       caption.textContent = fieldLabel;
       label.prepend(caption);
     }
