@@ -18,7 +18,7 @@ from moolias.newsletter_mode import (
     mailbox_newsletter_state as resolve_mailbox_newsletter_state,
 )
 from moolias.security import require_user, validate_csrf
-from moolias.ui import _load_ui_state, _template_context
+from moolias.ui import PAGE_SIZES, _load_ui_state, _template_context
 
 router = APIRouter()
 NEWSLETTER_MODE_SELECTIONS = {"inherit", "off", "on"}
@@ -235,6 +235,19 @@ async def newsletters_page(request: Request):
             newsletter_mode_state=state,
             newsletter_mode_selection=_selection(state),
             newsletters=[],
+            newsletter_alias_labels={},
+            newsletter_sender_names={},
+            newsletter_search_query="",
+            newsletter_status_filter="all",
+            newsletter_status_counts={"all": 0, "active": 0, "unsubscribed": 0},
+            newsletter_filtered_total=0,
+            newsletter_page=1,
+            newsletter_per_page=25,
+            newsletter_page_sizes=PAGE_SIZES,
+            newsletter_total_pages=1,
+            newsletter_pagination_items=[1],
+            newsletter_range_start=0,
+            newsletter_range_end=0,
             newsletter_collector_error=None,
             newsletter_collector_last_success=None,
             **ui_state,
@@ -258,6 +271,21 @@ async def unsubscribe_newsletter(
     user = require_user(request)
     await _require_enabled(request, user)
     return await newsletter_core.unsubscribe_newsletter(
+        request,
+        newsletter_id,
+        csrf_token,
+    )
+
+
+@router.post("/newsletters/{newsletter_id}/mark-unsubscribed")
+async def mark_newsletter_unsubscribed(
+    request: Request,
+    newsletter_id: int,
+    csrf_token: str = Form(...),
+):
+    user = require_user(request)
+    await _require_enabled(request, user)
+    return await newsletter_core.mark_newsletter_unsubscribed(
         request,
         newsletter_id,
         csrf_token,
