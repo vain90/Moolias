@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 import pytest
@@ -10,6 +12,7 @@ import pytest
 from moolias.aliases import RESERVED_COMMENT
 from moolias.config import Settings
 from moolias.mailcow import MailcowClient
+from moolias.newsletters import NewsletterAgentClient
 from moolias.stats_mode import replace_mailbox_stats_tags
 
 DOMAIN = "moolias-ci.test"
@@ -17,6 +20,9 @@ MAILBOX = f"owner@{DOMAIN}"
 ACCESS_TAG = "moolias-ci-access"
 STATS_TAG = "moolias-stats"
 PASSWORD = "Moolias-CI-Only-4f9d!A7"
+NEWSLETTER_AGENT_SECRET = "newsletter-ci-agent-secret-0123456789abcdef0123456789abcdef"
+DOVEADM_PASSWORD = "newsletter-ci-doveadm-0123456789abcdef0123456789abcdef"
+NEWSLETTER_MESSAGE_ID = "moolias-newsletter-agent-ci@example.net"
 
 
 @dataclass
@@ -229,3 +235,111 @@ async def test_mailbox_tag_add_remove_and_stats_mode_replacement(real_mailcow: R
 async def test_rspamd_history_endpoint_is_reachable(real_mailcow: RealMailcow):
     history = await real_mailcow.client.get_rspamd_history(10)
     assert isinstance(history, list)
+
+
+def _docker_compose(
+    mailcow_dir: Path,
+    *arguments: str,
+    input_bytes: bytes | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        ["docker", "compose", *arguments],
+        cwd=mailcow_dir,
+        input=input_bytes,
+        check=True,
+        capture_output=True,
+        timeout=180,
+    )
+
+
+async def test_zz_newsletter_agent_reads_headers_through_remote_doveadm(
+    real_mailcow: RealMailcow,
+    tmp_path: Path,
+):
+    # The fixture guarantees that the target mailbox exists before Dovecot is exercised.
+    assert (await real_mailcow.client.get_mailbox(MAILBOX))["username"] == MAILBOX
+
+    repository_root = Path(__file__).resolve().parents[1]
+    mailcow_dir = Path(os.environ["MAILCOW_DIR"])
+    moolias_dir = tmp_path / "moolias"
+    moolias_dir.mkdir()
+    (moolias_dir / ".env").write_text(
+        "MAILCOW_INTERNAL_URL=http://nginx-mailcow:80\n",
+        encoding="utf-8",
+    )
+
+    agent_image = os.environ.get("MOOLIAS_AGENT_IMAGE", "moolias:newsletter-agent-ci")
+    image_exists = subprocess.run(
+        ["docker", "image", "inspect", agent_image],
+        check=False,
+        capture_output=True,
+    ).returncode == 0
+    if not image_exists:
+        subprocess.run(
+            ["docker", "build", "-t", agent_image, "."],
+            cwd=repository_root,
+            check=True,
+            timeout=300,
+        )
+
+    installer_env = os.environ.copy()
+    installer_env.update(
+        {
+            "MAILCOW_DIR": str(mailcow_dir),
+            "MOOLIAS_DIR": str(moolias_dir),
+            "MOOLIAS_AGENT_IMAGE": agent_image,
+            "MOOLIAS_NEWSLETTER_AGENT_SECRET": NEWSLETTER_AGENT_SECRET,
+            "MOOLIAS_DOVEADM_PASSWORD": DOVEADM_PASSWORD,
+        }
+    )
+    subprocess.run(
+        ["bash", str(repository_root / "scripts" / "install-newsletter-agent.sh")],
+        cwd=repository_root,
+        env=installer_env,
+        check=True,
+        timeout=180,
+    )
+
+    message = (
+        "From: Moolias Newsletter CI <news@example.net>\r\n"
+        f"To: {MAILBOX}\r\n"
+        f"Message-ID: <{NEWSLETTER_MESSAGE_ID}>\r\n"
+        "Subject: Newsletter agent integration\r\n"
+        "List-ID: Moolias Newsletter CI <newsletter.example.net>\r\n"
+        "List-Unsubscribe: <https://example.net/unsubscribe?token=ci>, "
+        "<mailto:leave@example.net>\r\n"
+        "List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n"
+        "DKIM-Signature: v=1; a=rsa-sha256; d=example.net; s=ci; "
+        "h=from:to:subject:list-unsubscribe:list-unsubscribe-post; bh=abc; b=def\r\n"
+        "\r\n"
+        "Disposable Mailcow integration message.\r\n"
+    ).encode("utf-8")
+    _docker_compose(
+        mailcow_dir,
+        "exec",
+        "-T",
+        "dovecot-mailcow",
+        "doveadm",
+        "save",
+        "-u",
+        MAILBOX,
+        "-m",
+        "INBOX",
+        "-",
+        input_bytes=message,
+    )
+
+    async with NewsletterAgentClient(
+        f"{os.environ['MAILCOW_URL']}/moolias-newsletter-agent",
+        NEWSLETTER_AGENT_SECRET,
+        verify_tls=False,
+    ) as agent:
+        headers = await agent.fetch_headers(MAILBOX, NEWSLETTER_MESSAGE_ID)
+
+    assert headers["matches"] >= 1
+    assert headers["from"] == "Moolias Newsletter CI <news@example.net>"
+    assert headers["list_id"] == "Moolias Newsletter CI <newsletter.example.net>"
+    assert headers["list_unsubscribe"] == (
+        "<https://example.net/unsubscribe?token=ci>, <mailto:leave@example.net>"
+    )
+    assert headers["list_unsubscribe_post"] == "List-Unsubscribe=One-Click"
