@@ -13,19 +13,26 @@ def _login_de(page: Page, base_url: str) -> None:
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
 
 
-def _amazon_row(page: Page) -> Locator:
+def _alias_row(page: Page, address: str) -> Locator:
     return page.locator(
-        '.alias-row:has([data-alias-select][data-address="amazon-k7@example.org"])'
+        f'.alias-row:has([data-alias-select][data-address="{address}"])'
     )
+
+
+def _amazon_row(page: Page) -> Locator:
+    return _alias_row(page, "amazon-k7@example.org")
 
 
 def test_alias_description_edit_and_table_preview(page: Page, base_url: str) -> None:
     _login_de(page, base_url)
     page.goto(f"{base_url}/aliases")
 
-    expect(page.locator(".alias-table-head")).to_contain_text(
-        "Alias Name / Alias-Adresse"
-    )
+    identity_heading = page.locator(".alias-table-head > span").nth(1)
+    expect(identity_heading).to_contain_text("Alias Name / Alias-Adresse")
+    expect(page.locator('link[data-alias-description-styles="1"]')).to_have_count(1)
+    assert identity_heading.evaluate(
+        "el => getComputedStyle(el, '::after').content"
+    ) == '"Beschreibung"'
 
     row = _amazon_row(page)
     row.locator(".alias-edit-action > summary").click()
@@ -41,6 +48,11 @@ def test_alias_description_edit_and_table_preview(page: Page, base_url: str) -> 
     expect(description).to_be_visible()
     expect(description.locator("xpath=..")).to_contain_text("Beschreibung")
     expect(panel).not_to_contain_text("privaten Mailcow-Kommentar")
+
+    empty_info = _alias_row(page, "github-m4@example.org").locator(".alias-info")
+    assert empty_info.evaluate(
+        "el => getComputedStyle(el, '::after').content"
+    ) == '"–"'
 
     textarea_box = description.bounding_box()
     form_box = panel.locator('form[action$="/metadata"]').bounding_box()
@@ -64,6 +76,12 @@ def test_alias_description_edit_and_table_preview(page: Page, base_url: str) -> 
         "el => getComputedStyle(el).textOverflow"
     ) == "ellipsis"
 
+    address_box = row.locator(".alias-info > code").bounding_box()
+    details_box = details.bounding_box()
+    assert address_box is not None
+    assert details_box is not None
+    assert details_box["x"] > address_box["x"] + 40
+
     details.locator("summary").click()
     expect(details.locator(".alias-description-popover")).to_have_text(full_text)
 
@@ -71,8 +89,12 @@ def test_alias_description_edit_and_table_preview(page: Page, base_url: str) -> 
     page.reload()
     row = _amazon_row(page)
     details = row.locator(".alias-description-details")
+    expect(details).to_be_visible()
     expect(details.locator(".alias-description-preview")).to_be_hidden()
     expect(details.locator(".alias-description-info")).to_be_visible()
+    assert page.locator(".alias-table-head > span").nth(1).evaluate(
+        "el => getComputedStyle(el, '::after').content"
+    ) == '""'
     details.locator("summary").click()
     expect(details.locator(".alias-description-popover")).to_have_text(full_text)
 
