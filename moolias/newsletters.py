@@ -35,6 +35,7 @@ router = APIRouter()
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
 CLEAN_ACTIONS = frozenset({"clean", "no action", "accept"})
 AUTH_SYMBOLS = frozenset({"R_DKIM_ALLOW", "DMARC_POLICY_ALLOW"})
+NEWSLETTER_SYMBOLS = frozenset({"MAILLIST", "HAS_LIST_UNSUB"})
 MAX_UNSUBSCRIBE_URL_LENGTH = 8192
 MAX_RESPONSE_HEADER_BYTES = 65536
 MAX_HEADER_LOOKUPS_PER_SCAN = 50
@@ -129,19 +130,26 @@ def _agent_url(settings: Any) -> str:
     return f"{settings.mailcow_url.rstrip('/')}/moolias-newsletter-agent"
 
 
+def _normalise_symbol(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    for marker in ("(", "[", "{"):
+        text = text.split(marker, 1)[0]
+    return text.strip().upper()
+
+
 def _symbols(item: dict[str, Any]) -> set[str]:
     value = item.get("symbols")
     if isinstance(value, dict):
-        return {str(key).strip().upper() for key in value if str(key).strip()}
-    if isinstance(value, list):
-        return {str(entry).strip().upper() for entry in value if str(entry).strip()}
-    if isinstance(value, str):
-        return {
-            part.strip().upper()
-            for part in value.replace(",", " ").split()
-            if part.strip()
-        }
-    return set()
+        entries = value.keys()
+    elif isinstance(value, list):
+        entries = value
+    elif isinstance(value, str):
+        entries = value.replace(",", " ").split()
+    else:
+        return set()
+    return {symbol for entry in entries if (symbol := _normalise_symbol(entry))}
 
 
 def _recipients(value: Any) -> set[str]:
@@ -237,7 +245,7 @@ def _history_candidate(item: dict[str, Any]) -> bool:
     symbols = _symbols(item)
     action = str(item.get("action") or "").strip().casefold()
     return (
-        "HAS_LIST_UNSUB" in symbols
+        bool(symbols & NEWSLETTER_SYMBOLS)
         and action in CLEAN_ACTIONS
         and bool(symbols & AUTH_SYMBOLS)
         and bool(_message_id(item))
