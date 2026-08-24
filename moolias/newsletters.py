@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ipaddress
 import json
 import logging
@@ -525,10 +526,8 @@ async def _one_click_post(url: str) -> int:
         finally:
             if writer is not None:
                 writer.close()
-                try:
+                with contextlib.suppress(OSError):
                     await writer.wait_closed()
-                except OSError:
-                    pass
 
     raise OSError(str(last_error or "Unsubscribe request failed"))
 
