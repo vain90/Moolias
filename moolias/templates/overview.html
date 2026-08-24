@@ -69,11 +69,22 @@
         </a>
         {% endfor %}
       </div>
+      {% elif not stats_available %}
+      <div class="overview-empty">
+        <strong>{% if language == 'de' %}Nutzungsstatistik ist serverseitig deaktiviert{% else %}Usage statistics are disabled server-side{% endif %}</strong>
+        <p class="muted">{% if language == 'de' %}Ein Administrator muss die Statistikfunktion in der Moolias-Serverkonfiguration aktivieren, bevor Postfächer einen Statistikmodus auswählen können.{% else %}An administrator must enable statistics in the Moolias server configuration before mailboxes can select a statistics mode.{% endif %}</p>
+        <a class="button compact" href="https://github.com/vain90/Moolias/blob/main/docs/statistics.md" target="_blank" rel="noopener noreferrer">{% if language == 'de' %}So aktivierst du Statistiken{% else %}How to enable statistics{% endif %}</a>
+      </div>
+      {% elif stats_error or not stats_state %}
+      <div class="overview-empty">
+        <strong>{% if language == 'de' %}Statistikstatus ist vorübergehend nicht verfügbar{% else %}Statistics status is temporarily unavailable{% endif %}</strong>
+        <p class="muted">{% if language == 'de' %}Moolias konnte den aktuellen Statistikmodus dieses Postfachs nicht aus Mailcow laden. Versuche es später erneut oder prüfe die Serververbindung.{% else %}Moolias could not load this mailbox's current statistics mode from Mailcow. Try again later or check the server connection.{% endif %}</p>
+      </div>
       {% elif not usage_stats_visible %}
       <div class="overview-empty">
-        <strong>{% if language == 'de' %}Nutzungsstatistik ist aus{% else %}Usage statistics are off{% endif %}</strong>
-        <p class="muted">{% if language == 'de' %}Aktiviere einen Statistikmodus in den Einstellungen, damit Moolias die zuletzt benutzten Aliase anzeigen kann.{% else %}Enable a statistics mode in Settings so Moolias can show recently used aliases.{% endif %}</p>
-        <button class="button compact" type="button" data-open-settings>{{ icon('settings') }}{% if language == 'de' %}Einstellungen öffnen{% else %}Open settings{% endif %}</button>
+        <strong>{% if language == 'de' %}Für dieses Postfach ist kein Statistikmodus aktiviert{% else %}No statistics mode is enabled for this mailbox{% endif %}</strong>
+        <p class="muted">{% if language == 'de' %}Die Statistikfunktion ist serverseitig verfügbar. Wähle in den Einstellungen einen Statistikmodus, damit Moolias die zuletzt benutzten Aliase anzeigen kann.{% else %}The statistics feature is available server-side. Choose a statistics mode in Settings so Moolias can show recently used aliases.{% endif %}</p>
+        <button class="button compact" type="button" data-open-settings-section="statistics">{{ icon('settings') }}{% if language == 'de' %}Statistikmodus wählen{% else %}Choose statistics mode{% endif %}</button>
       </div>
       {% else %}
       <p class="empty">{% if language == 'de' %}Noch keine Nutzung erfasst.{% else %}No usage has been recorded yet.{% endif %}</p>
@@ -101,8 +112,20 @@
         <div class="stat-preview-item"><span class="stat-symbol amber" aria-hidden="true">{{ icon('triangle-alert') }}</span><strong>{{ stats_summary.unrecognized_senders }}</strong><span>{% if language == 'de' %}Nicht erkannt{% else %}Not detected{% endif %}</span></div>
         <div class="stat-preview-item"><span class="stat-symbol green" aria-hidden="true">{{ icon('at-sign') }}</span>{% if top_sources %}<strong class="stat-domain">{{ top_sources[0][0] }}</strong>{% else %}<strong>–</strong>{% endif %}<span>{% if language == 'de' %}Aktivste Quelle{% else %}Top source{% endif %}</span></div>
       </div>
+      {% elif not stats_available %}
+      <div class="overview-empty">
+        <strong>{% if language == 'de' %}Nutzungsstatistik ist serverseitig deaktiviert{% else %}Usage statistics are disabled server-side{% endif %}</strong>
+        <p class="muted">{% if language == 'de' %}Der Statistik-Collector startet erst, wenn die Funktion in der Moolias-Serverkonfiguration aktiviert wurde.{% else %}The statistics collector starts only after the feature has been enabled in the Moolias server configuration.{% endif %}</p>
+        <a class="button compact" href="https://github.com/vain90/Moolias/blob/main/docs/statistics.md" target="_blank" rel="noopener noreferrer">{% if language == 'de' %}So aktivierst du Statistiken{% else %}How to enable statistics{% endif %}</a>
+      </div>
+      {% elif stats_error or not stats_state %}
+      <p class="empty">{% if language == 'de' %}Der Statistikstatus ist vorübergehend nicht verfügbar.{% else %}Statistics status is temporarily unavailable.{% endif %}</p>
       {% else %}
-      <p class="empty">{% if language == 'de' %}Für diese Ansicht sind Nutzungsstatistiken erforderlich.{% else %}Usage statistics are required for this view.{% endif %}</p>
+      <div class="overview-empty">
+        <strong>{% if language == 'de' %}Für dieses Postfach ist kein Statistikmodus aktiviert{% else %}No statistics mode is enabled for this mailbox{% endif %}</strong>
+        <p class="muted">{% if language == 'de' %}Wähle einen Statistikmodus in den Einstellungen, um Nutzungsdaten zu erfassen.{% else %}Choose a statistics mode in Settings to collect usage data.{% endif %}</p>
+        <button class="button compact" type="button" data-open-settings-section="statistics">{{ icon('settings') }}{% if language == 'de' %}Statistikmodus wählen{% else %}Choose statistics mode{% endif %}</button>
+      </div>
       {% endif %}
     </section>
   </div>

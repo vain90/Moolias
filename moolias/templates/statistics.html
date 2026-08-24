@@ -119,11 +119,12 @@
 <section class="card empty-state-card statistics-disabled-state">
   {% if not stats_available %}
     <span class="empty-state-icon" aria-hidden="true">{{ icon('chart-no-axes-combined') }}</span>
-    <h2>{% if language == 'de' %}Statistiken sind auf diesem Server nicht aktiviert{% else %}Statistics are not enabled on this server{% endif %}</h2>
-    <p class="muted">{% if language == 'de' %}Die Statistikfunktion wurde serverseitig deaktiviert. Ein Administrator muss sie in der Moolias-Konfiguration aktivieren, bevor Postfächer sie nutzen können.{% else %}The statistics feature is disabled server-side. An administrator must enable it in the Moolias configuration before mailboxes can use it.{% endif %}</p>
+    <h2>{% if language == 'de' %}Nutzungsstatistik ist serverseitig deaktiviert{% else %}Usage statistics are disabled server-side{% endif %}</h2>
+    <p class="muted">{% if language == 'de' %}Ein Administrator muss die Statistikfunktion in der Moolias-Serverkonfiguration aktivieren, bevor Postfächer einen Statistikmodus auswählen können.{% else %}An administrator must enable statistics in the Moolias server configuration before mailboxes can select a statistics mode.{% endif %}</p>
+    <a class="button primary" href="https://github.com/vain90/Moolias/blob/main/docs/statistics.md" target="_blank" rel="noopener noreferrer">{% if language == 'de' %}So aktivierst du Statistiken{% else %}How to enable statistics{% endif %}</a>
   {% elif stats_error %}
     <span class="empty-state-icon" aria-hidden="true">{{ icon('triangle-alert') }}</span>
-    <h2>{% if language == 'de' %}Statistikstatus nicht verfügbar{% else %}Statistics status unavailable{% endif %}</h2>
+    <h2>{% if language == 'de' %}Statistikstatus ist vorübergehend nicht verfügbar{% else %}Statistics status is temporarily unavailable{% endif %}</h2>
     <p class="muted">{% if language == 'de' %}Moolias konnte den aktuellen Statistikmodus dieses Postfachs nicht aus Mailcow laden. Versuche es später erneut oder prüfe die Serververbindung.{% else %}Moolias could not load this mailbox's current statistics mode from Mailcow. Try again later or check the server connection.{% endif %}</p>
   {% elif stats_state and stats_state.conflict %}
     <span class="empty-state-icon" aria-hidden="true">{{ icon('triangle-alert') }}</span>
@@ -132,9 +133,9 @@
     <button class="button primary" type="button" data-open-settings-section="statistics">{{ icon('settings') }}{% if language == 'de' %}Einstellungen öffnen{% else %}Open settings{% endif %}</button>
   {% else %}
     <span class="empty-state-icon" aria-hidden="true">{{ icon('chart-no-axes-combined') }}</span>
-    <h2>{% if language == 'de' %}Statistiken sind für dieses Postfach ausgeschaltet{% else %}Statistics are off for this mailbox{% endif %}</h2>
-    <p class="muted">{% if language == 'de' %}Die Funktion ist auf dem Server verfügbar, aber für dieses Postfach ist aktuell kein Statistikmodus aktiviert. Du kannst ihn in den Einstellungen einschalten.{% else %}The feature is available on the server, but this mailbox currently has no statistics mode enabled. You can turn it on in Settings.{% endif %}</p>
-    <button class="button primary" type="button" data-open-settings-section="statistics">{{ icon('settings') }}{% if language == 'de' %}Statistiken aktivieren{% else %}Enable statistics{% endif %}</button>
+    <h2>{% if language == 'de' %}Für dieses Postfach ist kein Statistikmodus aktiviert{% else %}No statistics mode is enabled for this mailbox{% endif %}</h2>
+    <p class="muted">{% if language == 'de' %}Die Statistikfunktion ist serverseitig verfügbar. Wähle in den Einstellungen einen Statistikmodus, um Nutzungsdaten zu erfassen.{% else %}The statistics feature is available server-side. Choose a statistics mode in Settings to collect usage data.{% endif %}</p>
+    <button class="button primary" type="button" data-open-settings-section="statistics">{{ icon('settings') }}{% if language == 'de' %}Statistikmodus wählen{% else %}Choose statistics mode{% endif %}</button>
   {% endif %}
 </section>
 {% endif %}

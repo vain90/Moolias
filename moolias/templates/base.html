@@ -186,7 +186,9 @@
         <div class="settings-section-body">
           <h3>{{ t.usage_settings_title }}</h3>
           {% if not stats_available %}
-            <p class="muted">{{ t.usage_settings_unavailable }}</p>
+            <p class="muted"><strong>{% if language == 'de' %}Nutzungsstatistik ist serverseitig deaktiviert.{% else %}Usage statistics are disabled server-side.{% endif %}</strong></p>
+            <p class="muted">{% if language == 'de' %}Ein Administrator muss die Statistikfunktion in der Moolias-Serverkonfiguration aktivieren, bevor du einen Statistikmodus auswählen kannst.{% else %}An administrator must enable statistics in the Moolias server configuration before you can select a statistics mode.{% endif %}</p>
+            <a class="button compact" href="https://github.com/vain90/Moolias/blob/main/docs/statistics.md" target="_blank" rel="noopener noreferrer">{% if language == 'de' %}So aktivierst du Statistiken{% else %}How to enable statistics{% endif %}</a>
           {% elif stats_error or not stats_state %}
             <p class="muted">{{ t.usage_settings_unavailable }}</p>
           {% else %}
