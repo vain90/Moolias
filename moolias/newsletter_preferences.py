@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -38,7 +39,12 @@ def _untrack(request: Request, mailbox: str) -> None:
 
 
 async def _track(request: Request, mailbox: str) -> None:
-    _, collector = await newsletter_core._runtime(request)
+    store, collector = await newsletter_core._runtime(request)
+    if await store.history_since(mailbox) is None:
+        # A tag can be enabled directly by an administrator outside Moolias. In that
+        # case there was no interactive history choice, so fail privacy-safe and start
+        # with messages arriving from now on instead of silently importing history.
+        await store.set_history_since(mailbox, int(time.time()))
     collector.track(mailbox)
 
 
@@ -133,6 +139,7 @@ async def get_newsletter_management_setting(request: Request):
 async def update_newsletter_management_setting(
     request: Request,
     mode: str = Form(...),
+    backfill_history: bool | None = Form(None),
     csrf_token: str = Form(...),
     return_to: str = Form("/overview"),
 ):
@@ -150,11 +157,36 @@ async def update_newsletter_management_setting(
     mailcow = request.app.state.mailcow
     try:
         mailbox = await mailcow.get_mailbox(user)
+        domain_name = str(
+            mailbox.get("domain") or user.rsplit("@", 1)[-1]
+        ).strip().lower()
+        domain = await mailcow.get_domain(domain_name)
+        current_state = resolve_newsletter_mode(
+            mailbox.get("tags"),
+            domain.get("tags"),
+            settings.newsletter_tag,
+        )
         tags = replace_mailbox_newsletter_tags(
             mailbox.get("tags"),
             settings.newsletter_tag,
             mode,
         )
+        target_state = resolve_newsletter_mode(
+            tags,
+            domain.get("tags"),
+            settings.newsletter_tag,
+        )
+        activating = (
+            (current_state.conflict or not current_state.enabled)
+            and not target_state.conflict
+            and target_state.enabled
+        )
+        if activating and backfill_history is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Choose whether available newsletter history should be imported",
+            )
+
         await mailcow.set_mailbox_tags(user, tags)
         state = await mailbox_newsletter_state(request, user)
     except ValueError as exc:
@@ -166,7 +198,15 @@ async def update_newsletter_management_setting(
         ) from exc
 
     if not state.conflict and state.enabled:
-        await _track(request, user)
+        store, collector = await newsletter_core._runtime(request)
+        if activating:
+            await store.set_history_since(
+                user,
+                0 if backfill_history else int(time.time()),
+            )
+        elif await store.history_since(user) is None:
+            await store.set_history_since(user, int(time.time()))
+        collector.track(user)
     else:
         _untrack(request, user)
     return RedirectResponse(_safe_return_to(return_to), status_code=303)
@@ -185,6 +225,7 @@ async def newsletters_page(request: Request):
         ) from exc
 
     if server_enabled and not state.conflict and state.enabled:
+        await _track(request, user)
         return await newsletter_core.newsletters_page(request)
 
     _untrack(request, user)
