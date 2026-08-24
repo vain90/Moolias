@@ -10,6 +10,7 @@
   const oldToggle = setting?.querySelector('[data-newsletter-toggle]');
   const oldSwitch = oldToggle?.closest('.switch-control');
   let select = setting?.querySelector('[data-newsletter-mode-select]');
+  let policyData = null;
 
   if (!select && form) {
     select = document.createElement('select');
@@ -66,6 +67,15 @@
       conflictMailbox: 'Widersprüchliche Newsletter-Tags am Postfach. Die Funktion bleibt aus, bis der Konflikt behoben ist.',
       conflictDomain: 'Widersprüchliche Newsletter-Tags an der Domain. Die Funktion bleibt aus, bis der Konflikt behoben ist.',
       unavailable: 'Die Newsletter-Einstellung konnte nicht geladen werden.',
+      historyTitle: 'Vorhandene Newsletter-Historie einbeziehen?',
+      historyBody: 'Möchtest du die noch verfügbare Mailcow/Rspamd-Historie auswerten und vorhandene Newsletter rückwirkend übernehmen? Wie weit die Auswertung zurückreicht, hängt von der noch verfügbaren Rspamd-Historie und den noch vorhandenen Originalmails in Dovecot ab.',
+      historyInclude: 'Historie einbeziehen',
+      historyNow: 'Nur ab jetzt erkennen',
+      cancel: 'Abbrechen',
+      close: 'Schließen',
+      processingTitle: 'Newsletter-Verwaltung wird aktiviert',
+      processingHistory: 'Die verfügbare Historie wird für den Import freigegeben. Die Einträge werden anschließend schrittweise verarbeitet.',
+      processingNow: 'Die Einstellung wird gespeichert. Frühere Nachrichten werden nicht rückwirkend importiert.',
     },
     en: {
       serverOff: 'Newsletter management is disabled server-side.',
@@ -76,6 +86,15 @@
       conflictMailbox: 'Conflicting newsletter tags on the mailbox. The feature stays off until the conflict is fixed.',
       conflictDomain: 'Conflicting newsletter tags on the domain. The feature stays off until the conflict is fixed.',
       unavailable: 'The newsletter setting could not be loaded.',
+      historyTitle: 'Include available newsletter history?',
+      historyBody: 'Would you like Moolias to evaluate the Mailcow/Rspamd history that is still available and import existing newsletters retrospectively? How far the import can go back depends on the Rspamd history and original messages still available in Dovecot.',
+      historyInclude: 'Include history',
+      historyNow: 'Detect from now on only',
+      cancel: 'Cancel',
+      close: 'Close',
+      processingTitle: 'Enabling newsletter management',
+      processingHistory: 'Available history is being enabled for import. Entries will then be processed incrementally.',
+      processingNow: 'The setting is being saved. Earlier messages will not be imported retrospectively.',
     },
   }[language];
 
@@ -83,6 +102,83 @@
     if (select) select.disabled = disabled;
     if (save) save.disabled = disabled;
     setting?.classList.toggle('is-disabled', disabled);
+  };
+
+  const historyChoiceDialog = () => new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'moolias-dialog moolias-dialog-default newsletter-history-choice-dialog';
+
+    const head = document.createElement('div');
+    head.className = 'dialog-head';
+    const title = document.createElement('h2');
+    title.textContent = labels.historyTitle;
+    const close = document.createElement('button');
+    close.className = 'dialog-close';
+    close.type = 'button';
+    close.textContent = '×';
+    close.setAttribute('aria-label', labels.close);
+    close.title = labels.close;
+    head.append(title, close);
+
+    const body = document.createElement('p');
+    body.className = 'moolias-dialog-message';
+    body.textContent = labels.historyBody;
+
+    const actions = document.createElement('div');
+    actions.className = 'button-row moolias-dialog-actions newsletter-history-choice-actions';
+    const include = document.createElement('button');
+    include.className = 'button primary';
+    include.type = 'button';
+    include.textContent = labels.historyInclude;
+    const fromNow = document.createElement('button');
+    fromNow.className = 'button';
+    fromNow.type = 'button';
+    fromNow.textContent = labels.historyNow;
+    const cancel = document.createElement('button');
+    cancel.className = 'button ghost';
+    cancel.type = 'button';
+    cancel.textContent = labels.cancel;
+    actions.append(include, fromNow, cancel);
+    dialog.append(head, body, actions);
+    document.body.append(dialog);
+
+    let settled = false;
+    const finish = (choice) => {
+      if (settled) return;
+      settled = true;
+      dialog.close();
+      resolve(choice);
+    };
+    include.addEventListener('click', () => finish('backfill'));
+    fromNow.addEventListener('click', () => finish('now'));
+    cancel.addEventListener('click', () => finish(null));
+    close.addEventListener('click', () => finish(null));
+    dialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      finish(null);
+    });
+    dialog.addEventListener('close', () => dialog.remove(), { once: true });
+    dialog.showModal();
+    include.focus();
+  });
+
+  const showProcessingDialog = (choice) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'moolias-dialog moolias-dialog-default newsletter-processing-dialog';
+    dialog.setAttribute('aria-busy', 'true');
+    const title = document.createElement('h2');
+    title.textContent = labels.processingTitle;
+    const body = document.createElement('p');
+    body.className = 'moolias-dialog-message';
+    body.setAttribute('role', 'status');
+    body.textContent = choice === 'backfill'
+      ? labels.processingHistory
+      : labels.processingNow;
+    const progress = document.createElement('progress');
+    progress.setAttribute('aria-label', body.textContent);
+    dialog.append(title, body, progress);
+    document.body.append(dialog);
+    dialog.showModal();
   };
 
   fetch('/account/newsletter-management', {
@@ -94,6 +190,7 @@
       return response.json();
     })
     .then((data) => {
+      policyData = data;
       const serverEnabled = data.server_enabled === true;
       const effectiveEnabled = data.effective_enabled === true;
       const selection = data.selection || 'inherit';
@@ -136,4 +233,32 @@
       if (nav) nav.hidden = true;
       if (state) state.textContent = labels.unavailable;
     });
+
+  form?.addEventListener('submit', async (event) => {
+    if (form.querySelector('input[name="backfill_history"]')) return;
+    if (!policyData || !select) return;
+
+    const current = policyData.conflict === true ? 'off' : (policyData.effective || 'off');
+    const selection = select.value || 'inherit';
+    const target = selection === 'inherit'
+      ? (policyData.domain_default || 'off')
+      : selection;
+    if (current === 'on' || target !== 'on') return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const submitter = event.submitter;
+    const choice = await historyChoiceDialog();
+    if (!choice) return;
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'backfill_history';
+    input.value = choice === 'backfill' ? '1' : '0';
+    form.append(input);
+    showProcessingDialog(choice);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => form.requestSubmit(submitter || undefined));
+    });
+  });
 })();
