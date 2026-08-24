@@ -8,6 +8,7 @@ from moolias.newsletters import (
     _dkim_covers_one_click,
     _history_candidate,
     _public_https_target,
+    _symbols,
     _unsubscribe_targets,
 )
 
@@ -39,7 +40,27 @@ def test_dkim_signature_must_cover_both_one_click_headers():
     ) is False
 
 
-def test_history_candidate_requires_clean_authenticated_list_unsubscribe():
+def test_rspamd_string_symbols_are_normalised_to_symbol_names():
+    item = {
+        "symbols": (
+            "R_DKIM_ALLOW(-0.20)[example.org:s=mail], "
+            "MAILLIST(-0.18)[generic], HAS_LIST_UNSUB(-0.01)[]"
+        )
+    }
+    assert _symbols(item) == {"R_DKIM_ALLOW", "MAILLIST", "HAS_LIST_UNSUB"}
+
+
+def test_history_candidate_accepts_authenticated_maillist_symbol():
+    item = {
+        "action": "no action",
+        "message-id": "abc@example.org",
+        "unix_time": 1_780_000_000,
+        "symbols": "R_DKIM_ALLOW(-0.20)[example.org:s=mail], MAILLIST(-0.18)[generic]",
+    }
+    assert _history_candidate(item) is True
+
+
+def test_history_candidate_requires_clean_authenticated_newsletter_signal():
     item = {
         "action": "no action",
         "message-id": "abc@example.org",
