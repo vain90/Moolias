@@ -1,6 +1,9 @@
+from types import SimpleNamespace
+
 from moolias.newsletter_mode import (
     NewsletterMode,
     NewsletterModeSource,
+    mailbox_newsletter_state,
     replace_mailbox_newsletter_tags,
     resolve_newsletter_mode,
 )
@@ -81,3 +84,48 @@ def test_replace_mailbox_newsletter_tags_preserves_unrelated_tags():
         BASE,
         "inherit",
     ) == ["keep-me"]
+
+
+class FakeMailcow:
+    def __init__(self, mailbox_tags, domain_tags):
+        self.mailbox_tags = mailbox_tags
+        self.domain_tags = domain_tags
+        self.mailbox_calls = 0
+        self.domain_calls = 0
+
+    async def get_mailbox(self, email):
+        self.mailbox_calls += 1
+        return {
+            "username": email,
+            "domain": email.rsplit("@", 1)[-1],
+            "tags": self.mailbox_tags,
+        }
+
+    async def get_domain(self, domain):
+        self.domain_calls += 1
+        return {"domain": domain, "tags": self.domain_tags}
+
+
+async def test_mailbox_newsletter_state_reads_mailbox_and_domain_tags():
+    settings = SimpleNamespace(newsletter_management=True, newsletter_tag=BASE)
+    mailcow = FakeMailcow([f"{BASE}-off"], [BASE])
+
+    state = await mailbox_newsletter_state(settings, mailcow, "user@example.org")
+
+    assert state.effective is NewsletterMode.OFF
+    assert state.source is NewsletterModeSource.MAILBOX
+    assert state.domain_default is NewsletterMode.ON
+    assert mailcow.mailbox_calls == 1
+    assert mailcow.domain_calls == 1
+
+
+async def test_mailbox_newsletter_state_global_off_does_not_query_mailcow():
+    settings = SimpleNamespace(newsletter_management=False, newsletter_tag=BASE)
+    mailcow = FakeMailcow([BASE], [BASE])
+
+    state = await mailbox_newsletter_state(settings, mailcow, "user@example.org")
+
+    assert state.effective is NewsletterMode.OFF
+    assert state.source is NewsletterModeSource.NONE
+    assert mailcow.mailbox_calls == 0
+    assert mailcow.domain_calls == 0
