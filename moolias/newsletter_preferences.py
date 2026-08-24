@@ -29,6 +29,20 @@ def _store(request: Request) -> MailboxSettingsStore:
     return MailboxSettingsStore(request.app.state.settings.usage_db_path)
 
 
+def _untrack(request: Request, mailbox: str) -> None:
+    collector = getattr(request.app.state, "newsletter_collector", None)
+    if collector is None:
+        return
+    # The core collector keeps only an in-memory set of mailboxes. Removing an
+    # opted-out mailbox here stops future scheduled scans without deleting data.
+    collector._tracked_mailboxes.discard(mailbox.casefold())
+
+
+async def _track(request: Request, mailbox: str) -> None:
+    _, collector = await newsletter_core._runtime(request)
+    collector.track(mailbox)
+
+
 async def _preference(request: Request, mailbox: str) -> bool | None:
     try:
         return await _store(request).newsletter_enabled(mailbox)
@@ -57,10 +71,15 @@ async def get_newsletter_management_setting(request: Request):
     user = require_user(request)
     server_enabled = request.app.state.settings.newsletter_management
     preference = await _preference(request, user)
+    effective_enabled = server_enabled and preference is True
+    if effective_enabled:
+        await _track(request, user)
+    else:
+        _untrack(request, user)
     return {
         "server_enabled": server_enabled,
         "preference": preference,
-        "effective_enabled": server_enabled and preference is True,
+        "effective_enabled": effective_enabled,
     }
 
 
@@ -85,6 +104,11 @@ async def update_newsletter_management_setting(
             status_code=503,
             detail="Mailbox settings database is unavailable",
         ) from exc
+
+    if enabled:
+        await _track(request, user)
+    else:
+        _untrack(request, user)
     return RedirectResponse(_safe_return_to(return_to), status_code=303)
 
 
@@ -96,6 +120,7 @@ async def newsletters_page(request: Request):
     if server_enabled and preference is True:
         return await newsletter_core.newsletters_page(request)
 
+    _untrack(request, user)
     state = await _load_ui_state(request)
     return newsletter_core.TEMPLATES.TemplateResponse(
         request,
