@@ -88,7 +88,7 @@ async def test_newsletter_without_recoverable_link_stays_visible(tmp_path):
     assert newsletter.direct_unsubscribe_available is False
 
 
-async def test_new_message_after_unsubscribe_reactivates_newsletter(tmp_path):
+async def test_new_message_after_unsubscribe_is_flagged_without_losing_history(tmp_path):
     store = NewsletterStore(tmp_path / "newsletters.sqlite3")
     await store.initialize()
     newsletter_id = await store.record(
@@ -96,13 +96,26 @@ async def test_new_message_after_unsubscribe_reactivates_newsletter(tmp_path):
     )
     await store.mark_unsubscribed(newsletter_id, "user@example.org", when=1_780_000_001)
 
+    newsletter = await store.get(newsletter_id, "user@example.org")
+    assert newsletter is not None
+    assert newsletter.is_unsubscribed is True
+    assert newsletter.resumed_after_unsubscribe is False
+
     await store.record(
         observation(3, url="https://example.net/unsubscribe/two")
     )
 
     newsletter = await store.get(newsletter_id, "user@example.org")
     assert newsletter is not None
-    assert newsletter.unsubscribed_at is None
+    assert newsletter.unsubscribed_at == 1_780_000_001
+    assert newsletter.is_unsubscribed is False
+    assert newsletter.resumed_after_unsubscribe is True
+
+    await store.mark_unsubscribed(newsletter_id, "user@example.org", when=1_780_000_004)
+    newsletter = await store.get(newsletter_id, "user@example.org")
+    assert newsletter is not None
+    assert newsletter.is_unsubscribed is True
+    assert newsletter.resumed_after_unsubscribe is False
 
 
 async def test_from_now_watermark_ignores_older_history_and_header_lookup(tmp_path):
