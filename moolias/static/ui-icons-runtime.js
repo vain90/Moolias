@@ -161,28 +161,33 @@
 
   const aliasDescriptionCopy = {
     de: {
-      name: "Name",
+      address: "Alias-Adresse",
+      name: "Alias Name",
       description: "Beschreibung",
-      descriptionPlaceholder: "Optionaler Kontext, z. B. Rechnungen, Marketplace oder AWS",
-      hint: "Optional. Die Beschreibung bleibt im privaten Mailcow-Kommentar und hilft Moolias vorsichtig bei der Absendererkennung.",
-      column: "Name / Alias-Adresse",
+      showDescription: "Beschreibung vollständig anzeigen",
+      column: "Alias Name / Alias-Adresse",
     },
     en: {
-      name: "Name",
+      address: "Alias address",
+      name: "Alias name",
       description: "Description",
-      descriptionPlaceholder: "Optional context, for example invoices, Marketplace or AWS",
-      hint: "Optional. The description stays in Mailcow's private comment and is used conservatively for sender recognition.",
-      column: "Name / alias address",
+      showDescription: "Show full description",
+      column: "Alias name / alias address",
     },
   };
 
-  const replaceLabelText = (label, text) => {
-    const textNode = [...label.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
-    if (textNode) {
-      textNode.textContent = text;
-    } else {
-      label.prepend(document.createTextNode(text));
+  const setLabelCaption = (label, text) => {
+    [...label.childNodes]
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .forEach((node) => node.remove());
+
+    let caption = label.querySelector(":scope > [data-field-caption]");
+    if (!caption) {
+      caption = document.createElement("span");
+      caption.dataset.fieldCaption = "1";
+      label.prepend(caption);
     }
+    caption.textContent = text;
   };
 
   const replaceLinkText = (link, text) => {
@@ -190,45 +195,86 @@
     if (textNode) textNode.textContent = text;
   };
 
+  const ensureAliasAddress = (form, address, copy) => {
+    if (!address || form.querySelector("[data-alias-edit-address]")) return;
+    const nameInput = form.querySelector('input[name="description"]');
+    const nameLabel = nameInput?.closest("label");
+    if (!nameLabel) return;
+
+    const block = document.createElement("div");
+    block.className = "alias-edit-address";
+    block.dataset.aliasEditAddress = "1";
+
+    const caption = document.createElement("span");
+    caption.textContent = copy.address;
+    const code = document.createElement("code");
+    code.textContent = address;
+    block.append(caption, code);
+    form.insertBefore(block, nameLabel);
+  };
+
   const ensurePrivateDescriptionField = (form, value, copy) => {
-    if (form.querySelector('[name="private_description"]')) return;
     const nameInput = form.querySelector('input[name="description"]');
     const nameLabel = nameInput?.closest("label");
     if (!nameInput || !nameLabel) return;
 
-    replaceLabelText(nameLabel, copy.name);
+    setLabelCaption(nameLabel, copy.name);
+
+    const existing = form.querySelector('[name="private_description"]');
+    if (existing) return;
 
     const label = document.createElement("label");
     label.dataset.aliasPrivateDescriptionField = "1";
-    label.append(document.createTextNode(copy.description));
+
+    const caption = document.createElement("span");
+    caption.dataset.fieldCaption = "1";
+    caption.textContent = copy.description;
+    label.append(caption);
 
     const textarea = document.createElement("textarea");
     textarea.name = "private_description";
     textarea.maxLength = 160;
-    textarea.rows = 3;
-    textarea.placeholder = copy.descriptionPlaceholder;
+    textarea.rows = 4;
     textarea.value = value || "";
+    textarea.setAttribute("aria-label", copy.description);
     label.append(textarea);
 
-    const hint = document.createElement("p");
-    hint.className = "hint";
-    hint.dataset.aliasPrivateDescriptionHint = "1";
-    hint.textContent = copy.hint;
-
-    nameLabel.after(label, hint);
+    nameLabel.after(label);
   };
 
-  const addDescriptionPreview = (container, value) => {
+  const addDescriptionPreview = (container, value, copy) => {
     if (!container || !value || container.querySelector("[data-alias-private-description-preview]")) return;
-    const preview = document.createElement("small");
-    preview.className = "muted";
-    preview.dataset.aliasPrivateDescriptionPreview = "1";
+
+    const details = document.createElement("details");
+    details.className = "alias-description-details";
+    details.dataset.aliasPrivateDescriptionPreview = "1";
+
+    const summary = document.createElement("summary");
+    summary.className = "alias-description-summary";
+    summary.title = copy.showDescription;
+    summary.setAttribute("aria-label", copy.showDescription);
+
+    const preview = document.createElement("span");
+    preview.className = "alias-description-preview";
     preview.textContent = value;
+
+    const info = document.createElement("span");
+    info.className = "alias-description-info";
+    info.setAttribute("aria-hidden", "true");
+    info.textContent = "i";
+
+    const full = document.createElement("div");
+    full.className = "alias-description-popover";
+    full.textContent = value;
+
+    summary.append(preview, info);
+    details.append(summary, full);
+
     const address = container.querySelector("code");
     if (address) {
-      container.insertBefore(preview, address);
+      container.insertBefore(details, address);
     } else {
-      container.append(preview);
+      container.append(details);
     }
   };
 
@@ -259,10 +305,13 @@
       const id = checkbox.value;
       const value = descriptions[id] || "";
       const row = checkbox.closest(".alias-row");
-      addDescriptionPreview(row?.querySelector(".alias-info"), value);
+      addDescriptionPreview(row?.querySelector(".alias-info"), value, copy);
 
       const form = row?.querySelector('form[action$="/metadata"]');
-      if (form) ensurePrivateDescriptionField(form, value, copy);
+      if (form) {
+        ensureAliasAddress(form, checkbox.dataset.address || "", copy);
+        ensurePrivateDescriptionField(form, value, copy);
+      }
     });
 
     document.querySelectorAll("[data-assign-dialog]").forEach((dialog) => {
@@ -275,6 +324,7 @@
       addDescriptionPreview(
         row.querySelector(".alias-info"),
         descriptions[row.dataset.aliasId] || "",
+        copy,
       );
     });
   };
@@ -313,11 +363,18 @@
     document.querySelectorAll("details[data-language-dropdown][open]").forEach((details) => {
       if (!details.contains(event.target)) details.removeAttribute("open");
     });
+    document.querySelectorAll("details.alias-description-details[open]").forEach((details) => {
+      if (!details.contains(event.target)) details.removeAttribute("open");
+    });
   });
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     document.querySelectorAll("details[data-language-dropdown][open]").forEach((details) => {
+      details.removeAttribute("open");
+      details.querySelector("summary")?.focus();
+    });
+    document.querySelectorAll("details.alias-description-details[open]").forEach((details) => {
       details.removeAttribute("open");
       details.querySelector("summary")?.focus();
     });
