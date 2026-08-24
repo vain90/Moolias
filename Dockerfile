@@ -4,7 +4,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
-RUN useradd --create-home --uid 10001 moolias \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends dovecot-core \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10001 moolias \
     && install -d -o moolias -g moolias /data
 
 COPY pyproject.toml README.md LICENSE ./

@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block title %}{% if language == 'de' %}Newsletter · Moolias{% else %}Newsletters · Moolias{% endif %}{% endblock %}
+
+{% block content %}
+<section class="newsletter-page" data-newsletter-page>
+  <div class="newsletter-page-head">
+    <div>
+      <p class="eyebrow">{% if language == 'de' %}Postfach{% else %}Mailbox{% endif %}</p>
+      <h1>{% if language == 'de' %}Newsletter{% else %}Newsletters{% endif %}</h1>
+      <p class="muted">
+        {% if language == 'de' %}
+          Erkannte Newsletter und Abonnements kompakt verwalten und direkt abbestellen.
+        {% else %}
+          Manage detected newsletters and subscriptions and unsubscribe directly.
+        {% endif %}
+      </p>
+    </div>
+    {% if newsletter_enabled %}
+    <form method="post" action="/newsletters/refresh" class="newsletter-refresh-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="button compact" type="submit">
+        {{ icon('refresh-cw') }}
+        <span>{% if language == 'de' %}Aktualisieren{% else %}Refresh{% endif %}</span>
+      </button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if request.query_params.get('unsubscribed') %}
+  <div class="notice success newsletter-notice" role="status">
+    {% if language == 'de' %}Die direkte Abmeldung wurde erfolgreich übermittelt.{% else %}The one-click unsubscribe request was sent successfully.{% endif %}
+  </div>
+  {% elif request.query_params.get('unsubscribe_error') %}
+  <div class="notice error newsletter-notice" role="alert">
+    {% if language == 'de' %}Die direkte Abmeldung konnte mit keinem der gespeicherten Links durchgeführt werden.{% else %}None of the stored links could complete the one-click unsubscribe request.{% endif %}
+  </div>
+  {% endif %}
+
+  {% if not newsletter_enabled %}
+  <div class="newsletter-empty panel">
+    <h2>{% if language == 'de' %}Newsletter-Verwaltung ist deaktiviert{% else %}Newsletter management is disabled{% endif %}</h2>
+    <p class="muted">
+      {% if language == 'de' %}
+        Ein Administrator muss die Newsletter-Verwaltung und den Mailcow Newsletter Agent aktivieren.
+      {% else %}
+        An administrator must enable newsletter management and the Mailcow newsletter agent.
+      {% endif %}
+    </p>
+  </div>
+  {% else %}
+    {% if newsletter_collector_error %}
+    <div class="notice warning newsletter-notice" role="status">
+      {% if language == 'de' %}
+        Neue Abmeldelinks konnten zuletzt nicht vollständig geprüft werden. Bereits gespeicherte Daten bleiben verfügbar.
+      {% else %}
+        New unsubscribe links could not be checked completely. Previously stored data remains available.
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if newsletters %}
+    <div class="newsletter-table-wrap">
+      <table class="newsletter-table">
+        <thead>
+          <tr>
+            <th>{% if language == 'de' %}Newsletter{% else %}Newsletter{% endif %}</th>
+            <th>{% if language == 'de' %}Empfangen über{% else %}Received via{% endif %}</th>
+            <th class="numeric">{% if language == 'de' %}Mails{% else %}Messages{% endif %}</th>
+            <th>{% if language == 'de' %}Zuletzt{% else %}Last seen{% endif %}</th>
+            <th>{% if language == 'de' %}Status{% else %}Status{% endif %}</th>
+            <th class="newsletter-action-head"><span class="sr-only">{% if language == 'de' %}Aktionen{% else %}Actions{% endif %}</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for newsletter in newsletters %}
+          {% set latest = newsletter.latest_link %}
+          <tr class="newsletter-row {% if not latest %}newsletter-row-muted{% endif %}">
+            <td>
+              <div class="newsletter-name-cell">
+                <strong>{{ newsletter.sender_name or newsletter.sender_address }}</strong>
+                {% if newsletter.sender_name %}<small>{{ newsletter.sender_address }}</small>{% endif %}
+              </div>
+            </td>
+            <td><span class="newsletter-alias">{{ newsletter.recipient_alias }}</span></td>
+            <td class="numeric">{{ newsletter.message_count }}</td>
+            <td><time data-newsletter-time="{{ newsletter.last_seen_at }}">{{ newsletter.last_seen_at }}</time></td>
+            <td>
+              {% if newsletter.unsubscribed_at %}
+                <span class="newsletter-status success">{% if language == 'de' %}Abmeldung gesendet{% else %}Unsubscribe sent{% endif %}</span>
+              {% elif newsletter.one_click_available %}
+                <span class="newsletter-status success">One-Click</span>
+              {% elif latest %}
+                <span class="newsletter-status">{% if language == 'de' %}Abmeldeseite{% else %}Unsubscribe page{% endif %}</span>
+              {% else %}
+                <span class="newsletter-status muted">{% if language == 'de' %}Kein Link{% else %}No link{% endif %}</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="newsletter-actions">
+                {% if newsletter.one_click_available %}
+                <form method="post" action="/newsletters/{{ newsletter.id }}/unsubscribe" data-newsletter-unsubscribe-form>
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="button compact newsletter-unsubscribe" type="submit">
+                    {% if language == 'de' %}Abmelden{% else %}Unsubscribe{% endif %}
+                  </button>
+                </form>
+                {% elif latest %}
+                <a class="button compact newsletter-unsubscribe" href="{{ latest.url }}" target="_blank" rel="noopener noreferrer">
+                  {% if language == 'de' %}Abmelden{% else %}Unsubscribe{% endif %}
+                </a>
+                {% else %}
+                <button class="button compact newsletter-unsubscribe" type="button" disabled title="{% if language == 'de' %}Kein direkter Abmeldelink verfügbar{% else %}No direct unsubscribe link available{% endif %}">
+                  {% if language == 'de' %}Abmelden{% else %}Unsubscribe{% endif %}
+                </button>
+                {% endif %}
+                <button
+                  class="newsletter-details-toggle"
+                  type="button"
+                  data-newsletter-details-toggle="newsletter-details-{{ newsletter.id }}"
+                  aria-expanded="false"
+                  aria-controls="newsletter-details-{{ newsletter.id }}"
+                  title="{% if language == 'de' %}Details anzeigen{% else %}Show details{% endif %}"
+                >{{ icon('chevron-down') }}</button>
+              </div>
+            </td>
+          </tr>
+          <tr class="newsletter-details-row" id="newsletter-details-{{ newsletter.id }}" hidden>
+            <td colspan="6">
+              <div class="newsletter-details-grid">
+                <div>
+                  <span>{% if language == 'de' %}Absender{% else %}Sender{% endif %}</span>
+                  <strong>{{ newsletter.sender_address }}</strong>
+                </div>
+                <div>
+                  <span>{% if language == 'de' %}Erstmals erkannt{% else %}First seen{% endif %}</span>
+                  <strong><time data-newsletter-time="{{ newsletter.first_seen_at }}">{{ newsletter.first_seen_at }}</time></strong>
+                </div>
+                <div>
+                  <span>{% if language == 'de' %}Gespeicherte Links{% else %}Stored links{% endif %}</span>
+                  <strong>{{ newsletter.links|length }} / 3</strong>
+                </div>
+                <div>
+                  <span>List-ID</span>
+                  <strong>{{ newsletter.list_id or '–' }}</strong>
+                </div>
+                <div>
+                  <span>{% if language == 'de' %}Letzte Message-ID{% else %}Latest message ID{% endif %}</span>
+                  <strong class="newsletter-message-id">{{ newsletter.latest_message_id or '–' }}</strong>
+                </div>
+                <div>
+                  <span>{% if language == 'de' %}Abmeldemethode{% else %}Unsubscribe method{% endif %}</span>
+                  <strong>
+                    {% if newsletter.one_click_available %}RFC 8058 One-Click{% elif latest %}HTTPS{% else %}–{% endif %}
+                  </strong>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="newsletter-empty panel">
+      <h2>{% if language == 'de' %}Noch keine Newsletter erkannt{% else %}No newsletters detected yet{% endif %}</h2>
+      <p class="muted">
+        {% if language == 'de' %}
+          Moolias übernimmt passende Einträge aus der verfügbaren Rspamd-Historie. Bei neuen Mails wird die Liste automatisch ergänzt.
+        {% else %}
+          Moolias imports matching entries from the available Rspamd history and adds new messages automatically.
+        {% endif %}
+      </p>
+    </div>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}

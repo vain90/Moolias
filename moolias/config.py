@@ -23,6 +23,35 @@ class Settings(BaseSettings):
         alias="MOOLIAS_SENDER_PROTECTION_COOLDOWN_SECONDS",
     )
 
+    newsletter_management: bool = Field(
+        default=False,
+        alias="MOOLIAS_NEWSLETTER_MANAGEMENT",
+    )
+    newsletter_db_path: str = Field(
+        default="/data/moolias-newsletters.sqlite3",
+        alias="MOOLIAS_NEWSLETTER_DB_PATH",
+    )
+    newsletter_agent_url: str = Field(
+        default="",
+        alias="MOOLIAS_NEWSLETTER_AGENT_URL",
+    )
+    newsletter_agent_secret: str = Field(
+        default="",
+        alias="MOOLIAS_NEWSLETTER_AGENT_SECRET",
+    )
+    newsletter_poll_seconds: int = Field(
+        default=60,
+        ge=15,
+        le=3600,
+        alias="MOOLIAS_NEWSLETTER_POLL_SECONDS",
+    )
+    newsletter_history_count: int = Field(
+        default=1000,
+        ge=100,
+        le=10000,
+        alias="MOOLIAS_NEWSLETTER_HISTORY_COUNT",
+    )
+
     usage_stats: bool = Field(default=False, alias="MOOLIAS_USAGE_STATS")
     usage_tag: str = Field(default="moolias-stats", alias="MOOLIAS_USAGE_TAG")
     usage_db_path: str = Field(
@@ -60,6 +89,7 @@ class Settings(BaseSettings):
         "mailcow_url",
         "mailcow_internal_url",
         "sender_agent_url",
+        "newsletter_agent_url",
     )
     @classmethod
     def strip_trailing_slash(cls, value: str) -> str:
@@ -70,6 +100,8 @@ class Settings(BaseSettings):
         "usage_tag",
         "usage_db_path",
         "sender_agent_secret",
+        "newsletter_db_path",
+        "newsletter_agent_secret",
     )
     @classmethod
     def strip_optional_value(cls, value: str) -> str:
@@ -81,6 +113,14 @@ class Settings(BaseSettings):
             raise ValueError("MOOLIAS_USAGE_TAG must be set when usage statistics are enabled")
         if self.usage_stats and not self.usage_db_path:
             raise ValueError("MOOLIAS_USAGE_DB_PATH must be set when usage statistics are enabled")
+        if self.newsletter_management and not self.newsletter_db_path:
+            raise ValueError(
+                "MOOLIAS_NEWSLETTER_DB_PATH must be set when newsletter management is enabled"
+            )
+        if self.newsletter_management and len(self.newsletter_agent_secret) < 32:
+            raise ValueError(
+                "MOOLIAS_NEWSLETTER_AGENT_SECRET must contain at least 32 characters when newsletter management is enabled"
+            )
         return self
 
     @property

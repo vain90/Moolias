@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="/static/review.css">
   <link rel="stylesheet" href="/static/dialogs.css">
   <link rel="stylesheet" href="/static/sender-protection.css">
+  <link rel="stylesheet" href="/static/newsletters.css">
   <link rel="stylesheet" href="/static/mobile.css">
   <link rel="stylesheet" href="/static/theme.css">
   <link rel="stylesheet" href="/static/shell.css">
@@ -36,6 +37,7 @@
   <script src="/static/review-behavior.js" defer></script>
   <script src="/static/stats-mode.js" defer></script>
   <script src="/static/sender-protection.js" defer></script>
+  <script src="/static/newsletters.js" defer></script>
   <script src="/static/ui-icons-runtime.js?v=20260823-1" defer></script>
   <script src="/static/shell.js" defer></script>
   <script src="/static/tour.js?v=20260824-1" defer></script>
@@ -75,6 +77,10 @@
         <a class="side-nav-link {% if active_nav == 'pool' %}current{% endif %}" href="/offline-pool" {% if active_nav == 'pool' %}aria-current="page"{% endif %}>
           <span class="nav-icon" aria-hidden="true">{{ icon('archive') }}</span>
           <span>{% if language == 'de' %}Offline-Pool{% else %}Offline pool{% endif %}</span>
+        </a>
+        <a class="side-nav-link {% if active_nav == 'newsletters' %}current{% endif %}" href="/newsletters" {% if active_nav == 'newsletters' %}aria-current="page"{% endif %}>
+          <span class="nav-icon" aria-hidden="true">{{ icon('inbox') }}</span>
+          <span>{% if language == 'de' %}Newsletter{% else %}Newsletters{% endif %}</span>
         </a>
         <a class="side-nav-link {% if active_nav == 'statistics' %}current{% endif %}" href="/statistics" {% if active_nav == 'statistics' %}aria-current="page"{% endif %}>
           <span class="nav-icon" aria-hidden="true">{{ icon('chart-no-axes-combined') }}</span>
