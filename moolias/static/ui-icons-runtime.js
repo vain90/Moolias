@@ -190,12 +190,18 @@
       .filter((node) => node.nodeType === Node.TEXT_NODE)
       .forEach((node) => node.remove());
 
-    let caption = label.querySelector(":scope > [data-field-caption]");
+    const captions = [
+      ...label.querySelectorAll(
+        ":scope > [data-field-caption], :scope > span.alias-field-caption",
+      ),
+    ];
+    let caption = captions.shift();
+    captions.forEach((extra) => extra.remove());
     if (!caption) {
       caption = document.createElement("span");
-      caption.dataset.fieldCaption = "1";
       label.prepend(caption);
     }
+    caption.dataset.fieldCaption = "1";
     caption.textContent = text;
   };
 
@@ -219,7 +225,9 @@
     const code = document.createElement("code");
     code.textContent = address;
     block.append(caption, code);
-    form.insertBefore(block, nameLabel);
+
+    const nameRow = nameLabel.closest(".alias-edit-purpose-row");
+    (nameRow || nameLabel).insertAdjacentElement("beforebegin", block);
   };
 
   const ensurePrivateDescriptionField = (form, value, copy) => {
@@ -248,7 +256,8 @@
     textarea.setAttribute("aria-label", copy.description);
     label.append(textarea);
 
-    nameLabel.after(label);
+    const nameRow = nameLabel.closest(".alias-edit-purpose-row");
+    (nameRow || nameLabel).insertAdjacentElement("afterend", label);
   };
 
   const addDescriptionPreview = (container, value, copy) => {
@@ -328,6 +337,12 @@
     document.querySelectorAll("[data-assign-dialog]").forEach((dialog) => {
       const id = dialog.dataset.assignDialog;
       const form = dialog.querySelector("form");
+      if (form) ensurePrivateDescriptionField(form, descriptions[id] || "", copy);
+    });
+
+    document.querySelectorAll(".pool-assign-action[data-pool-inline-assign]").forEach((details) => {
+      const id = details.dataset.poolInlineAssign;
+      const form = details.querySelector("form");
       if (form) ensurePrivateDescriptionField(form, descriptions[id] || "", copy);
     });
 
