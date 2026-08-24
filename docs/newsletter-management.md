@@ -5,30 +5,60 @@ Moolias can detect newsletter and mailing-list messages from Mailcow's Rspamd hi
 The feature is disabled by default and has two independent enablement levels:
 
 1. An administrator makes newsletter management available server-wide with `MOOLIAS_NEWSLETTER_MANAGEMENT=true` and installs the restricted Newsletter Agent.
-2. Each authenticated mailbox decides for itself whether newsletter management should be enabled for that mailbox.
+2. Mailcow tags on the domain and/or mailbox decide whether newsletter management is enabled for a particular mailbox.
 
-The effective state is therefore **server enabled AND mailbox enabled**.
+The effective state is therefore **server enabled AND effective Mailcow newsletter policy enabled**.
 
-## Mailbox opt-in
+## Domain and mailbox policy
 
-When newsletter management becomes available on the server and a mailbox has not made a choice yet, Moolias asks that mailbox once whether it wants to enable the feature. The answer is stored per authenticated mailbox address and can later be changed in Settings.
+Newsletter enablement intentionally follows the same inheritance model as Moolias usage statistics.
 
-If the administrator sets `MOOLIAS_NEWSLETTER_MANAGEMENT=false`:
+With the default base tag `moolias-newsletter`:
 
-- newsletter discovery and unsubscribe actions are disabled for every mailbox
-- the mailbox switch is shown disabled/greyed with a server-side-disabled explanation
-- previously stored mailbox choices are retained
-- re-enabling the server feature restores each mailbox's previous choice
+- `moolias-newsletter` = enabled
+- `moolias-newsletter-off` = disabled
 
-If a mailbox disables newsletter management for itself, Moolias stops scheduling newsletter scans for that mailbox. Existing newsletter records are retained and become visible again if the mailbox later re-enables the feature.
+A mailbox tag overrides the domain tag. If the mailbox has neither newsletter tag, it inherits the domain setting. If neither the mailbox nor the domain has a matching tag, the safe default is off.
 
-The per-mailbox choice is stored in the persistent local Moolias SQLite database configured by `MOOLIAS_USAGE_DB_PATH`. Despite the variable name, this database is also used for normal Moolias mailbox preferences and is therefore required even when usage statistics are disabled.
+Examples:
+
+| Domain tags | Mailbox tags | Effective state |
+| --- | --- | --- |
+| `moolias-newsletter` | none | enabled by domain |
+| `moolias-newsletter` | `moolias-newsletter-off` | disabled by mailbox override |
+| `moolias-newsletter-off` | `moolias-newsletter` | enabled by mailbox override |
+| none | none | disabled |
+
+Moolias users may change only this newsletter tag family for their own mailbox through Settings. Unrelated Mailcow tags are preserved. The choices are the same style as statistics: **Use domain setting**, **Off**, or **On**.
+
+Conflicting tags at the active policy level fail closed. For example, if a mailbox contains both `moolias-newsletter` and `moolias-newsletter-off`, Moolias reports a tag conflict and treats newsletter management as disabled until the conflict is corrected.
+
+If the administrator sets `MOOLIAS_NEWSLETTER_MANAGEMENT=false`, newsletter management is disabled regardless of tags. The mailbox control is shown disabled/greyed with a server-side-disabled explanation. Existing Mailcow newsletter tags and already stored newsletter data are not removed.
+
+There is no additional opt-in prompt at login.
+
+## Enabling and historical data
+
+When a settings change makes the **effective** newsletter state switch from off to on, Moolias asks whether the still-available historical data should also be evaluated.
+
+The user can choose:
+
+- **Include history**: Moolias may process matching entries that are still present in the configured Rspamd history window and recover their newsletter headers from original messages still available in Dovecot.
+- **Detect from now on only**: Moolias records a mailbox-specific scan watermark and ignores Rspamd entries older than the activation time.
+
+This question is tied to an actual effective off-to-on transition. It is not shown merely because the source of the setting changes. For example, switching from an explicit mailbox `On` override to an inherited domain `On` value remains effectively enabled and therefore does not ask again.
+
+If newsletter management is later disabled and then enabled again, the question is shown again for that new off-to-on transition. Choosing **Detect from now on only** replaces the previous watermark with the new activation time. Choosing **Include history** opens the watermark to all history that is still available at that point.
+
+If an administrator enables newsletter tags directly in Mailcow without an interactive Moolias settings change, Moolias defaults to **from now on** rather than silently importing historical messages.
+
+The history watermark is operational collector state stored in `MOOLIAS_NEWSLETTER_DB_PATH`; it is not the source of the user's enable/disable preference. Mailcow tags remain the only newsletter policy source.
 
 ## User experience
 
 The Newsletter page shows one compact row per detected sender and recipient alias. The row includes the sender, the alias that received the message, the observed message count, the most recent message and the available unsubscribe action.
 
-The Newsletter navigation entry is shown only when the feature is effectively enabled for the signed-in mailbox. When the server feature is available but the mailbox has disabled it, the mailbox can re-enable it from Settings.
+The Newsletter navigation entry is shown only when the feature is effectively enabled for the signed-in mailbox. When it is disabled by the mailbox/domain policy, the setting can be changed from Settings if the administrator has enabled the feature server-wide.
 
 The details control expands technical information only when it is needed.
 
@@ -41,8 +71,9 @@ Moolias deliberately does not scan complete message bodies.
 1. Moolias reads the configured Rspamd history window through the existing Mailcow API integration.
 2. A message is considered a candidate when Rspamd recorded the mailing-list signal `MAILLIST` or the header signal `HAS_LIST_UNSUB`, the message was accepted without a spam action, and Rspamd has an authentication signal such as DKIM or DMARC allow. Rspamd history may expose symbols either as structured data or as scored strings such as `MAILLIST(-0.18)[generic]`; Moolias normalises both forms.
 3. Moolias associates the Rspamd SMTP recipient with the authenticated user's mailbox or one of that user's Mailcow aliases.
-4. The restricted Newsletter Agent asks Dovecot for a fixed set of headers for the exact mailbox and Message-ID.
-5. Moolias extracts HTTPS and `mailto:` targets from `List-Unsubscribe` and checks `List-Unsubscribe-Post` for RFC 8058 one-click support.
+4. The mailbox history watermark is applied before historical observations or header lookups are stored.
+5. The restricted Newsletter Agent asks Dovecot for a fixed set of headers for the exact mailbox and Message-ID.
+6. Moolias extracts HTTPS and `mailto:` targets from `List-Unsubscribe` and checks `List-Unsubscribe-Post` for RFC 8058 one-click support.
 
 Rspamd provides the cheap index. Dovecot remains the source of the original message headers.
 
@@ -65,12 +96,13 @@ Moolias stores:
 - up to the three newest different HTTPS unsubscribe URLs
 - optional `mailto:` target associated with a stored HTTPS URL
 - whether a stored URL qualified for verified one-click handling
+- the operational history watermark used for historical import/from-now behavior
 
 Unsubscribe URLs are stored in plaintext. This is intentional: the same personalized URLs already arrive as plaintext mail headers and may still be present in the Mailcow message store. Moolias does not write complete unsubscribe URLs to normal application logs.
 
 When a fourth different URL is learned for the same newsletter, the oldest stored URL is removed.
 
-The newsletter database is separate from the local mailbox-preference/state database configured by `MOOLIAS_USAGE_DB_PATH`. Both files must live on persistent storage under normal Docker deployments.
+The newsletter policy itself is not stored in SQLite. Domain and mailbox Mailcow tags are the source of truth for enablement.
 
 ## One-click unsubscribe
 
@@ -128,22 +160,22 @@ The web application authenticates requests to the agent with a separate HMAC sec
 ## Configuration
 
 ```dotenv
-# Global administrator switch. Mailboxes can opt in only while this is true.
+# Global administrator switch.
 MOOLIAS_NEWSLETTER_MANAGEMENT=true
 
-# Newsletter observations and unsubscribe metadata.
+# Domain/mailbox policy tag family.
+MOOLIAS_NEWSLETTER_TAG=moolias-newsletter
+
+# Newsletter observations, unsubscribe metadata and history watermark.
 MOOLIAS_NEWSLETTER_DB_PATH=/data/moolias-newsletters.sqlite3
 
 MOOLIAS_NEWSLETTER_AGENT_SECRET=<generated-secret>
 MOOLIAS_NEWSLETTER_AGENT_URL=
 MOOLIAS_NEWSLETTER_POLL_SECONDS=60
 MOOLIAS_NEWSLETTER_HISTORY_COUNT=1000
-
-# Persistent Moolias mailbox/UI state. Required even with statistics disabled.
-MOOLIAS_USAGE_DB_PATH=/data/moolias-stats.sqlite3
 ```
 
-The recommended installer creates the agent secret, configures Dovecot remote `doveadm` authentication when necessary, adds the sidecar to Mailcow's Compose override and enables the server-side feature in the Moolias `.env`. Individual mailboxes are still asked for their own choice in Moolias.
+The recommended installer creates the agent secret, configures Dovecot remote `doveadm` authentication when necessary, adds the sidecar to Mailcow's Compose override and enables the server-side feature in the Moolias `.env`. The domain/mailbox Mailcow tags then determine which mailboxes actually use newsletter management.
 
 Run it on the Mailcow host with:
 
