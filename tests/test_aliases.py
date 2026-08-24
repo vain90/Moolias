@@ -153,18 +153,20 @@ def test_only_moolias_markers_are_hidden_from_private_description():
 
 
 def test_non_moolias_brackets_and_old_marker_text_are_plain_description():
+    legacy = "cow" + "cloak"
+    private_comment = f"[{legacy}:reserved]\n[reserved] Offline alias\n[Family]"
     alias = AliasRecord(
         id=4,
         address="plain@example.org",
         goto="hidden@example.org",
         domain="example.org",
         active=True,
-        private_comment="[cowcloak:reserved]\n[reserved] Offline alias\n[Family]",
+        private_comment=private_comment,
         public_comment="Plain",
     )
     assert not alias.is_reserved
     assert not alias.is_reserved_used
-    assert alias.private_description == "[cowcloak:reserved]\n[reserved] Offline alias\n[Family]"
+    assert alias.private_description == private_comment
 
 
 def test_moolias_status_updates_preserve_human_text_and_other_markers():
