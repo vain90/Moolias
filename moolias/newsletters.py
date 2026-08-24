@@ -21,6 +21,7 @@ from fastapi.templating import Jinja2Templates
 
 from moolias import __version__
 from moolias.aliases import is_owned_alias
+from moolias.newsletter_mode import mailbox_newsletter_state
 from moolias.newsletter_store import NewsletterObservation, NewsletterStore
 from moolias.security import require_user, validate_csrf
 from moolias.sender_protocol import (
@@ -269,8 +270,16 @@ class NewsletterCollector:
 
     async def run_forever(self) -> None:
         while True:
-            for mailbox in sorted(self._tracked_mailboxes):
+            for mailbox in sorted(tuple(self._tracked_mailboxes)):
                 try:
+                    policy = await mailbox_newsletter_state(
+                        self.settings,
+                        self.mailcow,
+                        mailbox,
+                    )
+                    if policy.conflict or not policy.enabled:
+                        self._tracked_mailboxes.discard(mailbox)
+                        continue
                     await self.scan_mailbox(mailbox)
                 except Exception:
                     LOGGER.exception("Newsletter scan failed for %s", mailbox)
