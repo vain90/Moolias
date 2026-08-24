@@ -162,6 +162,22 @@ class NewsletterStore:
             )
         )
 
+    @staticmethod
+    def _history_allows(
+        connection: sqlite3.Connection,
+        mailbox: str,
+        event_at: int,
+    ) -> bool:
+        row = connection.execute(
+            """
+            SELECT history_since
+            FROM newsletter_mailbox_scan_policy
+            WHERE mailbox = ?
+            """,
+            (mailbox.strip().casefold(),),
+        ).fetchone()
+        return row is None or int(event_at) >= int(row["history_since"])
+
     async def history_since(self, mailbox: str) -> int | None:
         return await asyncio.to_thread(self._history_since, mailbox)
 
@@ -213,6 +229,9 @@ class NewsletterStore:
             raise ValueError("Newsletter observation is missing a message ID")
 
         with self._connect() as connection:
+            if not self._history_allows(connection, mailbox, event_at):
+                return 0
+
             row = connection.execute(
                 """
                 SELECT id, unsubscribed_at
@@ -347,6 +366,12 @@ class NewsletterStore:
 
     def _headers_checked(self, observation: NewsletterObservation) -> bool:
         with self._connect() as connection:
+            if not self._history_allows(
+                connection,
+                observation.mailbox,
+                int(observation.event_at),
+            ):
+                return True
             row = connection.execute(
                 """
                 SELECT headers_checked
