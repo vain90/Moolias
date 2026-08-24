@@ -86,6 +86,7 @@ async def _require_enabled(request: Request, mailbox: str) -> NewsletterModeStat
             status_code=409,
             detail="Newsletter management is disabled for this mailbox",
         )
+    await _track(request, mailbox)
     return state
 
 
