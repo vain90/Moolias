@@ -78,12 +78,15 @@ external_doveadm_password="$(
     | head -n1
 )"
 explicit_doveadm_password="${MOOLIAS_DOVEADM_PASSWORD:-}"
-if [[ -n "$explicit_doveadm_password" ]]; then
-  doveadm_password="$explicit_doveadm_password"
-elif [[ -n "$external_doveadm_password" ]]; then
+if [[ -n "$external_doveadm_password" ]]; then
   # An administrator-owned Dovecot setting is authoritative. Reuse it instead of
-  # silently replacing it with a stale password from an older agent environment.
+  # silently replacing it with a stale or explicitly different agent password.
+  if [[ -n "$explicit_doveadm_password" && "$explicit_doveadm_password" != "$external_doveadm_password" ]]; then
+    fail "MOOLIAS_DOVEADM_PASSWORD conflicts with the existing administrator-owned doveadm_password."
+  fi
   doveadm_password="$external_doveadm_password"
+elif [[ -n "$explicit_doveadm_password" ]]; then
+  doveadm_password="$explicit_doveadm_password"
 elif [[ -n "$existing_doveadm_password" ]]; then
   doveadm_password="$existing_doveadm_password"
 else
