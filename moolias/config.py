@@ -119,7 +119,8 @@ class Settings(BaseSettings):
             )
         if self.newsletter_management and len(self.newsletter_agent_secret) < 32:
             raise ValueError(
-                "MOOLIAS_NEWSLETTER_AGENT_SECRET must contain at least 32 characters when newsletter management is enabled"
+                "MOOLIAS_NEWSLETTER_AGENT_SECRET must contain at least 32 characters "
+                "when newsletter management is enabled"
             )
         return self
 
