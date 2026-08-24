@@ -2,7 +2,7 @@
 
 Moolias usage statistics are optional and globally disabled by default. Enabling the server-side feature and choosing a statistics mode for a mailbox are two separate steps.
 
-The persistent SQLite database configured by `MOOLIAS_USAGE_DB_PATH` is **not optional**, even when usage statistics are disabled. Moolias also uses this local database for mailbox-specific application preferences such as the Newsletter Management opt-in and other UI state. With statistics disabled, the statistics collector does not run and no new usage statistics are collected, but the database and its persistent `/data` storage are still required.
+The persistent SQLite database configured by `MOOLIAS_USAGE_DB_PATH` is **not optional**, even when usage statistics are disabled. Moolias also uses this local database for normal persistent application/UI state. With statistics disabled, the statistics collector does not run and no new usage statistics are collected, but the database and its persistent `/data` storage are still required. Newsletter enablement is not stored here; Newsletter Management uses Mailcow domain/mailbox tags for its policy and `MOOLIAS_NEWSLETTER_DB_PATH` for detected newsletter metadata and collector state.
 
 ## 1. Enable statistics on the Moolias server
 
@@ -51,6 +51,6 @@ A mailbox with no enabled mode does not collect usage statistics even when `MOOL
 
 Increasing the detail level can evaluate still-available Mailcow/Rspamd history. Reducing the detail level removes or collapses stored details that the new privacy mode no longer permits.
 
-Statistics, sender-review state and normal persistent mailbox preferences share the SQLite file configured by `MOOLIAS_USAGE_DB_PATH`. Alias configuration itself remains in Mailcow. Disabling `MOOLIAS_USAGE_STATS` stops statistics collection but does not make this database disposable.
+Statistics, sender-review state and normal persistent application/UI state share the SQLite file configured by `MOOLIAS_USAGE_DB_PATH`. Alias configuration itself remains in Mailcow. Disabling `MOOLIAS_USAGE_STATS` stops statistics collection but does not make this database disposable.
 
 For collector diagnostics and Rspamd-history coverage, see [Statistics collector health](statistics-collector-health.md).
