@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Locator, Page, expect
 
 
 def _login_de(page: Page, base_url: str) -> None:
@@ -13,7 +13,7 @@ def _login_de(page: Page, base_url: str) -> None:
     expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/overview(?:[?#].*)?$"))
 
 
-def _amazon_row(page: Page):
+def _amazon_row(page: Page) -> Locator:
     return page.locator(
         '.alias-row:has([data-alias-select][data-address="amazon-k7@example.org"])'
     )
@@ -22,6 +22,10 @@ def _amazon_row(page: Page):
 def test_alias_description_edit_and_table_preview(page: Page, base_url: str) -> None:
     _login_de(page, base_url)
     page.goto(f"{base_url}/aliases")
+
+    expect(page.locator(".alias-table-head")).to_contain_text(
+        "Alias Name / Alias-Adresse"
+    )
 
     row = _amazon_row(page)
     row.locator(".alias-edit-action > summary").click()
@@ -37,6 +41,13 @@ def test_alias_description_edit_and_table_preview(page: Page, base_url: str) -> 
     expect(description).to_be_visible()
     expect(description.locator("xpath=..")) .to_contain_text("Beschreibung")
     expect(panel).not_to_contain_text("privaten Mailcow-Kommentar")
+
+    textarea_box = description.bounding_box()
+    form_box = panel.locator('form[action$="/metadata"]').bounding_box()
+    assert textarea_box is not None
+    assert form_box is not None
+    assert textarea_box["width"] >= form_box["width"] - 2
+    assert textarea_box["height"] >= 90
 
     full_text = (
         "Bestellungen, Rechnungen, Marketplace und Audible für den privaten Einkauf"
@@ -82,6 +93,7 @@ def test_offline_pool_assignment_accepts_description(page: Page, base_url: str) 
     name.fill("Hotel")
     description.fill("Geschäftsreise und Hotelrechnungen")
     dialog.get_by_role("button", name="Zuordnen").click()
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/offline-pool(?:[?#].*)?$"))
 
     page.goto(f"{base_url}/aliases?q=feder-hafen-27")
     row = page.locator(
