@@ -27,6 +27,10 @@ class Settings(BaseSettings):
         default=False,
         alias="MOOLIAS_NEWSLETTER_MANAGEMENT",
     )
+    newsletter_tag: str = Field(
+        default="moolias-newsletter",
+        alias="MOOLIAS_NEWSLETTER_TAG",
+    )
     newsletter_db_path: str = Field(
         default="/data/moolias-newsletters.sqlite3",
         alias="MOOLIAS_NEWSLETTER_DB_PATH",
@@ -100,6 +104,7 @@ class Settings(BaseSettings):
         "usage_tag",
         "usage_db_path",
         "sender_agent_secret",
+        "newsletter_tag",
         "newsletter_db_path",
         "newsletter_agent_secret",
     )
@@ -116,6 +121,10 @@ class Settings(BaseSettings):
             )
         if self.usage_stats and not self.usage_tag:
             raise ValueError("MOOLIAS_USAGE_TAG must be set when usage statistics are enabled")
+        if self.newsletter_management and not self.newsletter_tag:
+            raise ValueError(
+                "MOOLIAS_NEWSLETTER_TAG must be set when newsletter management is enabled"
+            )
         if self.newsletter_management and not self.newsletter_db_path:
             raise ValueError(
                 "MOOLIAS_NEWSLETTER_DB_PATH must be set when newsletter management is enabled"
