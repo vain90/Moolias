@@ -406,6 +406,7 @@ class NewsletterCollector:
                 unsubscribe_url=unsubscribe_url,
                 unsubscribe_mailto=mailto,
                 one_click=one_click,
+                headers_resolved=True,
             )
         )
         await self.store.mark_headers_checked(base_observation)
