@@ -1,12 +1,60 @@
 (() => {
   const setting = document.querySelector('[data-newsletter-setting]');
   const nav = document.querySelector('[data-newsletter-nav]');
+  const oldDialog = document.querySelector('[data-newsletter-opt-in-dialog]');
+  oldDialog?.remove();
   if (!setting && !nav) return;
 
-  const select = setting?.querySelector('[data-newsletter-mode-select]');
+  const language = document.documentElement.lang === 'de' ? 'de' : 'en';
+  const form = setting?.querySelector('form[action="/account/newsletter-management"]');
+  const oldToggle = setting?.querySelector('[data-newsletter-toggle]');
+  const oldSwitch = oldToggle?.closest('.switch-control');
+  let select = setting?.querySelector('[data-newsletter-mode-select]');
+
+  if (!select && form) {
+    select = document.createElement('select');
+    select.name = 'mode';
+    select.dataset.newsletterModeSelect = '';
+    select.setAttribute(
+      'aria-label',
+      language === 'de' ? 'Newsletter-Einstellung' : 'Newsletter setting',
+    );
+    const choices = language === 'de'
+      ? [
+          ['inherit', 'Domain-Einstellung verwenden'],
+          ['off', 'Aus'],
+          ['on', 'An'],
+        ]
+      : [
+          ['inherit', 'Use domain setting'],
+          ['off', 'Off'],
+          ['on', 'On'],
+        ];
+    for (const [value, label] of choices) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      select.append(option);
+    }
+    if (oldSwitch) oldSwitch.replaceWith(select);
+    else form.prepend(select);
+  }
+
   const save = setting?.querySelector('[data-newsletter-save]');
   const state = setting?.querySelector('[data-newsletter-setting-state]');
-  const language = document.documentElement.lang === 'de' ? 'de' : 'en';
+  const description = setting?.querySelector('.setting-toggle-head .muted');
+  const hint = setting?.querySelector('.hint');
+
+  if (description) {
+    description.textContent = language === 'de'
+      ? 'Die Domain kann einen Standard vorgeben. Du kannst ihn für dein eigenes Postfach übernehmen oder mit An/Aus überschreiben.'
+      : 'The domain can define a default. You can inherit it for your mailbox or override it with On/Off.';
+  }
+  if (hint) {
+    hint.textContent = language === 'de'
+      ? 'Wie bei der Statistik werden Newsletter-Tags direkt an Domain und Postfach in Mailcow ausgewertet. Ist die Funktion serverseitig deaktiviert, kann diese Einstellung nicht geändert werden.'
+      : 'As with statistics, newsletter tags are evaluated directly on the Mailcow domain and mailbox. If the feature is disabled server-side, this setting cannot be changed.';
+  }
 
   const labels = {
     de: {
@@ -57,7 +105,9 @@
             conflictOption = document.createElement('option');
             conflictOption.value = 'conflict';
             conflictOption.disabled = true;
-            conflictOption.textContent = language === 'de' ? 'Tag-Konflikt beheben' : 'Fix tag conflict';
+            conflictOption.textContent = language === 'de'
+              ? 'Tag-Konflikt beheben'
+              : 'Fix tag conflict';
             select.prepend(conflictOption);
           }
           select.value = 'conflict';
