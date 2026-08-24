@@ -1,20 +1,65 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Form, HTTPException, Query, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 
+from moolias.aliases import (
+    RESERVED_MARKER,
+    USED_RESERVED_MARKER,
+    is_owned_alias,
+    is_primary_mailbox_alias,
+    mailbox_domain,
+    named_local_part,
+    readable_local_part,
+    update_private_comment,
+    validate_local_part,
+)
+from moolias.mailcow import MailcowError
+from moolias.security import require_user, validate_csrf
 from moolias.ui import (
     PAGE_SIZES,
     STATUS_FILTERS,
     TEMPLATES,
+    _language,
     _load_ui_state,
     _pagination_items,
+    _safe_return_to,
     _template_context,
 )
 
 router = APIRouter()
 SORT_MODES = {"attention", "last_used", "usage", "most_used", "status", "purpose"}
 SORT_DIRECTIONS = {"asc", "desc"}
+
+
+async def _create_unique_alias(
+    request: Request,
+    user: str,
+    factory,
+    *,
+    public_comment: str,
+    private_comment: str,
+    sogo_visible: bool,
+    attempts: int = 12,
+) -> str:
+    domain = mailbox_domain(user)
+    last_error: Exception | None = None
+    for _ in range(attempts):
+        address = f"{validate_local_part(factory())}@{domain}"
+        try:
+            await request.app.state.mailcow.create_alias(
+                address,
+                user,
+                public_comment,
+                private_comment=private_comment,
+                sogo_visible=sogo_visible,
+            )
+            return address
+        except MailcowError as exc:
+            last_error = exc
+    raise MailcowError(
+        f"Could not create a unique alias after {attempts} attempts: {last_error}"
+    )
 
 
 @router.get("/aliases", response_class=HTMLResponse)
@@ -69,7 +114,8 @@ async def aliases_page(
         filtered = [
             alias
             for alias in filtered
-            if needle in f"{alias.address} {alias.public_comment}".lower()
+            if needle
+            in f"{alias.address} {alias.name} {alias.private_description}".lower()
         ]
 
     def usage_total(alias) -> int:
@@ -81,7 +127,7 @@ async def aliases_page(
         return int(usage.get("last_used_at") or 0)
 
     def purpose(alias) -> tuple[str, str]:
-        return ((alias.description or "").casefold(), alias.address.lower())
+        return ((alias.name or "").casefold(), alias.address.lower())
 
     def status_rank(alias) -> tuple[int, str, str]:
         address = alias.address.lower()
@@ -158,3 +204,221 @@ async def aliases_page(
         "dashboard.html",
         _template_context(request, active_nav="aliases", **state),
     )
+
+
+@router.post("/aliases")
+async def create_alias(
+    request: Request,
+    mode: str = Form(...),
+    description: str = Form(...),
+    private_description: str = Form(""),
+    local_part: str = Form(""),
+    sogo_visible: bool = Form(False),
+    csrf_token: str = Form(...),
+):
+    validate_csrf(request, csrf_token)
+    user = require_user(request)
+    name = description.strip()
+    private_description = private_description.strip()
+    if not name or len(name) > 160:
+        raise HTTPException(status_code=400, detail="Name must be 1-160 characters")
+    if len(private_description) > 160:
+        raise HTTPException(status_code=400, detail="Description must be at most 160 characters")
+    private_comment = update_private_comment("", description=private_description)
+
+    try:
+        if mode == "readable":
+            await _create_unique_alias(
+                request,
+                user,
+                lambda: readable_local_part(_language(request)),
+                public_comment=name,
+                private_comment=private_comment,
+                sogo_visible=sogo_visible,
+            )
+        elif mode == "named":
+            await _create_unique_alias(
+                request,
+                user,
+                lambda: named_local_part(name),
+                public_comment=name,
+                private_comment=private_comment,
+                sogo_visible=sogo_visible,
+            )
+        elif mode == "custom":
+            address = f"{validate_local_part(local_part)}@{mailbox_domain(user)}"
+            await request.app.state.mailcow.create_alias(
+                address,
+                user,
+                name,
+                private_comment=private_comment,
+                sogo_visible=sogo_visible,
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Unknown alias mode")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except MailcowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return RedirectResponse("/aliases", status_code=303)
+
+
+@router.post("/aliases/{alias_id}/metadata")
+async def update_metadata(
+    request: Request,
+    alias_id: int,
+    description: str = Form(""),
+    private_description: str | None = Form(None),
+    sogo_visible: bool = Form(False),
+    csrf_token: str = Form(...),
+    return_to: str = Form("/aliases"),
+):
+    validate_csrf(request, csrf_token)
+    user = require_user(request)
+    alias = await request.app.state.mailcow.get_alias(alias_id)
+    if (
+        not is_owned_alias(alias, user)
+        or alias.is_reserved
+        or is_primary_mailbox_alias(alias, user)
+    ):
+        raise HTTPException(status_code=403, detail="Alias cannot be edited here")
+
+    name = description.strip()
+    description_text = (
+        alias.private_description
+        if private_description is None
+        else private_description.strip()
+    )
+    if not name or len(name) > 160:
+        raise HTTPException(status_code=400, detail="Name must be 1-160 characters")
+    if len(description_text) > 160:
+        raise HTTPException(status_code=400, detail="Description must be at most 160 characters")
+
+    private_comment = update_private_comment(
+        alias.private_comment,
+        description=description_text,
+    )
+    try:
+        await request.app.state.mailcow.update_alias_preferences(
+            alias_id,
+            name,
+            sogo_visible,
+            private_comment=private_comment,
+        )
+    except MailcowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return RedirectResponse(_safe_return_to(return_to), status_code=303)
+
+
+@router.post("/aliases/{alias_id}/description")
+async def assign_reserved_alias_compatibility(
+    request: Request,
+    alias_id: int,
+    description: str = Form(...),
+    private_description: str | None = Form(None),
+    sogo_visible: bool = Form(False),
+    csrf_token: str = Form(...),
+):
+    validate_csrf(request, csrf_token)
+    user = require_user(request)
+    alias = await request.app.state.mailcow.get_alias(alias_id)
+    if not is_owned_alias(alias, user) or not alias.is_reserved:
+        raise HTTPException(status_code=409, detail="Alias is not reserved")
+
+    name = description.strip()
+    description_text = (
+        alias.private_description
+        if private_description is None
+        else private_description.strip()
+    )
+    if not name or len(name) > 160:
+        raise HTTPException(status_code=400, detail="Name must be 1-160 characters")
+    if len(description_text) > 160:
+        raise HTTPException(status_code=400, detail="Description must be at most 160 characters")
+    private_comment = update_private_comment(
+        alias.private_comment,
+        description=description_text,
+        remove_markers={RESERVED_MARKER, USED_RESERVED_MARKER},
+    )
+    await request.app.state.mailcow.assign_reserved_alias(
+        alias_id,
+        name,
+        sogo_visible,
+        private_comment=private_comment,
+    )
+    return RedirectResponse("/aliases", status_code=303)
+
+
+@router.post("/aliases/{alias_id}/replace")
+async def replace_alias(
+    request: Request,
+    alias_id: int,
+    mode: str = Form("named"),
+    local_part: str = Form(""),
+    csrf_token: str = Form(...),
+):
+    validate_csrf(request, csrf_token)
+    user = require_user(request)
+    alias = await request.app.state.mailcow.get_alias(alias_id)
+    if (
+        not is_owned_alias(alias, user)
+        or alias.is_reserved
+        or is_primary_mailbox_alias(alias, user)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This alias cannot be replaced",
+        )
+    if mode not in {"named", "readable", "custom"}:
+        raise HTTPException(status_code=400, detail="Unknown replacement mode")
+
+    replacement_name = alias.name or "alias"
+    try:
+        if mode == "named":
+            new_address = await _create_unique_alias(
+                request,
+                user,
+                lambda: named_local_part(replacement_name),
+                public_comment=alias.public_comment,
+                private_comment=alias.private_comment,
+                sogo_visible=alias.sogo_visible,
+            )
+        elif mode == "readable":
+            new_address = await _create_unique_alias(
+                request,
+                user,
+                lambda: readable_local_part(_language(request)),
+                public_comment=alias.public_comment,
+                private_comment=alias.private_comment,
+                sogo_visible=alias.sogo_visible,
+            )
+        else:
+            new_address = f"{validate_local_part(local_part)}@{mailbox_domain(user)}"
+            await request.app.state.mailcow.create_alias(
+                new_address,
+                user,
+                alias.public_comment,
+                private_comment=alias.private_comment,
+                sogo_visible=alias.sogo_visible,
+            )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except MailcowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    try:
+        await request.app.state.mailcow.set_active(alias_id, False)
+    except MailcowError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "partial_replacement",
+                "message": (
+                    "The replacement alias was created, but the old alias "
+                    "could not be disabled"
+                ),
+                "address": new_address,
+            },
+        ) from exc
+
+    return {"address": new_address, "old_address": alias.address}

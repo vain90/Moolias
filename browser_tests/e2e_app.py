@@ -9,7 +9,13 @@ from pathlib import Path
 from fastapi import Response
 
 import moolias.main as main_module
-from moolias.aliases import RESERVED_COMMENT, USED_RESERVED_COMMENT, AliasRecord
+from moolias.aliases import (
+    RESERVED_COMMENT,
+    RESERVED_MARKER,
+    USED_RESERVED_MARKER,
+    AliasRecord,
+    update_private_comment,
+)
 from moolias.config import Settings
 from moolias.stats import SenderEvent, StatsStore, UsageEvent
 from moolias.usage_evidence import UsageEvidenceEvent, UsageEvidenceStore
@@ -78,7 +84,7 @@ class FakeMailcow:
                 goto=USER,
                 domain=DOMAIN,
                 active=True,
-                private_comment=USED_RESERVED_COMMENT,
+                private_comment="[moolias:reserved-used]",
                 public_comment="",
                 sogo_visible=False,
                 sender_allowed=True,
@@ -182,10 +188,16 @@ class FakeMailcow:
         alias_id: int,
         public_comment: str,
         sogo_visible: bool,
+        *,
+        private_comment: str | None = None,
     ) -> None:
+        alias = self.aliases[alias_id]
         self.aliases[alias_id] = replace(
-            self.aliases[alias_id],
+            alias,
             public_comment=public_comment,
+            private_comment=(
+                alias.private_comment if private_comment is None else private_comment
+            ),
             sogo_visible=sogo_visible,
         )
 
@@ -194,10 +206,12 @@ class FakeMailcow:
         alias_id: int,
         public_comment: str,
         sogo_visible: bool,
+        *,
+        private_comment: str = "",
     ) -> None:
         self.aliases[alias_id] = replace(
             self.aliases[alias_id],
-            private_comment="",
+            private_comment=private_comment,
             public_comment=public_comment,
             sogo_visible=sogo_visible,
         )
@@ -219,7 +233,15 @@ class FakeMailcow:
     async def mark_reserved_alias_used(self, alias_id: int) -> None:
         alias = self.aliases[alias_id]
         if alias.is_reserved:
-            self.aliases[alias_id] = replace(alias, private_comment=USED_RESERVED_COMMENT)
+            private_comment = update_private_comment(
+                alias.private_comment,
+                add_markers={USED_RESERVED_MARKER},
+                remove_markers={RESERVED_MARKER},
+            )
+            self.aliases[alias_id] = replace(
+                alias,
+                private_comment=private_comment,
+            )
 
     async def delete_alias(self, alias_id: int) -> None:
         del self.aliases[alias_id]

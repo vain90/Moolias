@@ -368,7 +368,7 @@ def test_alias_edit_panel_starts_with_logo_and_purpose_input(page: Page, base_ur
     expect(purpose_row.locator("[data-icon-picker-trigger]")).to_be_visible()
     purpose = purpose_row.locator('input[name="description"]')
     expect(purpose).to_have_value("Amazon")
-    expect(purpose.locator("xpath=..")).to_contain_text("Alias name / purpose")
+    expect(purpose.locator("xpath=..")).to_contain_text("Alias name")
     expect(edit.locator(".alias-edit-current-name")).to_have_count(0)
     expect(edit.locator('form[action$="/metadata"] button[type="submit"]')).to_have_class(
         re.compile(r"\bprimary\b")
@@ -495,7 +495,7 @@ def test_offline_pool_uses_primary_dropdown_for_supported_batch_sizes(
     expect(page.locator("dialog[data-assign-dialog][open]")).to_have_count(0)
 
     description = details.locator('input[name="description"]')
-    expect(description.locator("xpath=..")).to_contain_text("Alias name / purpose")
+    expect(description.locator("xpath=..")).to_contain_text("Alias name")
     expect(description).to_be_focused()
 
 

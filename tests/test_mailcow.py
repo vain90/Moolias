@@ -103,7 +103,7 @@ async def test_get_mailbox_redirects_when_mailbox_and_domain_lack_access_tag():
     assert "moolias" in str(exc_info.value.detail)
 
 
-async def test_create_alias_sets_public_purpose_sender_permission_and_sogo_visibility():
+async def test_create_alias_sets_name_private_description_sender_permission_and_sogo_visibility():
     captured = {}
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -116,6 +116,7 @@ async def test_create_alias_sets_public_purpose_sender_permission_and_sogo_visib
         "amazon-k7p4@example.org",
         "hidden@example.org",
         "Amazon",
+        private_comment="Invoices and Marketplace",
         sogo_visible=True,
     )
     await client.close()
@@ -123,7 +124,7 @@ async def test_create_alias_sets_public_purpose_sender_permission_and_sogo_visib
     assert captured["path"] == "/api/v1/add/alias"
     assert captured["json"]["goto"] == "hidden@example.org"
     assert captured["json"]["public_comment"] == "Amazon"
-    assert captured["json"]["private_comment"] == ""
+    assert captured["json"]["private_comment"] == "Invoices and Marketplace"
     assert captured["json"]["sender_allowed"] == 1
     assert captured["json"]["sogo_visible"] == 1
 
@@ -149,7 +150,33 @@ async def test_reserved_alias_uses_private_marker_and_stays_hidden_from_sogo():
     assert captured["json"]["sogo_visible"] == 0
 
 
-async def test_alias_preferences_never_touch_private_comment_address_or_target():
+async def test_alias_preferences_can_update_name_and_private_description_together():
+    captured = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured["json"] = json.loads(request.content)
+        return httpx.Response(200, json=[{"type": "success", "msg": ["alias_modified"]}])
+
+    client = MailcowClient(settings(), transport=httpx.MockTransport(handler))
+    await client.update_alias_preferences(
+        42,
+        "Amazon",
+        True,
+        private_comment="Invoices and AWS",
+    )
+    await client.close()
+
+    assert captured["json"] == {
+        "items": ["42"],
+        "attr": {
+            "public_comment": "Amazon",
+            "sogo_visible": 1,
+            "private_comment": "Invoices and AWS",
+        },
+    }
+
+
+async def test_alias_preferences_leave_private_comment_untouched_when_not_supplied():
     captured = {}
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -169,7 +196,7 @@ async def test_alias_preferences_never_touch_private_comment_address_or_target()
     }
 
 
-async def test_assign_reserved_alias_clears_only_reservation_marker_fields():
+async def test_assign_reserved_alias_writes_prepared_private_comment():
     captured = {}
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -177,17 +204,59 @@ async def test_assign_reserved_alias_clears_only_reservation_marker_fields():
         return httpx.Response(200, json=[{"type": "success", "msg": ["alias_modified"]}])
 
     client = MailcowClient(settings(), transport=httpx.MockTransport(handler))
-    await client.assign_reserved_alias(42, "Hotel", False)
+    await client.assign_reserved_alias(
+        42,
+        "Hotel",
+        False,
+        private_comment="Business trip",
+    )
     await client.close()
 
     assert captured["json"] == {
         "items": ["42"],
         "attr": {
-            "private_comment": "",
+            "private_comment": "Business trip",
             "public_comment": "Hotel",
             "sogo_visible": 0,
         },
     }
+
+
+async def test_mark_reserved_alias_used_preserves_human_private_comment_and_other_markers():
+    requests = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path, request.content))
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "id": 42,
+                    "address": "pool@example.org",
+                    "goto": "hidden@example.org",
+                    "domain": "example.org",
+                    "active": "1",
+                    "private_comment": (
+                        "Hotel invoices [Family]\n"
+                        "[moolias:reserved]\n"
+                        "[moolias:future-state]"
+                    ),
+                    "public_comment": "",
+                },
+            )
+        return httpx.Response(200, json=[{"type": "success", "msg": ["alias_modified"]}])
+
+    client = MailcowClient(settings(), transport=httpx.MockTransport(handler))
+    await client.mark_reserved_alias_used(42)
+    await client.close()
+
+    assert requests[0][0:2] == ("GET", "/api/v1/get/alias/42")
+    payload = json.loads(requests[1][2])
+    private_comment = payload["attr"]["private_comment"]
+    assert "Hotel invoices [Family]" in private_comment
+    assert "[moolias:reserved]" not in private_comment
+    assert "[moolias:reserved-used]" in private_comment
+    assert "[moolias:future-state]" in private_comment
 
 
 async def test_set_active_many_updates_all_selected_aliases_in_one_request():

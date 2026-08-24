@@ -8,9 +8,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from moolias.alias_table_ui import router as alias_table_router
 from moolias.aliases import (
     RESERVED_COMMENT,
+    RESERVED_MARKER,
+    USED_RESERVED_MARKER,
     is_owned_alias,
     mailbox_domain,
     readable_local_part,
+    update_private_comment,
     validate_local_part,
 )
 from moolias.i18n import LANGUAGE_COOKIE, detect_language
@@ -62,6 +65,22 @@ async def _create_unique_reserved(request: Request, user: str, attempts: int = 1
     raise MailcowError(
         f"Could not create a unique offline alias after {attempts} attempts: {last_error}"
     )
+
+
+@router.get("/aliases/private-descriptions")
+async def alias_private_descriptions(request: Request):
+    user = require_user(request)
+    try:
+        aliases = await request.app.state.mailcow.list_aliases()
+    except MailcowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "descriptions": {
+            str(alias.id): alias.private_description
+            for alias in aliases
+            if is_owned_alias(alias, user)
+        }
+    }
 
 
 @router.get("/statistics", response_class=HTMLResponse)
@@ -152,6 +171,7 @@ async def assign_offline_pool_alias(
     request: Request,
     alias_id: int,
     description: str = Form(...),
+    private_description: str | None = Form(None),
     sogo_visible: bool = Form(False),
     csrf_token: str = Form(...),
 ):
@@ -162,14 +182,28 @@ async def assign_offline_pool_alias(
             status_code=status.HTTP_409_CONFLICT,
             detail="Only offline aliases can be assigned",
         )
-    description = description.strip()
-    if not description or len(description) > 160:
-        raise HTTPException(status_code=400, detail="Purpose must be 1-160 characters")
+    name = description.strip()
+    description_text = (
+        alias.private_description
+        if private_description is None
+        else private_description.strip()
+    )
+    if not name or len(name) > 160:
+        raise HTTPException(status_code=400, detail="Name must be 1-160 characters")
+    if len(description_text) > 160:
+        raise HTTPException(status_code=400, detail="Description must be at most 160 characters")
+
+    private_comment = update_private_comment(
+        alias.private_comment,
+        description=description_text,
+        remove_markers={RESERVED_MARKER, USED_RESERVED_MARKER},
+    )
     try:
         await request.app.state.mailcow.assign_reserved_alias(
             alias_id,
-            description,
+            name,
             sogo_visible,
+            private_comment=private_comment,
         )
     except MailcowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

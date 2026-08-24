@@ -14,6 +14,7 @@ os.environ.setdefault("MAILCOW_API_KEY", "secret")
 os.environ.setdefault("MAILCOW_OAUTH_CLIENT_ID", "client")
 os.environ.setdefault("MAILCOW_OAUTH_CLIENT_SECRET", "oauth-secret")
 
+import moolias.alias_table_ui as alias_table_module  # noqa: E402
 import moolias.main as main_module  # noqa: E402
 
 
@@ -99,6 +100,7 @@ def make_client(monkeypatch, fake: FakeMailcow):
     monkeypatch.setattr(main_module, "exchange_code", fake_exchange_code)
     monkeypatch.setattr(main_module, "validate_oauth_state", lambda _request, _state: None)
     monkeypatch.setattr(main_module, "validate_csrf", lambda _request, _token: None)
+    monkeypatch.setattr(alias_table_module, "validate_csrf", lambda _request, _token: None)
 
     with TestClient(main_module.create_app(settings())) as client:
         login = client.get(
@@ -110,8 +112,8 @@ def make_client(monkeypatch, fake: FakeMailcow):
         yield client
 
 
-def test_replace_alias_copies_purpose_and_sogo_then_disables_old_alias(monkeypatch):
-    fake = FakeMailcow(alias_record())
+def test_replace_alias_copies_name_description_and_sogo_then_disables_old_alias(monkeypatch):
+    fake = FakeMailcow(alias_record(private_comment="Orders and invoices"))
 
     with make_client(monkeypatch, fake) as client:
         response = client.post("/aliases/42/replace", data={"csrf_token": "test"})
@@ -127,7 +129,7 @@ def test_replace_alias_copies_purpose_and_sogo_then_disables_old_alias(monkeypat
             "address": payload["address"],
             "target": "hidden@example.org",
             "public_comment": "Amazon",
-            "private_comment": "",
+            "private_comment": "Orders and invoices",
             "sogo_visible": True,
         }
     ]
@@ -137,6 +139,11 @@ def test_replace_alias_copies_purpose_and_sogo_then_disables_old_alias(monkeypat
 def test_replace_alias_can_use_readable_random_format(monkeypatch):
     fake = FakeMailcow(alias_record(sogo_visible=False))
     monkeypatch.setattr(main_module, "readable_local_part", lambda _language: "river-moon-42")
+    monkeypatch.setattr(
+        alias_table_module,
+        "readable_local_part",
+        lambda _language: "river-moon-42",
+    )
 
     with make_client(monkeypatch, fake) as client:
         response = client.post(

@@ -23,16 +23,20 @@ def test_new_offline_alias_markers_use_moolias_namespace() -> None:
     assert USED_RESERVED_COMMENT == "[moolias:reserved-used]"
 
 
-def test_pre_rename_offline_alias_markers_remain_recognized() -> None:
+def test_pre_rename_offline_alias_markers_are_plain_private_description() -> None:
     legacy = "cow" + "cloak"
 
-    reserved = _alias(f"[{legacy}:reserved]")
-    assert reserved.is_reserved
+    reserved_text = f"[{legacy}:reserved]"
+    reserved = _alias(reserved_text)
+    assert not reserved.is_reserved
     assert not reserved.is_reserved_used
+    assert reserved.private_description == reserved_text
 
-    used = _alias(f"[{legacy}:reserved-used]")
-    assert used.is_reserved
-    assert used.is_reserved_used
+    used_text = f"[{legacy}:reserved-used]"
+    used = _alias(used_text)
+    assert not used.is_reserved
+    assert not used.is_reserved_used
+    assert used.private_description == used_text
 
 
 def test_legacy_brand_only_exists_in_migration_compatibility() -> None:

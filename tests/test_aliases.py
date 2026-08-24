@@ -2,6 +2,8 @@ import pytest
 
 from moolias.aliases import (
     RESERVED_COMMENT,
+    RESERVED_MARKER,
+    USED_RESERVED_MARKER,
     AliasRecord,
     is_mailbox_catch_all,
     is_owned_alias,
@@ -11,6 +13,7 @@ from moolias.aliases import (
     named_local_part,
     readable_local_part,
     slugify,
+    update_private_comment,
     validate_local_part,
 )
 
@@ -68,11 +71,14 @@ def test_owned_alias_requires_exact_single_target_and_same_domain():
         goto="hidden@example.org",
         domain="example.org",
         active=True,
-        private_comment="Admin-only note",
+        private_comment="Invoices and Marketplace",
         public_comment="Amazon",
         sogo_visible=True,
     )
+    assert alias.name == "Amazon"
     assert alias.description == "Amazon"
+    assert alias.private_description == "Invoices and Marketplace"
+    assert alias.description.private_description == "Invoices and Marketplace"
     assert is_owned_alias(alias, "hidden@example.org")
     assert not is_owned_alias(alias, "other@example.org")
 
@@ -131,37 +137,58 @@ def test_active_catch_all_for_mailbox_is_detected_without_exposing_targets():
     assert not is_mailbox_catch_all(inactive, "hidden@example.org")
 
 
-def test_private_comments_are_not_exposed_as_description():
+def test_only_moolias_markers_are_hidden_from_private_description():
     alias = AliasRecord(
         id=3,
-        address="legacy@example.org",
+        address="private@example.org",
         goto="hidden@example.org",
         domain="example.org",
         active=True,
-        private_comment="Sensitive admin note",
-        public_comment="",
+        private_comment="Private shopping [Family]\n[moolias:reserved-used]",
+        public_comment="Amazon",
     )
-    assert alias.description == ""
+    assert alias.private_description == "Private shopping [Family]"
+    assert alias.is_reserved
+    assert alias.is_reserved_used
 
 
-def test_current_and_legacy_offline_markers_are_recognized():
-    current = AliasRecord(
+def test_non_moolias_brackets_and_old_marker_text_are_plain_description():
+    legacy = "cow" + "cloak"
+    private_comment = f"[{legacy}:reserved]\n[reserved] Offline alias\n[Family]"
+    alias = AliasRecord(
         id=4,
-        address="current@example.org",
+        address="plain@example.org",
         goto="hidden@example.org",
         domain="example.org",
         active=True,
-        private_comment=RESERVED_COMMENT,
-        public_comment="",
+        private_comment=private_comment,
+        public_comment="Plain",
     )
-    legacy = AliasRecord(
+    assert not alias.is_reserved
+    assert not alias.is_reserved_used
+    assert alias.private_description == private_comment
+
+
+def test_moolias_status_updates_preserve_human_text_and_other_markers():
+    original = "Amazon orders [Family]\n[moolias:reserved]\n[moolias:future-state]"
+    updated = update_private_comment(
+        original,
+        add_markers={USED_RESERVED_MARKER},
+        remove_markers={RESERVED_MARKER},
+    )
+    alias = AliasRecord(
         id=5,
-        address="legacy-pool@example.org",
+        address="pool@example.org",
         goto="hidden@example.org",
         domain="example.org",
         active=True,
-        private_comment="[reserved] Offline alias",
+        private_comment=updated,
         public_comment="",
     )
-    assert current.is_reserved
-    assert legacy.is_reserved
+    assert alias.private_description == "Amazon orders [Family]"
+    assert alias.markers == frozenset({"reserved-used", "future-state"})
+    assert alias.is_reserved_used
+
+
+def test_reserved_comment_constant_is_current_moolias_marker_only():
+    assert RESERVED_COMMENT == "[moolias:reserved]"

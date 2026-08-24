@@ -23,7 +23,7 @@
     ? {
         title: "Alias-Logo auswählen",
         aliasLogo: "Alias-Logo",
-        aliasPurpose: "Alias Name / Zweck",
+        aliasName: "Alias Name",
         search: "Logo suchen…",
         close: "Schließen",
         noResults: "Keine passenden Logos gefunden.",
@@ -35,7 +35,7 @@
     : {
         title: "Choose alias logo",
         aliasLogo: "Alias logo",
-        aliasPurpose: "Alias name / purpose",
+        aliasName: "Alias name",
         search: "Search logos…",
         close: "Close",
         noResults: "No matching logos found.",
@@ -241,12 +241,19 @@
     [...label.childNodes]
       .filter((node) => node.nodeType === Node.TEXT_NODE)
       .forEach((node) => node.remove());
-    let caption = label.querySelector(":scope > span.alias-field-caption");
+
+    const captions = [
+      ...label.querySelectorAll(
+        ":scope > span.alias-field-caption, :scope > [data-field-caption]",
+      ),
+    ];
+    let caption = captions.shift();
+    captions.forEach((extra) => extra.remove());
     if (!caption) {
       caption = document.createElement("span");
-      caption.className = "alias-field-caption";
       label.prepend(caption);
     }
+    caption.classList.add("alias-field-caption");
     caption.textContent = value;
   };
 
@@ -263,14 +270,14 @@
     const aliasCheckbox = aliasRow?.querySelector("[data-alias-select]");
     const metadataForm = panel.querySelector('form[action$="/metadata"]');
     const description = metadataForm?.querySelector('input[name="description"]');
-    const purposeLabel = description?.closest("label");
-    replaceLabelText(purposeLabel, text.aliasPurpose);
+    const nameLabel = description?.closest("label");
+    replaceLabelText(nameLabel, text.aliasName);
 
-    if (metadataForm && purposeLabel) {
-      const purposeRow = document.createElement("div");
-      purposeRow.className = "alias-edit-purpose-row";
-      purposeLabel.insertAdjacentElement("beforebegin", purposeRow);
-      purposeRow.append(iconPreference, purposeLabel);
+    if (metadataForm && nameLabel) {
+      const nameRow = document.createElement("div");
+      nameRow.className = "alias-edit-purpose-row";
+      nameLabel.insertAdjacentElement("beforebegin", nameRow);
+      nameRow.append(iconPreference, nameLabel);
     }
 
     const replaceButton = panel.querySelector("[data-replace-alias]");
