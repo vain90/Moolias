@@ -32,7 +32,7 @@ mailcow remains the source of truth for alias data. Moolias authenticates users 
 
 A user can manage only aliases that belong exclusively to their authenticated mailbox. Moolias derives the alias domain and forwarding target on the server instead of accepting them from the browser.
 
-By default, Moolias does not need its own user database. Optional usage statistics use a local SQLite database for counters, sender aggregates and review state; the aliases themselves remain in mailcow.
+Moolias does not maintain a separate account or identity database; Mailcow remains the identity source. Moolias does use a small persistent local SQLite database for mailbox-specific application preferences and UI state. Optional usage statistics add counters and sender aggregates to that local state, while optional Newsletter Management uses a separate newsletter database for detected newsletter metadata and unsubscribe information. Alias configuration itself remains in Mailcow.
 
 ## Features
 
@@ -49,6 +49,8 @@ By default, Moolias does not need its own user database. Optional usage statisti
 - Optionally collect received/sent usage counters and sender information with configurable privacy levels.
 - Review sender identities that do not match the expected use of an alias and mark them as expected or unexpected.
 - Monitor the health and Rspamd-history coverage of the optional statistics collector.
+- Optionally detect newsletters and subscriptions, show the alias that received them and expose safe unsubscribe actions.
+- Let each mailbox independently opt in or out of Newsletter Management when an administrator has enabled it server-wide.
 - German and English interface.
 - Installable web-app experience on supported desktop and mobile browsers.
 
@@ -188,9 +190,25 @@ Increasing the detail level can optionally evaluate the still-available Mailcow/
 
 When sender detail is enabled, Moolias can flag sender identities that appear unrelated to an alias and let the user review them. This is a traceability feature, not spam classification or threat intelligence.
 
-Statistics and review state are stored in the persistent SQLite database configured by `MOOLIAS_USAGE_DB_PATH`. Alias configuration remains in mailcow.
+Statistics and review state use the persistent SQLite database configured by `MOOLIAS_USAGE_DB_PATH`. This database is also used for normal mailbox-specific Moolias preferences and therefore remains required when `MOOLIAS_USAGE_STATS=false`; disabling statistics stops the collector and new statistics collection, not the persistent local state database. Alias configuration remains in mailcow.
 
-The dashboard also reports collector health and warns when Rspamd history coverage may be too small, stale or interrupted. See [Statistics collector health](docs/statistics-collector-health.md) for the operational details.
+The dashboard also reports collector health and warns when Rspamd history coverage may be too small, stale or interrupted. See [Usage statistics](docs/statistics.md) and [Statistics collector health](docs/statistics-collector-health.md) for the operational details.
+
+### Newsletter management
+
+Newsletter Management is globally disabled by default:
+
+```dotenv
+MOOLIAS_NEWSLETTER_MANAGEMENT=false
+```
+
+An administrator can install the restricted Mailcow Newsletter Agent and enable the server-side feature. Each mailbox is then asked once whether it wants Newsletter Management enabled for itself. The mailbox can change that choice later in Settings.
+
+The effective state is always the combination of both levels: the administrator must enable the feature server-wide and the mailbox must enable it for itself. If the administrator disables the feature later, mailbox controls are greyed out and discovery/actions stop, but each mailbox's stored choice is retained for a possible later re-enable.
+
+Detected newsletter metadata and unsubscribe information are stored in `MOOLIAS_NEWSLETTER_DB_PATH`; the mailbox opt-in/out choice is stored in the persistent local state database configured by `MOOLIAS_USAGE_DB_PATH`.
+
+See [Newsletter management](docs/newsletter-management.md) for discovery, privacy, agent installation and RFC 8058 one-click details.
 
 ### Offline aliases
 
