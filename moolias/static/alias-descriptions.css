@@ -44,6 +44,63 @@
   border-color: var(--accent);
 }
 
+.alias-management-card .alias-table-head > span:nth-child(2) {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.45fr) minmax(160px, .9fr);
+  align-items: center;
+  gap: 22px;
+}
+
+.alias-management-card .alias-table-head > span:nth-child(2)::after {
+  content: "Description";
+  min-width: 0;
+}
+
+html[lang="de"] .alias-management-card .alias-table-head > span:nth-child(2)::after {
+  content: "Beschreibung";
+}
+
+.alias-management-card .alias-info {
+  grid-template-columns: minmax(220px, 1.45fr) minmax(160px, .9fr);
+  grid-template-rows: auto auto auto;
+  column-gap: 22px;
+  row-gap: 3px;
+  align-items: center;
+}
+
+.alias-management-card .alias-info > strong {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.alias-management-card .alias-info > code {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+}
+
+.alias-management-card .alias-info > .sender-stats {
+  grid-column: 1;
+  grid-row: 3;
+  min-width: 0;
+}
+
+.alias-management-card .alias-info > .alias-description-details {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.alias-management-card .alias-info:not(:has(.alias-description-details))::after {
+  content: "–";
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .alias-description-details {
   position: relative;
   width: min(100%, 360px);
@@ -122,6 +179,25 @@
 }
 
 @media (max-width: 720px) {
+  .alias-management-card .alias-table-head > span:nth-child(2),
+  .alias-management-card .alias-info {
+    grid-template-columns: minmax(220px, 1fr) 24px;
+    column-gap: 10px;
+  }
+
+  .alias-management-card .alias-table-head > span:nth-child(2)::after,
+  html[lang="de"] .alias-management-card .alias-table-head > span:nth-child(2)::after {
+    content: "";
+  }
+
+  .alias-management-card .alias-info:not(:has(.alias-description-details))::after {
+    display: none;
+  }
+
+  .alias-management-card .alias-info > .alias-description-details {
+    justify-self: end;
+  }
+
   .alias-description-details {
     width: 22px;
   }
