@@ -5,7 +5,6 @@ from moolias.newsletter_mode import (
     resolve_newsletter_mode,
 )
 
-
 BASE = "moolias-newsletter"
 
 
