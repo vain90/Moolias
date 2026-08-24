@@ -185,6 +185,11 @@
     }
   };
 
+  const replaceLinkText = (link, text) => {
+    const textNode = [...link.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
+    if (textNode) textNode.textContent = text;
+  };
+
   const ensurePrivateDescriptionField = (form, value, copy) => {
     if (form.querySelector('[name="private_description"]')) return;
     const nameInput = form.querySelector('input[name="description"]');
@@ -247,8 +252,8 @@
     const createForm = document.querySelector("[data-create-alias-dialog] form");
     if (createForm) ensurePrivateDescriptionField(createForm, "", copy);
 
-    const aliasColumn = document.querySelector(".alias-table-head span:nth-child(2)");
-    if (aliasColumn) aliasColumn.textContent = copy.column;
+    const purposeLink = document.querySelector('.alias-table-head .alias-sort-link[href*="sort=purpose"]');
+    if (purposeLink) replaceLinkText(purposeLink, copy.column);
 
     document.querySelectorAll('.alias-row [data-alias-select]').forEach((checkbox) => {
       const id = checkbox.value;

@@ -171,7 +171,7 @@ async def assign_offline_pool_alias(
     request: Request,
     alias_id: int,
     description: str = Form(...),
-    private_description: str = Form(""),
+    private_description: str | None = Form(None),
     sogo_visible: bool = Form(False),
     csrf_token: str = Form(...),
 ):
@@ -183,15 +183,19 @@ async def assign_offline_pool_alias(
             detail="Only offline aliases can be assigned",
         )
     name = description.strip()
-    private_description = private_description.strip()
+    description_text = (
+        alias.private_description
+        if private_description is None
+        else private_description.strip()
+    )
     if not name or len(name) > 160:
         raise HTTPException(status_code=400, detail="Name must be 1-160 characters")
-    if len(private_description) > 160:
+    if len(description_text) > 160:
         raise HTTPException(status_code=400, detail="Description must be at most 160 characters")
 
     private_comment = update_private_comment(
         alias.private_comment,
-        description=private_description,
+        description=description_text,
         remove_markers={RESERVED_MARKER, USED_RESERVED_MARKER},
     )
     try:

@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 import secrets
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.resources import files
-from typing import Iterable
 
 RESERVED_MARKER = "reserved"
 USED_RESERVED_MARKER = "reserved-used"
