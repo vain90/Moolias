@@ -101,9 +101,9 @@ def test_alias_edit_panel_uses_compact_logo_and_bottom_actions(
     expect(trigger).to_be_visible(timeout=5000)
     expect(panel.locator(".service-icon-picker-label > span")).to_have_text("Alias logo")
 
-    purpose = panel.locator('input[name="description"]')
-    expect(purpose.locator("xpath=..").locator(".alias-field-caption")).to_have_text(
-        "Alias name / purpose"
+    name = panel.locator('input[name="description"]')
+    expect(name.locator("xpath=..").locator(".alias-field-caption")).to_have_text(
+        "Alias name"
     )
 
     replace = panel.locator("[data-replace-alias]")
@@ -112,11 +112,11 @@ def test_alias_edit_panel_uses_compact_logo_and_bottom_actions(
     expect(disable).to_have_text("Disable alias")
 
     trigger_box = trigger.bounding_box()
-    purpose_box = purpose.bounding_box()
+    name_box = name.bounding_box()
     replace_box = replace.bounding_box()
     disable_box = disable.bounding_box()
-    assert trigger_box and purpose_box and replace_box and disable_box
-    assert trigger_box["y"] < purpose_box["y"]
+    assert trigger_box and name_box and replace_box and disable_box
+    assert trigger_box["y"] < name_box["y"]
     assert replace_box["y"] < disable_box["y"]
     assert abs(replace_box["width"] - disable_box["width"]) <= 1
     expect(panel.locator(".hint").filter(has_text="Creates a new alias")).to_have_count(0)
