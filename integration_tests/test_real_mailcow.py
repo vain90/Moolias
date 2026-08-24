@@ -313,7 +313,7 @@ async def test_zz_newsletter_agent_reads_headers_through_remote_doveadm(
         "h=from:to:subject:list-unsubscribe:list-unsubscribe-post; bh=abc; b=def\r\n"
         "\r\n"
         "Disposable Mailcow integration message.\r\n"
-    ).encode("utf-8")
+    ).encode()
     _docker_compose(
         mailcow_dir,
         "exec",
