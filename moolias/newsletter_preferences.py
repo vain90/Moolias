@@ -11,9 +11,11 @@ from moolias.mailcow import MailcowError
 from moolias.newsletter_mode import (
     NewsletterModeSource,
     NewsletterModeState,
-    mailbox_newsletter_state as resolve_mailbox_newsletter_state,
     replace_mailbox_newsletter_tags,
     resolve_newsletter_mode,
+)
+from moolias.newsletter_mode import (
+    mailbox_newsletter_state as resolve_mailbox_newsletter_state,
 )
 from moolias.security import require_user, validate_csrf
 from moolias.ui import _load_ui_state, _template_context
