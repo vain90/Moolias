@@ -47,14 +47,14 @@ def test_short_brand_exceptions_require_exact_alias_tokens():
 
 def test_compound_brand_matches_complete_registered_domain_identity():
     alias = "takko-fashion-k7@example.org"
-    description = "TAKKO Fashion - App"
+    name = "TAKKO Fashion - App"
 
-    assert sender_match_token(alias, description, "contact.takko-fashion.com") == "takko-fashion"
-    assert sender_match_token(alias, description, "contact.takkofashion.com") == "takkofashion"
+    assert sender_match_token(alias, name, "contact.takko-fashion.com") == "takko-fashion"
+    assert sender_match_token(alias, name, "contact.takkofashion.com") == "takkofashion"
 
-    assert not sender_matches_alias(alias, description, "contact.takko-service.com")
-    assert not sender_matches_alias(alias, description, "contact.takko-fashion-service.com")
-    assert not sender_matches_alias(alias, description, "contact.takko-fashions.com")
+    assert not sender_matches_alias(alias, name, "contact.takko-service.com")
+    assert not sender_matches_alias(alias, name, "contact.takko-fashion-service.com")
+    assert not sender_matches_alias(alias, name, "contact.takko-fashions.com")
 
 
 def test_multilabel_public_suffix_uses_registered_domain_label():
@@ -77,20 +77,20 @@ def test_private_suffix_tenants_do_not_create_brand_trust():
 
 def test_hyphenated_or_embedded_brand_domains_do_not_auto_match():
     alias = "vodafone-k7@example.org"
-    description = "Vodafone - MeinVodafone"
+    name = "Vodafone - MeinVodafone"
 
-    assert not sender_matches_alias(alias, description, "kundenservice.vodafone-mail.com")
-    assert not sender_matches_alias(alias, description, "kundenservice.vodafone-service.com")
-    assert not sender_matches_alias(alias, description, "vodafone-example.com")
-    assert not sender_matches_alias(alias, description, "mail-vodafone.example.net")
+    assert not sender_matches_alias(alias, name, "kundenservice.vodafone-mail.com")
+    assert not sender_matches_alias(alias, name, "kundenservice.vodafone-service.com")
+    assert not sender_matches_alias(alias, name, "vodafone-example.com")
+    assert not sender_matches_alias(alias, name, "mail-vodafone.example.net")
 
 
 def test_lookalike_domains_do_not_auto_match():
     alias = "vodafone-k7@example.org"
-    description = "Vodafone - MeinVodafone"
+    name = "Vodafone - MeinVodafone"
 
-    assert not sender_matches_alias(alias, description, "kundenservice.vodafonee.com")
-    assert not sender_matches_alias(alias, description, "vodaf0ne.com")
+    assert not sender_matches_alias(alias, name, "kundenservice.vodafonee.com")
+    assert not sender_matches_alias(alias, name, "vodaf0ne.com")
 
 
 def test_brand_in_subdomain_does_not_auto_match():
@@ -117,9 +117,46 @@ def test_generic_alias_words_do_not_auto_approve_sender():
     )
 
 
+def test_private_description_can_supply_a_conservative_exact_brand_hint():
+    assert sender_match_token(
+        "random-k7@example.org",
+        "Audio account",
+        "mail.audible.de",
+        private_description="Invoices and Audible audiobooks",
+    ) == "audible"
+
+
+def test_private_description_does_not_promote_generic_words():
+    assert not sender_matches_alias(
+        "random-k7@example.org",
+        "Private account",
+        "support.example.org",
+        private_description="Newsletter support and login messages",
+    )
+
+
+def test_private_description_does_not_get_short_brand_exceptions():
+    assert not sender_matches_alias(
+        "random-k7@example.org",
+        "Drugstore purchases",
+        "news.dm.de",
+        private_description="DM receipts",
+    )
+
+
+def test_private_description_does_not_create_compound_brand_identity():
+    assert not sender_matches_alias(
+        "random-k7@example.org",
+        "Clothing",
+        "mail.takko-fashion.com",
+        private_description="Takko Fashion orders",
+    )
+
+
 def test_unrelated_sender_remains_unexpected():
     assert not sender_matches_alias(
         "betten-leinetal@example.org",
         "Betten Leinetal",
         "gwdg.de",
+        private_description="Furniture invoices",
     )

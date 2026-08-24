@@ -7,7 +7,12 @@ from urllib.parse import quote
 import httpx
 from fastapi import HTTPException, status
 
-from moolias.aliases import USED_RESERVED_COMMENT, AliasRecord
+from moolias.aliases import (
+    RESERVED_MARKER,
+    USED_RESERVED_MARKER,
+    AliasRecord,
+    update_private_comment,
+)
 from moolias.config import Settings
 
 
@@ -224,17 +229,19 @@ class MailcowClient:
         alias_id: int,
         public_comment: str,
         sogo_visible: bool,
+        *,
+        private_comment: str | None = None,
     ) -> None:
+        attributes: dict[str, Any] = {
+            "public_comment": public_comment,
+            "sogo_visible": 1 if sogo_visible else 0,
+        }
+        if private_comment is not None:
+            attributes["private_comment"] = private_comment
         payload = await self._request(
             "POST",
             "/api/v1/edit/alias",
-            json={
-                "items": [str(alias_id)],
-                "attr": {
-                    "public_comment": public_comment,
-                    "sogo_visible": 1 if sogo_visible else 0,
-                },
-            },
+            json={"items": [str(alias_id)], "attr": attributes},
         )
         self._ensure_success(payload)
 
@@ -243,6 +250,8 @@ class MailcowClient:
         alias_id: int,
         public_comment: str,
         sogo_visible: bool,
+        *,
+        private_comment: str = "",
     ) -> None:
         payload = await self._request(
             "POST",
@@ -250,7 +259,7 @@ class MailcowClient:
             json={
                 "items": [str(alias_id)],
                 "attr": {
-                    "private_comment": "",
+                    "private_comment": private_comment,
                     "public_comment": public_comment,
                     "sogo_visible": 1 if sogo_visible else 0,
                 },
@@ -259,12 +268,18 @@ class MailcowClient:
         self._ensure_success(payload)
 
     async def mark_reserved_alias_used(self, alias_id: int) -> None:
+        alias = await self.get_alias(alias_id)
+        private_comment = update_private_comment(
+            alias.private_comment,
+            add_markers={USED_RESERVED_MARKER},
+            remove_markers={RESERVED_MARKER},
+        )
         payload = await self._request(
             "POST",
             "/api/v1/edit/alias",
             json={
                 "items": [str(alias_id)],
-                "attr": {"private_comment": USED_RESERVED_COMMENT},
+                "attr": {"private_comment": private_comment},
             },
         )
         self._ensure_success(payload)

@@ -72,14 +72,21 @@ def _identity_candidates(value: str) -> set[str]:
     return candidates
 
 
-def alias_identity_tokens(alias_address: str, description: str) -> set[str]:
+def alias_identity_tokens(alias_address: str, name: str) -> set[str]:
     local_part = alias_address.split("@", 1)[0]
-    return _identity_candidates(local_part) | _identity_candidates(description)
+    return _identity_candidates(local_part) | _identity_candidates(name)
 
 
-def _short_brand_tokens(alias_address: str, description: str) -> set[str]:
+def description_identity_tokens(description: str) -> set[str]:
+    # A private description is supporting context, not a second alias name.
+    # Only exact significant tokens count; adjacent words are not promoted to
+    # compound brand identities and short-brand exceptions are not applied.
+    return _tokens(description)
+
+
+def _short_brand_tokens(alias_address: str, name: str) -> set[str]:
     local_part = alias_address.split("@", 1)[0]
-    raw_tokens = set(_TOKEN_RE.findall(_ascii(f"{local_part} {description}")))
+    raw_tokens = set(_TOKEN_RE.findall(_ascii(f"{local_part} {name}")))
     return raw_tokens & _SHORT_BRAND_TOKENS
 
 
@@ -117,8 +124,10 @@ def sender_domain_tokens(sender_domain: str) -> set[str]:
 
 def sender_match_token(
     alias_address: str,
-    description: str,
+    name: str,
     sender_domain: str,
+    *,
+    private_description: str | None = None,
 ) -> str | None:
     identity = _domain_identity(sender_domain)
     if identity is None:
@@ -126,17 +135,32 @@ def sender_match_token(
     registered_label, is_private = identity
     if is_private:
         return None
-    if registered_label in _short_brand_tokens(alias_address, description):
+
+    if private_description is None:
+        private_description = str(getattr(name, "private_description", ""))
+
+    if registered_label in _short_brand_tokens(alias_address, name):
         return registered_label
-    matches = alias_identity_tokens(alias_address, description) & {registered_label}
-    if not matches:
-        return None
-    return registered_label
+    if registered_label in alias_identity_tokens(alias_address, name):
+        return registered_label
+    if registered_label in description_identity_tokens(private_description):
+        return registered_label
+    return None
 
 
 def sender_matches_alias(
     alias_address: str,
-    description: str,
+    name: str,
     sender_domain: str,
+    *,
+    private_description: str | None = None,
 ) -> bool:
-    return sender_match_token(alias_address, description, sender_domain) is not None
+    return (
+        sender_match_token(
+            alias_address,
+            name,
+            sender_domain,
+            private_description=private_description,
+        )
+        is not None
+    )

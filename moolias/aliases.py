@@ -5,25 +5,78 @@ import secrets
 import unicodedata
 from dataclasses import dataclass
 from importlib.resources import files
+from typing import Iterable
 
-RESERVED_COMMENT = "[moolias:reserved]"
-USED_RESERVED_COMMENT = "[moolias:reserved-used]"
-_LEGACY_RESERVED_COMMENT = "[cowcloak:reserved]"
-_LEGACY_USED_RESERVED_COMMENT = "[cowcloak:reserved-used]"
-LEGACY_RESERVED_COMMENTS = frozenset(
-    {
-        RESERVED_COMMENT,
-        USED_RESERVED_COMMENT,
-        _LEGACY_RESERVED_COMMENT,
-        _LEGACY_USED_RESERVED_COMMENT,
-        "[reserved] Offline alias",
-    }
-)
-USED_RESERVED_COMMENTS = frozenset(
-    {USED_RESERVED_COMMENT, _LEGACY_USED_RESERVED_COMMENT}
-)
+RESERVED_MARKER = "reserved"
+USED_RESERVED_MARKER = "reserved-used"
+RESERVED_COMMENT = f"[moolias:{RESERVED_MARKER}]"
+USED_RESERVED_COMMENT = f"[moolias:{USED_RESERVED_MARKER}]"
+_MOOLIAS_MARKER_RE = re.compile(r"\[moolias:([a-z0-9][a-z0-9._-]*)\]", re.IGNORECASE)
 _SUFFIX_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
 _LOCAL_PART_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,62}$")
+
+
+def moolias_markers(private_comment: str) -> frozenset[str]:
+    return frozenset(
+        match.group(1).lower()
+        for match in _MOOLIAS_MARKER_RE.finditer(private_comment or "")
+    )
+
+
+def private_comment_description(private_comment: str) -> str:
+    """Return the human description while hiding Moolias metadata markers."""
+    without_markers = _MOOLIAS_MARKER_RE.sub(" ", private_comment or "")
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in without_markers.splitlines()]
+    while lines and not lines[0]:
+        lines.pop(0)
+    while lines and not lines[-1]:
+        lines.pop()
+    return "\n".join(lines)
+
+
+def compose_private_comment(description: str, markers: Iterable[str] = ()) -> str:
+    """Build a private comment from user text plus explicit Moolias markers."""
+    clean_description = private_comment_description(description)
+    normalized_markers = sorted(
+        {
+            str(marker).strip().lower()
+            for marker in markers
+            if str(marker).strip()
+        }
+    )
+    parts = [clean_description] if clean_description else []
+    parts.extend(f"[moolias:{marker}]" for marker in normalized_markers)
+    return "\n".join(parts)
+
+
+def update_private_comment(
+    private_comment: str,
+    *,
+    description: str | None = None,
+    add_markers: Iterable[str] = (),
+    remove_markers: Iterable[str] = (),
+) -> str:
+    """Update only Moolias metadata and/or the human description."""
+    markers = set(moolias_markers(private_comment))
+    markers.difference_update(str(marker).strip().lower() for marker in remove_markers)
+    markers.update(str(marker).strip().lower() for marker in add_markers if str(marker).strip())
+    text = (
+        private_comment_description(private_comment)
+        if description is None
+        else private_comment_description(description)
+    )
+    return compose_private_comment(text, markers)
+
+
+class AliasPurpose(str):
+    """Public alias name carrying its optional private description for matchers."""
+
+    private_description: str
+
+    def __new__(cls, name: str, private_description: str = "") -> AliasPurpose:
+        value = super().__new__(cls, name)
+        value.private_description = private_description
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,17 +109,30 @@ class AliasRecord:
         )
 
     @property
+    def markers(self) -> frozenset[str]:
+        return moolias_markers(self.private_comment)
+
+    @property
     def is_reserved(self) -> bool:
-        return self.private_comment in LEGACY_RESERVED_COMMENTS
+        return bool({RESERVED_MARKER, USED_RESERVED_MARKER} & self.markers)
 
     @property
     def is_reserved_used(self) -> bool:
-        return self.private_comment in USED_RESERVED_COMMENTS
+        return USED_RESERVED_MARKER in self.markers
 
     @property
-    def description(self) -> str:
-        # mailcow public comments are user-visible; private comments stay admin-only.
-        return self.public_comment
+    def name(self) -> str:
+        return self.public_comment.strip()
+
+    @property
+    def private_description(self) -> str:
+        return private_comment_description(self.private_comment)
+
+    @property
+    def description(self) -> AliasPurpose:
+        # Keep existing purpose/name consumers compatible while attaching the
+        # private description for sender matching.
+        return AliasPurpose(self.name, self.private_description)
 
 
 def mailbox_domain(email: str) -> str:

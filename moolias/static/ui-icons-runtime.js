@@ -159,6 +159,121 @@
     }
   };
 
+  const aliasDescriptionCopy = {
+    de: {
+      name: "Name",
+      description: "Beschreibung",
+      descriptionPlaceholder: "Optionaler Kontext, z. B. Rechnungen, Marketplace oder AWS",
+      hint: "Optional. Die Beschreibung bleibt im privaten Mailcow-Kommentar und hilft Moolias vorsichtig bei der Absendererkennung.",
+      column: "Name / Alias-Adresse",
+    },
+    en: {
+      name: "Name",
+      description: "Description",
+      descriptionPlaceholder: "Optional context, for example invoices, Marketplace or AWS",
+      hint: "Optional. The description stays in Mailcow's private comment and is used conservatively for sender recognition.",
+      column: "Name / alias address",
+    },
+  };
+
+  const replaceLabelText = (label, text) => {
+    const textNode = [...label.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
+    if (textNode) {
+      textNode.textContent = text;
+    } else {
+      label.prepend(document.createTextNode(text));
+    }
+  };
+
+  const ensurePrivateDescriptionField = (form, value, copy) => {
+    if (form.querySelector('[name="private_description"]')) return;
+    const nameInput = form.querySelector('input[name="description"]');
+    const nameLabel = nameInput?.closest("label");
+    if (!nameInput || !nameLabel) return;
+
+    replaceLabelText(nameLabel, copy.name);
+
+    const label = document.createElement("label");
+    label.dataset.aliasPrivateDescriptionField = "1";
+    label.append(document.createTextNode(copy.description));
+
+    const textarea = document.createElement("textarea");
+    textarea.name = "private_description";
+    textarea.maxLength = 160;
+    textarea.rows = 3;
+    textarea.placeholder = copy.descriptionPlaceholder;
+    textarea.value = value || "";
+    label.append(textarea);
+
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.dataset.aliasPrivateDescriptionHint = "1";
+    hint.textContent = copy.hint;
+
+    nameLabel.after(label, hint);
+  };
+
+  const addDescriptionPreview = (container, value) => {
+    if (!container || !value || container.querySelector("[data-alias-private-description-preview]")) return;
+    const preview = document.createElement("small");
+    preview.className = "muted";
+    preview.dataset.aliasPrivateDescriptionPreview = "1";
+    preview.textContent = value;
+    const address = container.querySelector("code");
+    if (address) {
+      container.insertBefore(preview, address);
+    } else {
+      container.append(preview);
+    }
+  };
+
+  const enhanceAliasDescriptions = async () => {
+    if (!document.body.classList.contains("app-body")) return;
+    if (!document.querySelector("[data-create-alias-dialog], [data-assign-dialog], .alias-row")) return;
+
+    const language = document.documentElement.lang?.toLowerCase().startsWith("de") ? "de" : "en";
+    const copy = aliasDescriptionCopy[language];
+    let descriptions = {};
+    try {
+      const response = await fetch("/aliases/private-descriptions", { headers: { Accept: "application/json" } });
+      if (response.ok) {
+        const payload = await response.json();
+        descriptions = payload.descriptions || {};
+      }
+    } catch (error) {
+      console.debug("Alias descriptions could not be loaded", error);
+    }
+
+    const createForm = document.querySelector("[data-create-alias-dialog] form");
+    if (createForm) ensurePrivateDescriptionField(createForm, "", copy);
+
+    const aliasColumn = document.querySelector(".alias-table-head span:nth-child(2)");
+    if (aliasColumn) aliasColumn.textContent = copy.column;
+
+    document.querySelectorAll('.alias-row [data-alias-select]').forEach((checkbox) => {
+      const id = checkbox.value;
+      const value = descriptions[id] || "";
+      const row = checkbox.closest(".alias-row");
+      addDescriptionPreview(row?.querySelector(".alias-info"), value);
+
+      const form = row?.querySelector('form[action$="/metadata"]');
+      if (form) ensurePrivateDescriptionField(form, value, copy);
+    });
+
+    document.querySelectorAll("[data-assign-dialog]").forEach((dialog) => {
+      const id = dialog.dataset.assignDialog;
+      const form = dialog.querySelector("form");
+      if (form) ensurePrivateDescriptionField(form, descriptions[id] || "", copy);
+    });
+
+    document.querySelectorAll(".offline-pool-row[data-alias-id]").forEach((row) => {
+      addDescriptionPreview(
+        row.querySelector(".alias-info"),
+        descriptions[row.dataset.aliasId] || "",
+      );
+    });
+  };
+
   document.querySelectorAll(".service-badge").forEach((badge) => {
     if (!badge.querySelector(".ui-icon")) return;
     badge.classList.remove("service-badge");
@@ -187,6 +302,7 @@
 
   enhanceBranding();
   document.querySelectorAll(".language-switch").forEach(enhanceLanguageSwitch);
+  enhanceAliasDescriptions();
 
   document.addEventListener("click", (event) => {
     document.querySelectorAll("details[data-language-dropdown][open]").forEach((details) => {
