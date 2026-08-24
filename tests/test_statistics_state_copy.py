@@ -4,6 +4,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OVERVIEW = (ROOT / "moolias" / "templates" / "overview.html").read_text(encoding="utf-8")
 BASE = (ROOT / "moolias" / "templates" / "base.html").read_text(encoding="utf-8")
 STATISTICS = (ROOT / "moolias" / "templates" / "statistics.html").read_text(encoding="utf-8")
+TOUR = (ROOT / "moolias" / "static" / "tour.js").read_text(encoding="utf-8")
 DOCS = (ROOT / "docs" / "statistics.md").read_text(encoding="utf-8")
 
 DOC_URL = "https://github.com/vain90/Moolias/blob/main/docs/statistics.md"
@@ -45,6 +46,16 @@ def test_statistics_page_distinguishes_server_and_mailbox_disabled_states():
     assert "Für dieses Postfach ist kein Statistikmodus aktiviert" in STATISTICS
     assert "Die Statistikfunktion ist serverseitig verfügbar." in STATISTICS
     assert "Statistikstatus ist vorübergehend nicht verfügbar" in STATISTICS
+
+
+def test_guided_tour_explains_admin_control_for_optional_features():
+    assert "Auf diesem Server hat dein Administrator den Hauptadressenschutz nicht aktiviert" in TOUR
+    assert "Auf diesem Server sind Nutzungsstatistiken vom Administrator deaktiviert" in TOUR
+    assert "Statistikmodus und Hauptadressenschutz sind dort nur nutzbar" in TOUR
+    assert "Your administrator has not enabled primary-address protection" in TOUR
+    assert "Usage statistics are disabled by the administrator" in TOUR
+    assert "statisticsServerEnabled" in TOUR
+    assert "primaryProtectionStatus" in TOUR
 
 
 def test_statistics_documentation_has_same_host_enable_steps():
