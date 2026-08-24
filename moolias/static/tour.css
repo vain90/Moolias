@@ -75,6 +75,8 @@
 }
 
 .tour-popover {
+  top: 14px;
+  left: 14px;
   z-index: 9992;
   width: min(370px, calc(100vw - 28px));
   padding: 18px;
