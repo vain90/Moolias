@@ -1,12 +1,34 @@
 # Newsletter management
 
-Moolias can detect newsletter and mailing-list messages from Mailcow's Rspamd history and expose a compact unsubscribe view for each Moolias user.
+Moolias can detect newsletter and mailing-list messages from Mailcow's Rspamd history and expose a compact unsubscribe view for each Moolias mailbox.
 
-The feature is disabled by default.
+The feature is disabled by default and has two independent enablement levels:
+
+1. An administrator makes newsletter management available server-wide with `MOOLIAS_NEWSLETTER_MANAGEMENT=true` and installs the restricted Newsletter Agent.
+2. Each authenticated mailbox decides for itself whether newsletter management should be enabled for that mailbox.
+
+The effective state is therefore **server enabled AND mailbox enabled**.
+
+## Mailbox opt-in
+
+When newsletter management becomes available on the server and a mailbox has not made a choice yet, Moolias asks that mailbox once whether it wants to enable the feature. The answer is stored per authenticated mailbox address and can later be changed in Settings.
+
+If the administrator sets `MOOLIAS_NEWSLETTER_MANAGEMENT=false`:
+
+- newsletter discovery and unsubscribe actions are disabled for every mailbox
+- the mailbox switch is shown disabled/greyed with a server-side-disabled explanation
+- previously stored mailbox choices are retained
+- re-enabling the server feature restores each mailbox's previous choice
+
+If a mailbox disables newsletter management for itself, Moolias stops scheduling newsletter scans for that mailbox. Existing newsletter records are retained and become visible again if the mailbox later re-enables the feature.
+
+The per-mailbox choice is stored in the persistent local Moolias SQLite database configured by `MOOLIAS_USAGE_DB_PATH`. Despite the variable name, this database is also used for normal Moolias mailbox preferences and is therefore required even when usage statistics are disabled.
 
 ## User experience
 
 The Newsletter page shows one compact row per detected sender and recipient alias. The row includes the sender, the alias that received the message, the observed message count, the most recent message and the available unsubscribe action.
+
+The Newsletter navigation entry is shown only when the feature is effectively enabled for the signed-in mailbox. When the server feature is available but the mailbox has disabled it, the mailbox can re-enable it from Settings.
 
 The details control expands technical information only when it is needed.
 
@@ -47,6 +69,8 @@ Moolias stores:
 Unsubscribe URLs are stored in plaintext. This is intentional: the same personalized URLs already arrive as plaintext mail headers and may still be present in the Mailcow message store. Moolias does not write complete unsubscribe URLs to normal application logs.
 
 When a fourth different URL is learned for the same newsletter, the oldest stored URL is removed.
+
+The newsletter database is separate from the local mailbox-preference/state database configured by `MOOLIAS_USAGE_DB_PATH`. Both files must live on persistent storage under normal Docker deployments.
 
 ## One-click unsubscribe
 
@@ -104,23 +128,30 @@ The web application authenticates requests to the agent with a separate HMAC sec
 ## Configuration
 
 ```dotenv
+# Global administrator switch. Mailboxes can opt in only while this is true.
 MOOLIAS_NEWSLETTER_MANAGEMENT=true
+
+# Newsletter observations and unsubscribe metadata.
 MOOLIAS_NEWSLETTER_DB_PATH=/data/moolias-newsletters.sqlite3
+
 MOOLIAS_NEWSLETTER_AGENT_SECRET=<generated-secret>
 MOOLIAS_NEWSLETTER_AGENT_URL=
 MOOLIAS_NEWSLETTER_POLL_SECONDS=60
 MOOLIAS_NEWSLETTER_HISTORY_COUNT=1000
+
+# Persistent Moolias mailbox/UI state. Required even with statistics disabled.
+MOOLIAS_USAGE_DB_PATH=/data/moolias-stats.sqlite3
 ```
 
-The recommended installer creates the agent secret, configures Dovecot remote `doveadm` authentication when necessary, adds the sidecar to Mailcow's Compose override and enables the feature in the Moolias `.env`.
+The recommended installer creates the agent secret, configures Dovecot remote `doveadm` authentication when necessary, adds the sidecar to Mailcow's Compose override and enables the server-side feature in the Moolias `.env`. Individual mailboxes are still asked for their own choice in Moolias.
 
 Run it on the Mailcow host with:
 
 ```bash
 cd /opt/moolias
-bash scripts/install-newsletter-agent.sh
+sudo bash scripts/install-newsletter-agent.sh
 ```
 
-The script is idempotent for its managed Dovecot, nginx and Compose blocks. If an administrator already configured `doveadm_password`, the installer reuses that setting rather than replacing it.
+The script intentionally requires root because it modifies Mailcow configuration files and restarts/reloads Mailcow services. The script is idempotent for its managed Dovecot, nginx and Compose blocks. If an administrator already configured `doveadm_password`, the installer reuses that setting rather than replacing it.
 
 After installation, restart or rebuild the Moolias application so the new application settings and image are active.
