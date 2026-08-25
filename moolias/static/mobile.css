@@ -1,3 +1,7 @@
+body > noscript {
+  display: contents !important;
+}
+
 .javascript-warning {
   position: relative !important;
   z-index: 1000 !important;
@@ -5,6 +9,9 @@
   height: auto !important;
   min-height: 0 !important;
   box-sizing: border-box !important;
+  display: grid !important;
+  align-items: center !important;
+  justify-content: center !important;
   margin: 0 !important;
   padding: 12px 52px !important;
   border-bottom: 1px solid #eab308 !important;
@@ -19,8 +26,7 @@
 .javascript-warning > span:last-child {
   position: static !important;
   display: block !important;
-  width: 100% !important;
-  max-width: 1120px !important;
+  width: min(1120px, 100%) !important;
   box-sizing: border-box !important;
   margin: 0 auto !important;
   padding: 0 !important;
