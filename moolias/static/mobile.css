@@ -1,9 +1,5 @@
 body > noscript {
-  display: block !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-  background: #fef3c7 !important;
-  color: #78350f !important;
+  display: contents !important;
 }
 
 .javascript-warning {
