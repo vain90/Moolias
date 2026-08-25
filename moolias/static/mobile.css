@@ -1,70 +1,47 @@
-body > noscript {
-  display: contents !important;
-}
-
-.javascript-warning {
-  position: relative !important;
-  z-index: 1000 !important;
+body > noscript:has(> .javascript-warning) {
+  display: block !important;
   width: 100% !important;
-  height: auto !important;
-  min-height: 0 !important;
   box-sizing: border-box !important;
-  display: grid !important;
-  align-items: center !important;
-  justify-content: center !important;
   margin: 0 !important;
-  padding: 12px 52px !important;
+  padding: 12px 20px !important;
   border-bottom: 1px solid #eab308 !important;
   background: #fef3c7 !important;
   color: #78350f !important;
   font-size: 14px !important;
   line-height: 1.45 !important;
   text-align: center !important;
-  overflow: visible !important;
 }
 
-.javascript-warning > span:last-child {
-  position: static !important;
-  display: block !important;
-  width: min(1120px, 100%) !important;
-  box-sizing: border-box !important;
-  margin: 0 auto !important;
-  padding: 0 !important;
-  color: #78350f !important;
-  text-align: center !important;
-  transform: none !important;
+body > noscript:has(> .javascript-warning)::before {
+  content: "JavaScript ist deaktiviert. ";
+  font-weight: 800;
 }
 
-.javascript-warning-icon {
-  position: absolute !important;
-  left: 20px !important;
-  top: 50% !important;
-  display: grid !important;
-  place-items: center !important;
-  width: 18px !important;
-  height: 18px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  transform: translateY(-50%) !important;
+body > noscript:has(> .javascript-warning)::after {
+  content: "Moolias ist ohne JavaScript nicht oder nur sehr eingeschränkt nutzbar. Bitte aktiviere JavaScript in deinem Browser.";
+  font-weight: 400;
 }
 
-.javascript-warning-icon svg {
-  width: 18px !important;
-  height: 18px !important;
+html[lang="en"] body > noscript:has(> .javascript-warning)::before {
+  content: "JavaScript is disabled. ";
+}
+
+html[lang="en"] body > noscript:has(> .javascript-warning)::after {
+  content: "Moolias is unavailable or only very limited without JavaScript. Please enable JavaScript in your browser.";
+}
+
+body > noscript:has(> .javascript-warning) > .javascript-warning {
+  display: none !important;
 }
 
 @media (max-width: 640px) {
-  .javascript-warning {
-    padding: 10px 44px !important;
+  body > noscript:has(> .javascript-warning) {
+    padding: 10px 14px !important;
     font-size: 13px !important;
-  }
-
-  .javascript-warning-icon {
-    left: 14px !important;
   }
 }
 
-.app-body:has(.javascript-warning) .app-sidebar {
+.app-body:has(> noscript > .javascript-warning) .app-sidebar {
   position: sticky;
   inset: 0 auto auto 0;
   height: 100vh;
