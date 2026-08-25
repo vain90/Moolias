@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="/static/review.css">
   <link rel="stylesheet" href="/static/dialogs.css">
   <link rel="stylesheet" href="/static/sender-protection.css">
+  <link rel="stylesheet" href="/static/newsletters.css">
   <link rel="stylesheet" href="/static/mobile.css">
   <link rel="stylesheet" href="/static/theme.css">
   <link rel="stylesheet" href="/static/shell.css">
@@ -36,6 +37,8 @@
   <script src="/static/review-behavior.js" defer></script>
   <script src="/static/stats-mode.js" defer></script>
   <script src="/static/sender-protection.js" defer></script>
+  <script src="/static/newsletters.js" defer></script>
+  <script src="/static/newsletter-settings.js" defer></script>
   <script src="/static/ui-icons-runtime.js?v=20260823-1" defer></script>
   <script src="/static/shell.js" defer></script>
   <script src="/static/tour.js?v=20260824-1" defer></script>
@@ -75,6 +78,10 @@
         <a class="side-nav-link {% if active_nav == 'pool' %}current{% endif %}" href="/offline-pool" {% if active_nav == 'pool' %}aria-current="page"{% endif %}>
           <span class="nav-icon" aria-hidden="true">{{ icon('archive') }}</span>
           <span>{% if language == 'de' %}Offline-Pool{% else %}Offline pool{% endif %}</span>
+        </a>
+        <a class="side-nav-link {% if active_nav == 'newsletters' %}current{% endif %}" href="/newsletters" data-newsletter-nav hidden {% if active_nav == 'newsletters' %}aria-current="page"{% endif %}>
+          <span class="nav-icon" aria-hidden="true">{{ icon('inbox') }}</span>
+          <span>{% if language == 'de' %}Newsletter{% else %}Newsletters{% endif %}</span>
         </a>
         <a class="side-nav-link {% if active_nav == 'statistics' %}current{% endif %}" href="/statistics" {% if active_nav == 'statistics' %}aria-current="page"{% endif %}>
           <span class="nav-icon" aria-hidden="true">{{ icon('chart-no-axes-combined') }}</span>
@@ -245,11 +252,46 @@
           <p class="hint" data-sender-protection-message aria-live="polite"></p>
         </div>
       </section>
+
+      <section class="settings-section newsletter-settings" data-newsletter-setting>
+        <div class="settings-section-number">4</div>
+        <div class="settings-section-body">
+          <h3>{% if language == 'de' %}Newsletter-Verwaltung{% else %}Newsletter management{% endif %}</h3>
+          <p class="muted">
+            {% if language == 'de' %}
+              Die Domain kann einen Standard vorgeben. Du kannst ihn für dein eigenes Postfach übernehmen oder mit An/Aus überschreiben.
+            {% else %}
+              The domain can define a default. You can inherit it for your mailbox or override it with On/Off.
+            {% endif %}
+          </p>
+          <form method="post" action="/account/newsletter-management" class="settings-form newsletter-mode-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="return_to" value="{{ return_to }}">
+            <label>
+              <span>{% if language == 'de' %}Newsletter-Einstellung{% else %}Newsletter setting{% endif %}</span>
+              <select name="mode" data-newsletter-mode-select disabled aria-label="{% if language == 'de' %}Newsletter-Einstellung{% else %}Newsletter setting{% endif %}">
+                <option value="inherit">{% if language == 'de' %}Domain-Einstellung verwenden{% else %}Use domain setting{% endif %}</option>
+                <option value="off">{% if language == 'de' %}Aus{% else %}Off{% endif %}</option>
+                <option value="on">{% if language == 'de' %}An{% else %}On{% endif %}</option>
+              </select>
+            </label>
+            <button class="button compact" type="submit" data-newsletter-save disabled>{{ t.save }}</button>
+          </form>
+          <p class="settings-state" data-newsletter-setting-state>{% if language == 'de' %}Status wird geladen …{% else %}Loading status …{% endif %}</p>
+          <p class="hint">
+            {% if language == 'de' %}
+              Wie bei der Statistik werden Newsletter-Tags direkt an Domain und Postfach in Mailcow ausgewertet. Beim tatsächlichen Aktivieren kannst du entscheiden, ob noch verfügbare historische Daten einbezogen werden sollen. Ist die Funktion serverseitig deaktiviert, kann die Einstellung nicht geändert werden.
+            {% else %}
+              As with statistics, newsletter tags are evaluated directly on the Mailcow domain and mailbox. When the feature is actually enabled, you can choose whether still-available historical data should be included. If the feature is disabled server-side, the setting cannot be changed.
+            {% endif %}
+          </p>
+        </div>
+      </section>
     </div>
 
     <div class="settings-drawer-foot">
       {{ icon('info') }}
-      <span>{% if language == 'de' %}Darstellung und Schutz werden automatisch gespeichert. Statistikmodi werden über „Speichern“ übernommen.{% else %}Appearance and protection are saved automatically. Statistics modes are applied with Save.{% endif %}</span>
+      <span>{% if language == 'de' %}Darstellung und Schutz werden automatisch gespeichert. Statistikmodus und Newsletter-Einstellung werden über „Speichern“ übernommen.{% else %}Appearance and protection are saved automatically. Statistics mode and newsletter setting are applied with Save.{% endif %}</span>
     </div>
   </aside>
 
@@ -288,7 +330,7 @@
       </section>
       <section>
         <h3>{% if language == 'de' %}Wo liegen die Daten?{% else %}Where is the data stored?{% endif %}</h3>
-        <p>{% if language == 'de' %}Mailcow bleibt die Quelle für deine Alias-Adressen und deren Status. Nur optionale Statistik- und Prüfdaten werden von Moolias zusätzlich lokal gespeichert.{% else %}Mailcow remains the source for your alias addresses and their status. Only optional statistics and review data are additionally stored locally by Moolias.{% endif %}</p>
+        <p>{% if language == 'de' %}Mailcow bleibt die Quelle für Alias-Adressen, Status und die Domain-/Postfach-Tags für Statistik und Newsletter. Moolias speichert zusätzlich lokalen Anwendungszustand sowie – bei aktivierten Funktionen – Statistik- und Newsletter-Metadaten in persistenten SQLite-Datenbanken unter /data.{% else %}Mailcow remains the source of truth for alias addresses, status and the domain/mailbox tags used for statistics and newsletters. Moolias additionally stores local application state and, for enabled features, statistics and newsletter metadata in persistent SQLite databases under /data.{% endif %}</p>
       </section>
       <div class="button-row top-gap">
         <button class="button primary" type="button" data-start-tour>{{ icon('play') }}{% if language == 'de' %}Geführte Tour starten{% else %}Start guided tour{% endif %}</button>

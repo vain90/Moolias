@@ -32,7 +32,7 @@ mailcow remains the source of truth for alias data. Moolias authenticates users 
 
 A user can manage only aliases that belong exclusively to their authenticated mailbox. Moolias derives the alias domain and forwarding target on the server instead of accepting them from the browser.
 
-By default, Moolias does not need its own user database. Optional usage statistics use a local SQLite database for counters, sender aggregates and review state; the aliases themselves remain in mailcow.
+Moolias does not maintain a separate account or identity database; Mailcow remains the identity source. Moolias does use persistent local SQLite state for application/UI data. Optional usage statistics add counters and sender aggregates, while optional Newsletter Management uses a separate newsletter database for detected newsletter metadata, unsubscribe information and its historical-import watermark. Newsletter enablement itself remains a Mailcow domain/mailbox tag policy rather than a local database preference. Alias configuration itself remains in Mailcow.
 
 ## Features
 
@@ -49,6 +49,8 @@ By default, Moolias does not need its own user database. Optional usage statisti
 - Optionally collect received/sent usage counters and sender information with configurable privacy levels.
 - Review sender identities that do not match the expected use of an alias and mark them as expected or unexpected.
 - Monitor the health and Rspamd-history coverage of the optional statistics collector.
+- Optionally detect newsletters and subscriptions, show the alias that received them and expose safe unsubscribe actions.
+- Control Newsletter Management through an inheritable Mailcow domain/mailbox tag policy, analogous to usage statistics.
 - German and English interface.
 - Installable web-app experience on supported desktop and mobile browsers.
 
@@ -188,9 +190,29 @@ Increasing the detail level can optionally evaluate the still-available Mailcow/
 
 When sender detail is enabled, Moolias can flag sender identities that appear unrelated to an alias and let the user review them. This is a traceability feature, not spam classification or threat intelligence.
 
-Statistics and review state are stored in the persistent SQLite database configured by `MOOLIAS_USAGE_DB_PATH`. Alias configuration remains in mailcow.
+Statistics and review state use the persistent SQLite database configured by `MOOLIAS_USAGE_DB_PATH`. This database is also used for normal Moolias application/UI state and therefore remains required when `MOOLIAS_USAGE_STATS=false`; disabling statistics stops the collector and new statistics collection, not the persistent local state database. Alias configuration remains in mailcow.
 
-The dashboard also reports collector health and warns when Rspamd history coverage may be too small, stale or interrupted. See [Statistics collector health](docs/statistics-collector-health.md) for the operational details.
+The dashboard also reports collector health and warns when Rspamd history coverage may be too small, stale or interrupted. See [Usage statistics](docs/statistics.md) and [Statistics collector health](docs/statistics-collector-health.md) for the operational details.
+
+### Newsletter management
+
+Newsletter Management is globally disabled by default:
+
+```dotenv
+MOOLIAS_NEWSLETTER_MANAGEMENT=false
+```
+
+An administrator can install the restricted Mailcow Newsletter Agent and enable the server-side feature. Actual enablement for each mailbox then follows the same Mailcow tag inheritance model as statistics. With the default `MOOLIAS_NEWSLETTER_TAG=moolias-newsletter`, `moolias-newsletter` enables the feature and `moolias-newsletter-off` disables it. A mailbox tag overrides the domain tag; without a mailbox newsletter tag, the domain setting is inherited.
+
+There is no additional prompt at login. Users can choose **Use domain setting**, **Off**, or **On** in Settings, and Moolias modifies only that newsletter tag family on their own mailbox.
+
+When a settings change makes the effective state switch from off to on, Moolias asks whether still-available historical Rspamd/Dovecot data should be imported or whether detection should start only from that point forward. The question is shown only for a real effective off-to-on transition.
+
+If the administrator disables `MOOLIAS_NEWSLETTER_MANAGEMENT` server-wide, controls are greyed out and discovery/actions stop regardless of Mailcow tags. The tags and already detected newsletter data are retained.
+
+Detected newsletter metadata, up to the three newest distinct unsubscribe URLs and the operational historical-import watermark are stored in `MOOLIAS_NEWSLETTER_DB_PATH`. The enable/disable policy itself is stored only as Mailcow domain/mailbox tags.
+
+See [Newsletter management](docs/newsletter-management.md) for discovery, privacy, agent installation and RFC 8058 one-click details.
 
 ### Offline aliases
 

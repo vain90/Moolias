@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from playwright.sync_api import Page, expect
 
 UNUSED_POOL = "feder-hafen-27@example.org"
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _login(page: Page, base_url: str) -> None:
@@ -88,3 +90,55 @@ def test_confirmation_fits_mobile_viewport(page: Page, base_url: str) -> None:
     assert box["y"] >= 0
     assert box["x"] + box["width"] <= 390
     assert box["y"] + box["height"] <= 844
+
+
+def test_newsletter_one_click_does_not_fall_back_to_stale_generic_confirm(
+    page: Page,
+    base_url: str,
+) -> None:
+    page.set_content(
+        f"""
+        <!doctype html>
+        <html lang="de">
+          <head><base href="{base_url}/"></head>
+          <body>
+            <section data-newsletter-page>
+              <form
+                method="post"
+                action="/newsletters/1/unsubscribe"
+                data-confirm="Diesen Newsletter jetzt per One-Click abmelden?"
+              >
+                <input type="hidden" name="csrf_token" value="e2e">
+                <button type="submit">Abmelden</button>
+              </form>
+            </section>
+          </body>
+        </html>
+        """
+    )
+
+    page.add_script_tag(path=str(REPOSITORY_ROOT / "moolias/static/dialogs.js"))
+    # app.js intentionally runs first and binds the legacy data-confirm listener.
+    page.add_script_tag(path=str(REPOSITORY_ROOT / "moolias/static/app.js"))
+    page.add_script_tag(path=str(REPOSITORY_ROOT / "moolias/static/newsletters.js"))
+
+    page.route(
+        "**/newsletters/1/unsubscribe",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="text/html",
+            body="<html><body>newsletter submit reached server</body></html>",
+        ),
+    )
+
+    page.locator('form[action="/newsletters/1/unsubscribe"] button').click()
+    dialog = page.locator('dialog[data-moolias-dialog="confirm"]')
+    expect(dialog).to_be_visible()
+    expect(dialog.locator("h2")).to_have_text("Newsletter abmelden?")
+    expect(dialog).not_to_contain_text("undefined")
+
+    with page.expect_request("**/newsletters/1/unsubscribe") as request_info:
+        dialog.locator('[data-moolias-dialog-confirm]').click()
+
+    assert request_info.value.method == "POST"
+    expect(page.locator("body")).to_contain_text("newsletter submit reached server", timeout=5000)
