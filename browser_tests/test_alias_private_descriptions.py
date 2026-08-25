@@ -33,6 +33,12 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         _login_de(page, base_url)
         page.goto(f"{base_url}/aliases")
 
+        warning = page.locator("[data-javascript-warning]")
+        expect(warning).to_be_visible()
+        expect(warning).to_contain_text("JavaScript ist deaktiviert.")
+        expect(warning).to_contain_text("nicht oder nur sehr eingeschränkt nutzbar")
+        expect(warning.locator("button")).to_have_count(0)
+
         expect(page.locator('link[data-alias-description-styles="1"]')).to_have_count(1)
         expect(page.locator(".alias-table-head > span").nth(1)).to_contain_text(
             "Alias Name / Alias-Adresse"
@@ -61,6 +67,8 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
 def test_alias_description_edit_and_table_preview(page: Page, base_url: str) -> None:
     _login_de(page, base_url)
     page.goto(f"{base_url}/aliases")
+
+    expect(page.locator("[data-javascript-warning]")).to_have_count(0)
 
     identity_heading = page.locator(".alias-table-head > span").nth(1)
     expect(identity_heading).to_contain_text("Alias Name / Alias-Adresse")
