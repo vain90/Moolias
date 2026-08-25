@@ -40,6 +40,7 @@ jobs:
       - run: node --check moolias/static/pool-create-menu.js
       - run: node --check moolias/static/tour.js
       - run: bash -n install.sh
+      - run: bash -n install-newsletter.sh
       - run: bash -n scripts/install.sh
       - run: bash -n scripts/install-mailcow-agent.sh
       - run: bash -n scripts/install-newsletter-agent.sh
