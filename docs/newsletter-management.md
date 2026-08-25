@@ -94,7 +94,7 @@ For a custom `MOOLIAS_NEWSLETTER_TAG`, the same pattern derives from that base t
 
 Only active Mailcow mailboxes with a source tag matching a target tag on the authenticated mailbox qualify. The tags express the administrative relationship only: Moolias does not create, verify or change the actual Sieve/forwarding configuration.
 
-Moolias reads Mailcow's mailbox list when the user opens the Newsletter page and caches the linked source addresses in the running Moolias process for that target mailbox. The background collector does **not** call `mailbox/all` or inspect Sieve filters on every polling cycle. Opening the Newsletter page again refreshes the link cache; the manual Newsletter refresh action also refreshes it.
+Moolias reads Mailcow's mailbox list at most once per authenticated browser session when the user first opens the Newsletter page or first uses the forwarding control. The resolved source addresses are cached in the running Moolias process for that target mailbox. The background collector does **not** call `mailbox/all` or inspect Sieve filters on every polling cycle. Repeated page reloads and the normal Newsletter refresh action reuse the session/process cache. After a new login session the links are evaluated again; after an application restart they are also reloaded even if the browser session cookie still exists.
 
 When at least one qualifying direct forwarding alias or explicitly linked source mailbox exists, the Newsletter page shows an **Include forwarded addresses** control. If none exist, no forwarding control is rendered. Enabling the option stores the derived mailbox tag `moolias-newsletter-forwarded` when the default newsletter base tag is used. With a custom base tag, the forwarding flag is `<base-tag>-forwarded`.
 
@@ -212,7 +212,7 @@ The web application authenticates requests to the agent with a separate HMAC sec
 
 The same installer also installs `scripts/rspamd/moolias_newsletter.lua` into Mailcow's persistent Rspamd configuration and enables it through a managed block in `data/conf/rspamd/rspamd.conf.local`.
 
-The installer runs `rspamadm configtest` before accepting the Rspamd change. If Rspamd rejectss the configuration, the previous plugin/configuration files are restored. On success the Rspamd container is restarted so new incoming messages can receive `MOOLIAS_BODY_UNSUB`.
+The installer runs `rspamadm configtest` before accepting the Rspamd change. If Rspamd rejects the configuration, the previous plugin/configuration files are restored. On success the Rspamd container is restarted so new incoming messages can receive `MOOLIAS_BODY_UNSUB`.
 
 The detector has score `0.0`; it is a classification hint for Moolias and does not make a message more or less spammy.
 
