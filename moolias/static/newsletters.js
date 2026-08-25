@@ -11,23 +11,31 @@
 
   const labels = isGerman
     ? {
+        confirmTitle: "Newsletter abmelden?",
+        confirmBody: "Möchtest du diesen Newsletter jetzt per One-Click abmelden?",
+        confirm: "Abmelden",
+        cancel: "Abbrechen",
         processingTitle: "Newsletter wird abgemeldet",
         processingBody: "Moolias führt die direkte One-Click-Abmeldung durch und probiert bei Bedarf die gespeicherten Links nacheinander. Das kann einige Sekunden dauern.",
         successTitle: "Abmeldung erfolgreich",
         successBody: "Der Anbieter hat die direkte Abmeldung erfolgreich angenommen. Der Newsletter wurde als abgemeldet markiert.",
         errorTitle: "Abmeldung nicht möglich",
         errorBody: "Die direkte One-Click-Abmeldung konnte mit keinem der gespeicherten Links abgeschlossen werden.",
-        errorAdvice: "Öffne eine aktuelle Newsletter-Mail und nutze dort den angebotenen Abmeldelink. Falls der Anbieter trotzdem weiter sendet oder keine Abmeldung möglich ist, kannst du den verwendeten Alias in Moolias deaktivieren oder ersetzen.",
+        errorAdvice: "Empfehlung: Öffne eine aktuelle Newsletter-Mail und nutze dort den angebotenen Abmeldelink. Falls der Anbieter trotzdem weiter sendet oder keine Abmeldung möglich ist, kannst du den verwendeten Alias in Moolias deaktivieren oder ersetzen.",
         close: "Schließen",
       }
     : {
+        confirmTitle: "Unsubscribe from newsletter?",
+        confirmBody: "Do you want to unsubscribe from this newsletter using one-click now?",
+        confirm: "Unsubscribe",
+        cancel: "Cancel",
         processingTitle: "Unsubscribing",
         processingBody: "Moolias is performing the direct one-click unsubscribe and will try the stored links in order if needed. This may take a few seconds.",
         successTitle: "Unsubscribe successful",
         successBody: "The provider accepted the direct unsubscribe request. The newsletter has been marked as unsubscribed.",
         errorTitle: "Could not unsubscribe",
         errorBody: "The direct one-click unsubscribe could not be completed with any of the stored links.",
-        errorAdvice: "Open a recent newsletter message and use the unsubscribe link provided there. If the provider still keeps sending or no unsubscribe works, you can disable or replace the alias in Moolias.",
+        errorAdvice: "Recommendation: Open a recent newsletter message and use the unsubscribe link provided there. If the provider still keeps sending or no unsubscribe works, you can disable or replace the alias in Moolias.",
         close: "Close",
       };
 
@@ -67,8 +75,8 @@
   };
 
   const showResultDialog = async (success) => {
-    // The server-rendered notice is retained as a no-JavaScript fallback. Once the
-    // interactive dialog is available it should not appear above the table as well.
+    // Keep the server-rendered notice only as a no-JavaScript fallback. With the
+    // interactive flow the result belongs in the modal, not above the table.
     const queryNotice = page.querySelector(".newsletter-notice");
     queryNotice?.remove();
     cleanupResultQuery();
@@ -85,7 +93,7 @@
       return;
     }
 
-    await api.error(`${labels.errorBody}\n\n${labels.errorAdvice}`, {
+    await api.error(`${labels.errorBody} ${labels.errorAdvice}`, {
       title: labels.errorTitle,
       closeLabel: labels.close,
     });
@@ -118,20 +126,32 @@
   });
 
   page.querySelectorAll('form[action^="/newsletters/"][action$="/unsubscribe"]').forEach((form) => {
-    form.addEventListener("submit", (event) => {
+    // The newsletter flow has its own asynchronous confirmation so it can continue
+    // into a progress state and a result dialog without falling back to a native or
+    // generic form confirmation.
+    form.removeAttribute("data-confirm");
+
+    form.addEventListener("submit", async (event) => {
       if (form.dataset.newsletterProcessingSubmit === "1") {
         delete form.dataset.newsletterProcessingSubmit;
         return;
       }
 
-      // The global Moolias confirmation handler runs in capture phase first. This
-      // listener is reached only after the user has confirmed and the form is
-      // resubmitted. Defer the final submit by two frames so the progress dialog is
-      // visibly painted before navigation starts.
       event.preventDefault();
+      const api = window.MooliasDialog;
+      if (!api) return;
       const submitter = event.submitter;
+      const accepted = await api.confirm({
+        title: labels.confirmTitle,
+        message: labels.confirmBody,
+        confirmLabel: labels.confirm,
+        cancelLabel: labels.cancel,
+        tone: "danger",
+        dismissOnBackdrop: false,
+      });
+      if (!accepted) return;
+
       showProcessingDialog();
-      form.dataset.mooliasConfirmed = "1";
       form.dataset.newsletterProcessingSubmit = "1";
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => form.requestSubmit(submitter || undefined));
