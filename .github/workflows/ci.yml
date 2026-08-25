@@ -28,6 +28,7 @@ jobs:
       - run: pytest -q
       - run: node --check moolias/static/dialogs.js
       - run: node --check moolias/static/app.js
+      - run: node --check moolias/static/alias-workflow.js
       - run: node --check moolias/static/stats.js
       - run: node --check moolias/static/sender-domain.js
       - run: node --check moolias/static/review.js
