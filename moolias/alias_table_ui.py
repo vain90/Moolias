@@ -32,6 +32,18 @@ SORT_MODES = {"attention", "last_used", "usage", "most_used", "status", "purpose
 SORT_DIRECTIONS = {"asc", "desc"}
 
 
+async def _submitted_private_description(
+    request: Request,
+    parsed_value: str | None,
+    *,
+    fallback: str,
+) -> str:
+    form = await request.form()
+    if "private_description" not in form:
+        return fallback
+    return (parsed_value or "").strip()
+
+
 async def _create_unique_alias(
     request: Request,
     user: str,
@@ -284,10 +296,10 @@ async def update_metadata(
         raise HTTPException(status_code=403, detail="Alias cannot be edited here")
 
     name = description.strip()
-    description_text = (
-        alias.private_description
-        if private_description is None
-        else private_description.strip()
+    description_text = await _submitted_private_description(
+        request,
+        private_description,
+        fallback=alias.private_description,
     )
     if not name or len(name) > 160:
         raise HTTPException(status_code=400, detail="Name must be 1-160 characters")
@@ -326,10 +338,10 @@ async def assign_reserved_alias_compatibility(
         raise HTTPException(status_code=409, detail="Alias is not reserved")
 
     name = description.strip()
-    description_text = (
-        alias.private_description
-        if private_description is None
-        else private_description.strip()
+    description_text = await _submitted_private_description(
+        request,
+        private_description,
+        fallback=alias.private_description,
     )
     if not name or len(name) > 160:
         raise HTTPException(status_code=400, detail="Name must be 1-160 characters")
