@@ -23,6 +23,7 @@ PASSWORD = "Moolias-CI-Only-4f9d!A7"
 NEWSLETTER_AGENT_SECRET = "newsletter-ci-agent-secret-0123456789abcdef0123456789abcdef"
 DOVEADM_PASSWORD = "newsletter-ci-doveadm-0123456789abcdef0123456789abcdef"
 NEWSLETTER_MESSAGE_ID = "moolias-newsletter-agent-ci@example.net"
+BODY_NEWSLETTER_MESSAGE_ID = "moolias-newsletter-body-ci@example.net"
 
 
 @dataclass
@@ -314,6 +315,12 @@ async def test_zz_newsletter_agent_reads_headers_through_remote_doveadm(
         timeout=180,
     )
 
+    rspamd_plugin = mailcow_dir / "data/conf/rspamd/plugins.d/moolias_newsletter.lua"
+    assert rspamd_plugin.exists()
+    assert "MOOLIAS_BODY_UNSUB" in rspamd_plugin.read_text(encoding="utf-8")
+    rspamd_local = mailcow_dir / "data/conf/rspamd/rspamd.conf.local"
+    assert "moolias_newsletter { }" in rspamd_local.read_text(encoding="utf-8")
+
     message = (
         "From: Moolias Newsletter CI <news@example.net>\r\n"
         f"To: {MAILBOX}\r\n"
@@ -343,12 +350,43 @@ async def test_zz_newsletter_agent_reads_headers_through_remote_doveadm(
         input_bytes=message,
     )
 
+    body_message = (
+        "From: Body Newsletter CI <body-news@example.net>\r\n"
+        f"To: {MAILBOX}\r\n"
+        f"Message-ID: <{BODY_NEWSLETTER_MESSAGE_ID}>\r\n"
+        "Subject: Body-only newsletter integration\r\n"
+        "MIME-Version: 1.0\r\n"
+        "Content-Type: text/plain; charset=utf-8\r\n"
+        "\r\n"
+        "Angebot und Produktinformationen.\r\n\r\n"
+        "Abbestellen (https://example.net/body-unsubscribe?token=ci-body)\r\n"
+    ).encode()
+    _docker_compose(
+        mailcow_dir,
+        "exec",
+        "-T",
+        "dovecot-mailcow",
+        "doveadm",
+        "save",
+        "-u",
+        MAILBOX,
+        "-m",
+        "INBOX",
+        "-",
+        input_bytes=body_message,
+    )
+
     async with NewsletterAgentClient(
         f"{os.environ['MAILCOW_URL']}/moolias-newsletter-agent",
         NEWSLETTER_AGENT_SECRET,
         verify_tls=False,
     ) as agent:
         headers = await agent.fetch_headers(MAILBOX, NEWSLETTER_MESSAGE_ID)
+        body_headers = await agent.fetch_headers(
+            MAILBOX,
+            BODY_NEWSLETTER_MESSAGE_ID,
+            include_body_unsubscribe=True,
+        )
 
     assert headers["matches"] >= 1
     assert headers["from"] == "Moolias Newsletter CI <news@example.net>"
@@ -357,3 +395,9 @@ async def test_zz_newsletter_agent_reads_headers_through_remote_doveadm(
         "<https://example.net/unsubscribe?token=ci>, <mailto:leave@example.net>"
     )
     assert headers["list_unsubscribe_post"] == "List-Unsubscribe=One-Click"
+
+    assert body_headers["matches"] >= 1
+    assert body_headers["list_unsubscribe"] == ""
+    assert body_headers["body_unsubscribe_url"] == (
+        "https://example.net/body-unsubscribe?token=ci-body"
+    )
