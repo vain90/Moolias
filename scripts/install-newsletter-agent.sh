@@ -273,7 +273,9 @@ fi
 
 cd "$MAILCOW_DIR"
 docker compose config >/dev/null
-if ! docker image inspect "$MOOLIAS_AGENT_IMAGE" >/dev/null 2>&1; then
+if [[ "$MOOLIAS_AGENT_IMAGE" == ghcr.io/* ]]; then
+  docker pull "$MOOLIAS_AGENT_IMAGE"
+elif ! docker image inspect "$MOOLIAS_AGENT_IMAGE" >/dev/null 2>&1; then
   docker pull "$MOOLIAS_AGENT_IMAGE"
 fi
 
