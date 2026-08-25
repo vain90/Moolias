@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import asyncio
-import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
 from moolias.aliases import AliasRecord, is_owned_alias
-from moolias.mailcow import MailcowError
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +45,44 @@ def replace_forwarded_newsletter_tag(
     ]
     if enabled:
         result.append(marker)
+    return result
+
+
+def _active(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value == 1
+    return str(value or "").strip().casefold() in {"1", "true", "yes", "on"}
+
+
+def _normalised_tags(value: object) -> set[str]:
+    if not isinstance(value, (list, tuple, set, frozenset)):
+        return set()
+    return {str(tag).strip().casefold() for tag in value if str(tag).strip()}
+
+
+def _link_ids(tags: object, base_tag: str, role: str) -> set[str]:
+    base = base_tag.strip().casefold()
+    if not base:
+        raise ValueError("Newsletter tag must not be empty")
+    if role not in {"source", "target"}:
+        raise ValueError("Unknown newsletter link role")
+
+    prefix = f"{base}-link-"
+    suffix = f"-{role}"
+    result: set[str] = set()
+    for tag in _normalised_tags(tags):
+        if not tag.startswith(prefix) or not tag.endswith(suffix):
+            continue
+        link_id = tag[len(prefix) : -len(suffix)]
+        if not link_id or len(link_id) > 64:
+            continue
+        if not link_id[0].isalnum():
+            continue
+        if any(character not in "abcdefghijklmnopqrstuvwxyz0123456789._-" for character in link_id):
+            continue
+        result.add(link_id)
     return result
 
 
@@ -93,115 +128,70 @@ def direct_mailcow_forwards_to_mailbox(
     return sorted(forwarded, key=lambda item: (item.name.casefold(), item.address))
 
 
-def _active(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int):
-        return value == 1
-    return str(value or "").strip().casefold() in {"1", "true", "yes", "on"}
-
-
-def _simple_sieve_redirect_target(script: object) -> str | None:
-    """Return the target of a deliberately simple unconditional Sieve redirect.
-
-    The parser is intentionally conservative. Conditional rules, multiple actions that
-    can deliver elsewhere, variables and multiple redirects are not treated as proof of
-    a full mailbox forward.
-    """
-
-    text = str(script or "").replace("\r\n", "\n").replace("\r", "\n")
-    if not text.strip() or "/*" in text or "*/" in text:
-        return None
-
-    lines: list[str] = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if "#" in stripped:
-            return None
-        lines.append(stripped)
-
-    compact = " ".join(lines)
-    match = re.fullmatch(
-        r'redirect\s+"([^"\r\n]+)"\s*;'
-        r"\s*(?:discard\s*;\s*)?"
-        r"(?:stop\s*;\s*)?",
-        compact,
-        flags=re.IGNORECASE,
-    )
-    if match is None:
-        return None
-    target = match.group(1).strip().casefold()
-    return target if "@" in target else None
-
-
-def sieve_mailcow_forwards_to_mailbox(
+def linked_mailcow_mailboxes(
     mailboxes: Iterable[dict[str, Any]],
-    filters: Iterable[dict[str, Any]],
     mailbox: str,
+    base_tag: str,
 ) -> list[ForwardedNewsletterAddress]:
-    """Return active Mailcow mailbox prefilters that fully redirect to mailbox."""
+    """Return active source mailboxes explicitly linked to the target by Mailcow tags.
+
+    A link named ``private`` uses ``<base>-link-private-target`` on the target
+    mailbox and ``<base>-link-private-source`` on one or more source mailboxes.
+    The tags express ownership for Newsletter Management only; Moolias does not
+    infer or modify the actual Mailcow/Sieve routing between the mailboxes.
+    """
 
     mailbox_key = mailbox.strip().casefold()
     if "@" not in mailbox_key:
         return []
 
-    source_mailboxes: dict[str, dict[str, Any]] = {}
-    for item in mailboxes:
-        address = str(item.get("username") or "").strip().casefold()
-        if address and address != mailbox_key and _active(item.get("active")):
-            source_mailboxes[address] = item
+    records = [item for item in mailboxes if isinstance(item, dict)]
+    target = next(
+        (
+            item
+            for item in records
+            if str(item.get("username") or "").strip().casefold() == mailbox_key
+        ),
+        None,
+    )
+    if target is None:
+        return []
 
-    forwarded: dict[str, ForwardedNewsletterAddress] = {}
-    for item in filters:
-        source = str(item.get("username") or "").strip().casefold()
-        if source not in source_mailboxes:
-            continue
-        if str(item.get("filter_type") or "").strip().casefold() != "prefilter":
+    target_links = _link_ids(target.get("tags"), base_tag, "target")
+    if not target_links:
+        return []
+
+    result: dict[str, ForwardedNewsletterAddress] = {}
+    for item in records:
+        address = str(item.get("username") or "").strip().casefold()
+        if not address or address == mailbox_key or "@" not in address:
             continue
         if not _active(item.get("active")):
             continue
-        if _simple_sieve_redirect_target(item.get("script_data")) != mailbox_key:
+        source_links = _link_ids(item.get("tags"), base_tag, "source")
+        if not (target_links & source_links):
             continue
-
-        mailbox_details = source_mailboxes[source]
-        forwarded[source] = ForwardedNewsletterAddress(
-            address=source,
-            name=str(mailbox_details.get("name") or "").strip(),
-            source="sieve",
+        result[address] = ForwardedNewsletterAddress(
+            address=address,
+            name=str(item.get("name") or "").strip(),
+            source="linked_mailbox",
         )
 
-    return sorted(forwarded.values(), key=lambda item: (item.name.casefold(), item.address))
+    return sorted(result.values(), key=lambda item: (item.name.casefold(), item.address))
 
 
-async def discover_mailcow_forwards_to_mailbox(
-    mailcow: Any,
+def mailcow_forwarded_newsletter_addresses(
+    aliases: Iterable[AliasRecord],
+    mailboxes: Iterable[dict[str, Any]],
     mailbox: str,
-    *,
-    aliases: Iterable[AliasRecord] | None = None,
+    base_tag: str,
 ) -> list[ForwardedNewsletterAddress]:
-    """Discover only forwarding relationships that are explicitly configured in Mailcow."""
+    """Combine direct alias forwards with explicitly tag-linked source mailboxes."""
 
-    alias_records = list(aliases) if aliases is not None else await mailcow.list_aliases()
     forwarded = {
         item.address.casefold(): item
-        for item in direct_mailcow_forwards_to_mailbox(alias_records, mailbox)
+        for item in direct_mailcow_forwards_to_mailbox(aliases, mailbox)
     }
-
-    list_filters = getattr(mailcow, "list_filters", None)
-    list_mailboxes = getattr(mailcow, "list_mailboxes", None)
-    if not callable(list_filters) or not callable(list_mailboxes):
-        return sorted(forwarded.values(), key=lambda item: (item.name.casefold(), item.address))
-
-    try:
-        mailboxes, filters = await asyncio.gather(list_mailboxes(), list_filters())
-    except MailcowError:
-        # Older Mailcow versions may not expose filter listing through the API. Direct
-        # alias forwards remain usable instead of making Newsletter Management fail.
-        return sorted(forwarded.values(), key=lambda item: (item.name.casefold(), item.address))
-
-    for item in sieve_mailcow_forwards_to_mailbox(mailboxes, filters, mailbox):
+    for item in linked_mailcow_mailboxes(mailboxes, mailbox, base_tag):
         forwarded.setdefault(item.address.casefold(), item)
-
     return sorted(forwarded.values(), key=lambda item: (item.name.casefold(), item.address))
