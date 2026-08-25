@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from urllib.parse import urlsplit
 
@@ -9,6 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from moolias import newsletters as newsletter_core
 from moolias.mailcow import MailcowError
 from moolias.newsletter_forwarding import (
+    cache_linked_mailcow_mailboxes,
     direct_mailcow_forwards_to_mailbox,
     replace_forwarded_newsletter_tag,
 )
@@ -53,6 +55,22 @@ async def _track(request: Request, mailbox: str) -> None:
         # with messages arriving from now on instead of silently importing history.
         await store.set_history_since(mailbox, int(time.time()))
     collector.track(mailbox)
+
+
+async def _refresh_linked_mailboxes(request: Request, mailbox: str) -> None:
+    """Refresh explicit source/target mailbox links once when the page is opened."""
+
+    try:
+        mailboxes = await request.app.state.mailcow.list_mailboxes()
+    except MailcowError:
+        # Linked mailboxes are optional. A temporary failure must not make the normal
+        # Newsletter page unavailable; direct aliases continue to work as before.
+        return
+    cache_linked_mailcow_mailboxes(
+        mailboxes,
+        mailbox,
+        request.app.state.settings.newsletter_tag,
+    )
 
 
 async def mailbox_newsletter_state(
@@ -224,13 +242,21 @@ async def update_forwarded_newsletter_setting(
     mailcow = request.app.state.mailcow
     settings = request.app.state.settings
     try:
-        mailbox = await mailcow.get_mailbox(user)
-        aliases = await mailcow.list_aliases()
+        mailbox, aliases, mailboxes = await asyncio.gather(
+            mailcow.get_mailbox(user),
+            mailcow.list_aliases(),
+            mailcow.list_mailboxes(),
+        )
+        cache_linked_mailcow_mailboxes(
+            mailboxes,
+            user,
+            settings.newsletter_tag,
+        )
         forwarded = direct_mailcow_forwards_to_mailbox(aliases, user)
         if enabled and not forwarded:
             raise HTTPException(
                 status_code=409,
-                detail="No direct Mailcow forwarding addresses exist for this mailbox",
+                detail="No Mailcow forwarding or linked source mailbox exists for this mailbox",
             )
         tags = replace_forwarded_newsletter_tag(
             mailbox.get("tags"),
@@ -261,6 +287,7 @@ async def newsletters_page(request: Request):
 
     if server_enabled and not state.conflict and state.enabled:
         await _track(request, user)
+        await _refresh_linked_mailboxes(request, user)
         return await newsletter_core.newsletters_page(request)
 
     _untrack(request, user)
@@ -302,6 +329,7 @@ async def newsletters_page(request: Request):
 async def refresh_newsletters(request: Request, csrf_token: str = Form(...)):
     user = require_user(request)
     await _require_enabled(request, user)
+    await _refresh_linked_mailboxes(request, user)
     return await newsletter_core.refresh_newsletters(request, csrf_token)
 
 
