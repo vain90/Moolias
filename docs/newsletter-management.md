@@ -43,7 +43,7 @@ When a settings change makes the **effective** newsletter state switch from off 
 
 The user can choose:
 
-- **Include history**: Moolias may process matching entries that are still present in the configured Rspamd history window and recover their newsletter headers from original messages still available in Dovecot.
+- **Include history**: Moolias may process matching entries that are still present in the configured Rspamd history window and recover their newsletter metadata from original messages still available in Dovecot.
 - **Detect from now on only**: Moolias records a mailbox-specific scan watermark and ignores Rspamd entries older than the activation time.
 
 This question is tied to an actual effective off-to-on transition. It is not shown merely because the source of the setting changes. For example, switching from an explicit mailbox `On` override to an inherited domain `On` value remains effectively enabled and therefore does not ask again.
@@ -60,24 +60,33 @@ The Newsletter page shows one compact row per detected sender and recipient alia
 
 The Newsletter navigation entry is shown only when the feature is effectively enabled for the signed-in mailbox. When it is disabled by the mailbox/domain policy, the setting can be changed from Settings if the administrator has enabled the feature server-wide.
 
-The details control expands technical information only when it is needed.
+The table supports search, active/unsubscribed filtering and pagination. The details control expands technical information only when it is needed.
 
 A detected sender remains visible even when Moolias cannot recover a usable HTTPS unsubscribe URL. In that case the direct unsubscribe button is disabled. This can happen when the original message has already been deleted from Dovecot.
 
+Successfully accepted RFC 8058 one-click unsubscribes remain visible as unsubscribed entries. If a newer message from that subscription is observed afterwards, Moolias highlights the row as mail received after unsubscribe instead of silently forgetting the previous unsubscribe state.
+
 ## Discovery flow
 
-Moolias deliberately does not scan complete message bodies.
+Moolias uses Rspamd as a cheap candidate index so it does not have to read the body of every stored message.
 
 1. Moolias reads the configured Rspamd history window through the existing Mailcow API integration.
-2. A message is considered a candidate when Rspamd recorded the mailing-list signal `MAILLIST` or the header signal `HAS_LIST_UNSUB`, the message was accepted without a spam action, and Rspamd has an authentication signal such as DKIM or DMARC allow. Rspamd history may expose symbols either as structured data or as scored strings such as `MAILLIST(-0.18)[generic]`; Moolias normalises both forms.
-3. Moolias associates the Rspamd SMTP recipient with the authenticated user's mailbox or one of that user's Mailcow aliases.
-4. The mailbox history watermark is applied before historical observations or header lookups are stored.
-5. The restricted Newsletter Agent asks Dovecot for a fixed set of headers for the exact mailbox and Message-ID.
-6. Moolias extracts HTTPS and `mailto:` targets from `List-Unsubscribe` and checks `List-Unsubscribe-Post` for RFC 8058 one-click support.
+2. Standard candidates are messages for which Rspamd recorded `MAILLIST` or `HAS_LIST_UNSUB`.
+3. The Moolias Mailcow installer additionally installs a zero-score Rspamd Lua detector. It records `MOOLIAS_BODY_UNSUB` when a message body contains a likely unsubscribe action such as `unsubscribe`, `Abbestellen`, `Abmelden`, `opt out` or `manage preferences` and the message contains URLs. The Rspamd symbol contains only the matched indicator and **never the personalized unsubscribe URL**.
+4. A candidate must also have been accepted without a spam action and carry an authentication signal such as DKIM or DMARC allow. Rspamd history may expose symbols either as structured data or as scored strings such as `MAILLIST(-0.18)[generic]`; Moolias normalises both forms.
+5. Moolias associates the Rspamd SMTP recipient with the authenticated user's mailbox or one of that user's Mailcow aliases.
+6. The mailbox history watermark is applied before historical observations or message lookups are stored.
+7. For normal `MAILLIST`/`HAS_LIST_UNSUB` candidates, the restricted Newsletter Agent asks Dovecot for a fixed set of headers for the exact mailbox and Message-ID.
+8. Only for `MOOLIAS_BODY_UNSUB` candidates may the agent additionally request the UTF-8 message text for that exact Message-ID. It searches locally for a nearby HTTPS unsubscribe link and returns only the extracted URL to the Moolias application; the message body itself is not returned or stored by Moolias.
+9. Header-based HTTPS and `mailto:` targets come from `List-Unsubscribe`. `List-Unsubscribe-Post` and DKIM coverage determine whether a header-based HTTPS URL qualifies for RFC 8058 one-click handling. A body-derived URL is always treated as a normal unsubscribe page, never as RFC 8058 one-click.
 
-Rspamd provides the cheap index. Dovecot remains the source of the original message headers.
+This two-stage design catches providers such as Sonos that put an unsubscribe link only in the footer while avoiding broad IMAP/Dovecot body scans for ordinary mail.
 
-Header lookups are remembered per Message-ID so old messages are not queried again on every polling cycle. A scan performs at most 50 new Dovecot header lookups; additional historical candidates are picked up by later scans.
+Header/body lookups are remembered per Message-ID so old messages are not queried again on every polling cycle. A scan performs at most 50 new Dovecot lookups; additional historical candidates are picked up by later scans.
+
+### Historical limitation of the body detector
+
+`MOOLIAS_BODY_UNSUB` is added by Rspamd while a message is scanned. Installing the detector does not retroactively add the symbol to entries that are already present in Rspamd history. Existing historical messages without `MAILLIST`/`HAS_LIST_UNSUB` therefore do not automatically become body-only candidates merely because the plugin is installed. New matching messages are detected from that point onward.
 
 ## Stored data
 
@@ -98,7 +107,7 @@ Moolias stores:
 - whether a stored URL qualified for verified one-click handling
 - the operational history watermark used for historical import/from-now behavior
 
-Unsubscribe URLs are stored in plaintext. This is intentional: the same personalized URLs already arrive as plaintext mail headers and may still be present in the Mailcow message store. Moolias does not write complete unsubscribe URLs to normal application logs.
+Unsubscribe URLs are stored in plaintext. This is intentional: the same personalized URLs already arrive as plaintext mail headers or message content and may still be present in the Mailcow message store. Moolias does not write complete unsubscribe URLs to normal application logs.
 
 When a fourth different URL is learned for the same newsletter, the oldest stored URL is removed.
 
@@ -118,9 +127,11 @@ A URL is treated as one-click only when:
 
 After explicit user confirmation, the Moolias backend sends the RFC 8058 POST. If the newest stored one-click URL fails, Moolias can try the remaining stored one-click URLs from newest to oldest.
 
+Moolias marks the newsletter as unsubscribed only after the provider accepts the POST with a 2xx HTTP response.
+
 ### Normal HTTPS unsubscribe page
 
-When an HTTPS URL exists without verified one-click support, Moolias opens the newest URL in the user's browser. Moolias does not attempt to automate arbitrary unsubscribe forms.
+When an HTTPS URL exists without verified one-click support, including URLs recovered from the message body, Moolias opens the newest URL in the user's browser. Moolias does not attempt to automate arbitrary unsubscribe forms and cannot know whether the user completed the action on the provider's page.
 
 ## SSRF protection
 
@@ -153,9 +164,19 @@ The Moolias web application does not receive the Dovecot `doveadm_password` and 
 - drops all Linux capabilities
 - exposes only the signed `/v1/headers` API through Mailcow nginx
 - accepts only a mailbox and exact Message-ID
-- returns only the fixed newsletter-related header set
+- normally returns only the fixed newsletter-related header set
+- may inspect the UTF-8 message text only when Moolias explicitly marks the request as a Rspamd `MOOLIAS_BODY_UNSUB` candidate
+- returns only a matched HTTPS unsubscribe URL from such a body lookup, not the body itself
 
 The web application authenticates requests to the agent with a separate HMAC secret.
+
+## Mailcow Rspamd detector
+
+The same installer also installs `scripts/rspamd/moolias_newsletter.lua` into Mailcow's persistent Rspamd configuration and enables it through a managed block in `data/conf/rspamd/rspamd.conf.local`.
+
+The installer runs `rspamadm configtest` before accepting the Rspamd change. If Rspamd rejects the configuration, the previous plugin/configuration files are restored. On success the Rspamd container is restarted so new incoming messages can receive `MOOLIAS_BODY_UNSUB`.
+
+The detector has score `0.0`; it is a classification hint for Moolias and does not make a message more or less spammy.
 
 ## Configuration
 
@@ -175,7 +196,7 @@ MOOLIAS_NEWSLETTER_POLL_SECONDS=60
 MOOLIAS_NEWSLETTER_HISTORY_COUNT=1000
 ```
 
-The recommended installer creates the agent secret, configures Dovecot remote `doveadm` authentication when necessary, adds the sidecar to Mailcow's Compose override and enables the server-side feature in the Moolias `.env`. The domain/mailbox Mailcow tags then determine which mailboxes actually use newsletter management.
+The recommended installer creates the agent secret, configures Dovecot remote `doveadm` authentication when necessary, installs the Rspamd body detector, adds the sidecar to Mailcow's Compose override and enables the server-side feature in the Moolias `.env`. The domain/mailbox Mailcow tags then determine which mailboxes actually use newsletter management.
 
 Run it on the Mailcow host with:
 
@@ -184,6 +205,6 @@ cd /opt/moolias
 sudo bash scripts/install-newsletter-agent.sh
 ```
 
-The script intentionally requires root because it modifies Mailcow configuration files and restarts/reloads Mailcow services. The script is idempotent for its managed Dovecot, nginx and Compose blocks. If an administrator already configured `doveadm_password`, the installer reuses that setting rather than replacing it.
+The script intentionally requires root because it modifies Mailcow configuration files and restarts/reloads Mailcow services. The script is idempotent for its managed Dovecot, nginx, Compose and Rspamd blocks. If an administrator already configured `doveadm_password`, the installer reuses that setting rather than replacing it.
 
 After installation, restart or rebuild the Moolias application so the new application settings and image are active.
