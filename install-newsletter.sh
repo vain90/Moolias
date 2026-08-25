@@ -11,6 +11,7 @@ main() {
   local final_url=""
   local latest_ref=""
   local tmp_dir=""
+  local tmp_dir_cleanup=""
 
   fail() {
     echo "Moolias Newsletter installer: $*" >&2
@@ -47,7 +48,8 @@ main() {
   fi
 
   tmp_dir="$(mktemp -d)"
-  trap 'rm -rf -- "$tmp_dir"' EXIT
+  printf -v tmp_dir_cleanup '%q' "$tmp_dir"
+  trap "rm -rf -- ${tmp_dir_cleanup}" EXIT
   mkdir -p "${tmp_dir}/scripts/rspamd"
 
   fetch_asset() {
