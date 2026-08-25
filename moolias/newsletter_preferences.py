@@ -12,6 +12,7 @@ from moolias.mailcow import MailcowError
 from moolias.newsletter_forwarding import (
     cache_linked_mailcow_mailboxes,
     direct_mailcow_forwards_to_mailbox,
+    linked_mailcow_mailbox_cache_ready,
     replace_forwarded_newsletter_tag,
 )
 from moolias.newsletter_mode import (
@@ -28,6 +29,7 @@ from moolias.ui import PAGE_SIZES, _load_ui_state, _template_context
 
 router = APIRouter()
 NEWSLETTER_MODE_SELECTIONS = {"inherit", "off", "on"}
+_LINK_SESSION_KEY = "newsletter_link_cache"
 
 
 def _safe_return_to(value: str | None, fallback: str = "/overview") -> str:
@@ -57,8 +59,20 @@ async def _track(request: Request, mailbox: str) -> None:
     collector.track(mailbox)
 
 
+def _link_session_value(request: Request, mailbox: str) -> str:
+    base_tag = request.app.state.settings.newsletter_tag.strip().casefold()
+    return f"{mailbox.strip().casefold()}|{base_tag}"
+
+
 async def _refresh_linked_mailboxes(request: Request, mailbox: str) -> None:
-    """Refresh explicit source/target mailbox links once when the page is opened."""
+    """Resolve source/target mailbox tags once per authenticated browser session."""
+
+    expected = _link_session_value(request, mailbox)
+    if (
+        request.session.get(_LINK_SESSION_KEY) == expected
+        and linked_mailcow_mailbox_cache_ready(mailbox)
+    ):
+        return
 
     try:
         mailboxes = await request.app.state.mailcow.list_mailboxes()
@@ -71,6 +85,7 @@ async def _refresh_linked_mailboxes(request: Request, mailbox: str) -> None:
         mailbox,
         request.app.state.settings.newsletter_tag,
     )
+    request.session[_LINK_SESSION_KEY] = expected
 
 
 async def mailbox_newsletter_state(
@@ -238,19 +253,14 @@ async def update_forwarded_newsletter_setting(
     validate_csrf(request, csrf_token)
     user = require_user(request)
     await _require_enabled(request, user)
+    await _refresh_linked_mailboxes(request, user)
 
     mailcow = request.app.state.mailcow
     settings = request.app.state.settings
     try:
-        mailbox, aliases, mailboxes = await asyncio.gather(
+        mailbox, aliases = await asyncio.gather(
             mailcow.get_mailbox(user),
             mailcow.list_aliases(),
-            mailcow.list_mailboxes(),
-        )
-        cache_linked_mailcow_mailboxes(
-            mailboxes,
-            user,
-            settings.newsletter_tag,
         )
         forwarded = direct_mailcow_forwards_to_mailbox(aliases, user)
         if enabled and not forwarded:
