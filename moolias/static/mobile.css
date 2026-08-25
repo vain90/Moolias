@@ -1,3 +1,10 @@
+.app-body:has(.javascript-warning) .app-sidebar {
+  position: sticky;
+  inset: 0 auto auto 0;
+  height: 100vh;
+  height: 100dvh;
+}
+
 @media (max-width: 760px) {
   .status-row {
     width: auto;
