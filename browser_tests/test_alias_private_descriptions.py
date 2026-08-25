@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from playwright.sync_api import Locator, Page, expect
+from playwright.sync_api import Browser, Locator, Page, expect
 
 
 def _login_de(page: Page, base_url: str) -> None:
@@ -21,6 +21,37 @@ def _alias_row(page: Page, address: str) -> Locator:
 
 def _amazon_row(page: Page) -> Locator:
     return _alias_row(page, "amazon-k7@example.org")
+
+
+def test_alias_description_fields_are_server_rendered_without_javascript(
+    browser: Browser,
+    base_url: str,
+) -> None:
+    context = browser.new_context(java_script_enabled=False)
+    try:
+        page = context.new_page()
+        _login_de(page, base_url)
+        page.goto(f"{base_url}/aliases")
+
+        expect(page.locator('link[data-alias-description-styles="1"]')).to_have_count(1)
+        expect(page.locator(".alias-table-head > span").nth(1)).to_contain_text(
+            "Alias Name / Alias-Adresse"
+        )
+
+        row = _amazon_row(page)
+        expect(row.locator("[data-alias-edit-address] code")).to_have_text(
+            "amazon-k7@example.org"
+        )
+        expect(
+            row.locator('.edit-panel textarea[name="private_description"]')
+        ).to_have_count(1)
+        expect(
+            page.locator(
+                'dialog[data-create-alias-dialog] textarea[name="private_description"]'
+            )
+        ).to_have_count(1)
+    finally:
+        context.close()
 
 
 def test_alias_description_edit_and_table_preview(page: Page, base_url: str) -> None:
