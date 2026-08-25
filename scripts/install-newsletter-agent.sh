@@ -290,6 +290,10 @@ mounts="$(docker inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "
 docker compose exec -T nginx-mailcow nginx -t
 docker compose exec -T nginx-mailcow nginx -s reload
 
+rspamd_installer="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/install-newsletter-rspamd.sh"
+[[ -f "$rspamd_installer" ]] || fail "Rspamd detector installer is missing at ${rspamd_installer}."
+MAILCOW_DIR="$MAILCOW_DIR" bash "$rspamd_installer"
+
 echo
 echo "Moolias Newsletter Agent installed successfully."
 echo "Moolias configuration updated: ${MOOLIAS_ENV}"
