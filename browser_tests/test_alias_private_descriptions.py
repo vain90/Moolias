@@ -45,6 +45,10 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         expect(
             row.locator('.edit-panel textarea[name="private_description"]')
         ).to_have_count(1)
+        expect(row.locator("[data-replace-alias]")).to_have_text("Alias ersetzen")
+        expect(row.locator(".alias-toggle-action button")).to_have_text(
+            "Alias deaktivieren"
+        )
         expect(
             page.locator(
                 'dialog[data-create-alias-dialog] textarea[name="private_description"]'
