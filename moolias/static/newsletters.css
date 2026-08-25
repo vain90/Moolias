@@ -15,6 +15,28 @@
   margin: 0;
 }
 
+.newsletter-forwarding-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0;
+}
+
+.newsletter-forwarding-notice form {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.newsletter-forwarded-addresses {
+  margin-top: 0.35rem;
+  color: var(--muted);
+}
+
+.newsletter-forwarded-label {
+  font-weight: 700;
+}
+
 .newsletter-management-card {
   padding-bottom: 14px;
 }
@@ -319,6 +341,16 @@
   }
 
   .newsletter-refresh-form .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .newsletter-forwarding-notice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .newsletter-forwarding-notice .button {
     width: 100%;
     justify-content: center;
   }
