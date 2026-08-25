@@ -206,10 +206,11 @@
                   <label class="check-row"><input type="checkbox" name="sogo_visible" value="1" {% if alias.sogo_visible %}checked{% endif %}><span>{{ t.show_in_sogo }}</span></label>
                   <button class="button primary compact" type="submit">{{ t.save }}</button>
                 </form>
+                <button class="button compact alias-replace-action" type="button" data-replace-alias="{{ alias.id }}">{% if language == 'de' %}Alias ersetzen{% else %}Replace alias{% endif %}</button>
                 <form class="alias-toggle-action top-gap" method="post" action="/aliases/{{ alias.id }}/toggle">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="return_to" value="{{ return_to }}">
-                  <button class="button compact {{ 'danger' if alias.active else '' }}" type="submit">{{ t.disable if alias.active else t.enable }}</button>
+                  <button class="button compact {{ 'danger' if alias.active else '' }}" type="submit">{% if alias.active %}{% if language == 'de' %}Alias deaktivieren{% else %}Disable alias{% endif %}{% else %}{% if language == 'de' %}Alias aktivieren{% else %}Enable alias{% endif %}{% endif %}</button>
                 </form>
               </div>
             </details>
