@@ -4,14 +4,94 @@ import socket
 
 import pytest
 
+from moolias.newsletter_store import Newsletter, NewsletterLink
 from moolias.newsletters import (
     _decode_header_text,
     _dkim_covers_one_click,
     _history_candidate,
+    _newsletter_sort_key,
+    _normalise_newsletter_status_filter,
     _public_https_target,
     _symbols,
     _unsubscribe_targets,
 )
+
+
+def _newsletter(
+    newsletter_id: int,
+    *,
+    last_seen_at: int,
+    unsubscribed_at: int | None = None,
+    has_link: bool = False,
+) -> Newsletter:
+    links = (
+        NewsletterLink(
+            id=newsletter_id,
+            newsletter_id=newsletter_id,
+            url=f"https://example.org/unsubscribe/{newsletter_id}",
+            one_click=True,
+            mailto=None,
+            source_message_id=f"message-{newsletter_id}@example.org",
+            discovered_at=last_seen_at,
+            last_seen_at=last_seen_at,
+        ),
+    ) if has_link else ()
+    return Newsletter(
+        id=newsletter_id,
+        mailbox="owner@example.org",
+        recipient_alias="alias@example.org",
+        identity_key=f"sender:newsletter-{newsletter_id}@example.org",
+        sender_name=f"Newsletter {newsletter_id}",
+        sender_address=f"newsletter-{newsletter_id}@example.org",
+        list_id=None,
+        first_seen_at=last_seen_at - 10,
+        last_seen_at=last_seen_at,
+        message_count=1,
+        latest_message_id=f"message-{newsletter_id}@example.org",
+        unsubscribed_at=unsubscribed_at,
+        links=links,
+    )
+
+
+def test_newsletter_status_filter_defaults_to_active():
+    assert _normalise_newsletter_status_filter(None) == "active"
+    assert _normalise_newsletter_status_filter("") == "active"
+    assert _normalise_newsletter_status_filter("invalid") == "active"
+    assert _normalise_newsletter_status_filter("all") == "all"
+    assert _normalise_newsletter_status_filter("unsubscribed") == "unsubscribed"
+
+
+def test_newsletter_sort_prioritizes_actionable_active_rows_and_keeps_unsubscribed_last():
+    resumed = _newsletter(
+        1,
+        last_seen_at=200,
+        unsubscribed_at=150,
+        has_link=True,
+    )
+    actionable = _newsletter(2, last_seen_at=400, has_link=True)
+    no_link = _newsletter(3, last_seen_at=500)
+    unsubscribed = _newsletter(
+        4,
+        last_seen_at=600,
+        unsubscribed_at=700,
+        has_link=True,
+    )
+
+    ordered = sorted(
+        [unsubscribed, no_link, actionable, resumed],
+        key=_newsletter_sort_key,
+    )
+
+    assert [item.id for item in ordered] == [1, 2, 3, 4]
+
+
+def test_newsletter_sort_uses_last_seen_within_same_priority():
+    older = _newsletter(1, last_seen_at=100, has_link=True)
+    newer = _newsletter(2, last_seen_at=200, has_link=True)
+
+    ordered = sorted([older, newer], key=_newsletter_sort_key)
+
+    assert [item.id for item in ordered] == [2, 1]
 
 
 def test_encoded_sender_name_is_decoded_for_display():
