@@ -74,8 +74,11 @@ async def _refresh_linked_mailboxes(request: Request, mailbox: str) -> None:
     ):
         return
 
+    list_mailboxes = getattr(request.app.state.mailcow, "list_mailboxes", None)
+    if not callable(list_mailboxes):
+        return
     try:
-        mailboxes = await request.app.state.mailcow.list_mailboxes()
+        mailboxes = await list_mailboxes()
     except MailcowError:
         # Linked mailboxes are optional. A temporary failure must not make the normal
         # Newsletter page unavailable; direct aliases continue to work as before.
