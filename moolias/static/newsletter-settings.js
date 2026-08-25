@@ -43,32 +43,26 @@
 
   const save = setting?.querySelector('[data-newsletter-save]');
   const state = setting?.querySelector('[data-newsletter-setting-state]');
-  const description = setting?.querySelector('.setting-toggle-head .muted');
-  const hint = setting?.querySelector('.hint');
+  const description = setting?.querySelector('.settings-section-body > .muted');
+  const hint = setting?.querySelector('.settings-section-body > .hint');
 
-  if (description) {
-    description.textContent = language === 'de'
-      ? 'Die Domain kann einen Standard vorgeben. Du kannst ihn für dein eigenes Postfach übernehmen oder mit An/Aus überschreiben.'
-      : 'The domain can define a default. You can inherit it for your mailbox or override it with On/Off.';
-  }
-  if (hint) {
-    hint.textContent = language === 'de'
-      ? 'Wie bei der Statistik werden Newsletter-Tags direkt an Domain und Postfach in Mailcow ausgewertet. Ist die Funktion serverseitig deaktiviert, kann diese Einstellung nicht geändert werden.'
-      : 'As with statistics, newsletter tags are evaluated directly on the Mailcow domain and mailbox. If the feature is disabled server-side, this setting cannot be changed.';
-  }
+  // Keep the normal settings view concise. Policy details belong in the documentation;
+  // the user only needs the selection and the resulting effective state here.
+  description?.remove();
+  hint?.remove();
 
   const labels = {
     de: {
-      serverOff: 'Newsletter-Verwaltung ist serverseitig deaktiviert.',
-      inheritedOn: 'Aktiviert über die Domain-Einstellung.',
-      inheritedOff: 'Deaktiviert über die Domain-Einstellung.',
+      serverOff: 'Serverseitig deaktiviert.',
+      inheritedOn: 'Über die Domain-Einstellung aktiviert.',
+      inheritedOff: 'Über die Domain-Einstellung deaktiviert.',
       mailboxOn: 'Für dieses Postfach aktiviert.',
       mailboxOff: 'Für dieses Postfach deaktiviert.',
       conflictMailbox: 'Widersprüchliche Newsletter-Tags am Postfach. Die Funktion bleibt aus, bis der Konflikt behoben ist.',
       conflictDomain: 'Widersprüchliche Newsletter-Tags an der Domain. Die Funktion bleibt aus, bis der Konflikt behoben ist.',
       unavailable: 'Die Newsletter-Einstellung konnte nicht geladen werden.',
       historyTitle: 'Vorhandene Newsletter-Historie einbeziehen?',
-      historyBody: 'Möchtest du die noch verfügbare Mailcow/Rspamd-Historie auswerten und vorhandene Newsletter rückwirkend übernehmen? Wie weit die Auswertung zurückreicht, hängt von der noch verfügbaren Rspamd-Historie und den noch vorhandenen Originalmails in Dovecot ab.',
+      historyBody: 'Möchtest du die noch verfügbare Historie nach bereits erkannten Newslettern durchsuchen?',
       historyInclude: 'Historie einbeziehen',
       historyNow: 'Nur ab jetzt erkennen',
       cancel: 'Abbrechen',
@@ -78,7 +72,7 @@
       processingNow: 'Die Einstellung wird gespeichert. Frühere Nachrichten werden nicht rückwirkend importiert.',
     },
     en: {
-      serverOff: 'Newsletter management is disabled server-side.',
+      serverOff: 'Disabled server-side.',
       inheritedOn: 'Enabled by the domain setting.',
       inheritedOff: 'Disabled by the domain setting.',
       mailboxOn: 'Enabled for this mailbox.',
@@ -87,7 +81,7 @@
       conflictDomain: 'Conflicting newsletter tags on the domain. The feature stays off until the conflict is fixed.',
       unavailable: 'The newsletter setting could not be loaded.',
       historyTitle: 'Include available newsletter history?',
-      historyBody: 'Would you like Moolias to evaluate the Mailcow/Rspamd history that is still available and import existing newsletters retrospectively? How far the import can go back depends on the Rspamd history and original messages still available in Dovecot.',
+      historyBody: 'Would you like Moolias to search the still-available history for previously detected newsletters?',
       historyInclude: 'Include history',
       historyNow: 'Detect from now on only',
       cancel: 'Cancel',
