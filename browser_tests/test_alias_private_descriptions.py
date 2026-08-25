@@ -39,10 +39,13 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         expect(warning).to_contain_text("nicht oder nur sehr eingeschränkt nutzbar")
         expect(warning.locator("button")).to_have_count(0)
 
+        warning_text = warning.locator(":scope > span").last
         warning_box = warning.bounding_box()
+        warning_text_box = warning_text.bounding_box()
         sidebar_box = page.locator("[data-app-sidebar]").bounding_box()
         viewport = page.viewport_size
         assert warning_box is not None
+        assert warning_text_box is not None
         assert sidebar_box is not None
         assert viewport is not None
         assert abs(warning_box["x"]) <= 1
@@ -54,7 +57,18 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         assert warning.evaluate(
             "el => getComputedStyle(el).justifyContent"
         ) == "center"
-        assert warning.evaluate("el => getComputedStyle(el).display") == "flex"
+        assert warning.evaluate("el => getComputedStyle(el).display") == "grid"
+        assert warning_text.evaluate(
+            "el => getComputedStyle(el).textAlign"
+        ) == "center"
+        assert warning_text_box["y"] >= warning_box["y"] - 1
+        assert (
+            warning_text_box["y"] + warning_text_box["height"]
+            <= warning_box["y"] + warning_box["height"] + 1
+        )
+        warning_center = warning_box["x"] + warning_box["width"] / 2
+        text_center = warning_text_box["x"] + warning_text_box["width"] / 2
+        assert abs(text_center - warning_center) <= 2
 
         expect(page.locator('link[data-alias-description-styles="1"]')).to_have_count(1)
         expect(page.locator(".alias-table-head > span").nth(1)).to_contain_text(
