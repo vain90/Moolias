@@ -66,28 +66,43 @@ A detected sender remains visible even when Moolias cannot recover a usable HTTP
 
 Successfully accepted RFC 8058 one-click unsubscribes remain visible as unsubscribed entries. If a newer message from that subscription is observed afterwards, Moolias highlights the row as mail received after unsubscribe instead of silently forgetting the previous unsubscribe state.
 
-## Mailcow forwarding addresses
+## Additional forwarding addresses and linked mailboxes
 
-Some installations keep old addresses as Mailcow aliases that forward directly to a newer mailbox. Those addresses are not automatically treated as normal Moolias aliases when they belong to another Mailcow-managed domain.
+Newsletter Management can optionally include receiving addresses that are not normal owned Moolias aliases. There are two supported sources.
 
-Moolias offers a separate opt-in only when Mailcow currently contains at least one matching forwarding alias. A forwarding alias qualifies only when it is:
+### Direct Mailcow alias forwards
 
-- active in Mailcow
-- not a catch-all
-- addressed to one concrete email address
-- configured with exactly one `goto` target
-- targeted directly at the authenticated mailbox
-- not already a normal owned Moolias alias for that mailbox
+A Mailcow alias qualifies automatically when it is active, is not a catch-all, has exactly one `goto` target, points directly at the authenticated mailbox, and is not already a normal owned Moolias alias. Shared aliases, catch-alls and forwarding chains are deliberately excluded.
 
-Shared aliases, catch-alls and forwarding chains are deliberately excluded.
+### Explicitly linked Mailcow mailboxes
 
-When at least one qualifying forwarding address exists, the Newsletter page shows an **Include forwarded addresses** control. If none exist, no forwarding control is rendered. Enabling the option stores the derived mailbox tag `moolias-newsletter-forwarded` when the default newsletter base tag is used. With a custom `MOOLIAS_NEWSLETTER_TAG`, the forwarding tag is `<base-tag>-forwarded`.
+For old addresses that still exist as real Mailcow mailboxes and are forwarded by an administrator through Sieve or another routing mechanism, Moolias does **not** inspect or parse the routing rule. Instead, the administrator explicitly links source and target mailboxes with Mailcow mailbox tags.
 
-This forwarding flag is mailbox-only and has no domain inheritance. It does not change the Mailcow alias or routing configuration. The collector still revalidates the live Mailcow alias list on every scan, so a forwarding address that is later disabled, deleted, changed to a shared target or otherwise ceases to qualify is no longer included even if the mailbox forwarding flag remains set.
+With the default newsletter base tag, a link named `private` is configured as follows:
 
-The existing newsletter-history watermark is still respected. Enabling forwarded addresses does not override an earlier **Detect from now on only** decision. If the mailbox was configured to include available history, matching Rspamd entries for the forwarded address may be imported while they remain available.
+```text
+Target/main mailbox:
+  moolias-newsletter-link-private-target
 
-Newsletter rows received through such an address display its Mailcow alias name when present, the forwarded email address, and a **Forwarded** marker.
+Old/source mailbox:
+  moolias-newsletter-link-private-source
+```
+
+The part between `link-` and `-source`/`-target` is the link ID. It may contain lowercase letters, digits, dots, underscores and hyphens and may be chosen freely. Multiple old mailboxes can use the same source tag to link them to one target mailbox. A target mailbox may also carry multiple target link IDs.
+
+For a custom `MOOLIAS_NEWSLETTER_TAG`, the same pattern derives from that base tag. For example, `MOOLIAS_NEWSLETTER_TAG=company-news` produces `company-news-link-private-target` and `company-news-link-private-source`.
+
+Only active Mailcow mailboxes with a source tag matching a target tag on the authenticated mailbox qualify. The tags express the administrative relationship only: Moolias does not create, verify or change the actual Sieve/forwarding configuration.
+
+Moolias reads Mailcow's mailbox list when the user opens the Newsletter page and caches the linked source addresses in the running Moolias process for that target mailbox. The background collector does **not** call `mailbox/all` or inspect Sieve filters on every polling cycle. Opening the Newsletter page again refreshes the link cache; the manual Newsletter refresh action also refreshes it.
+
+When at least one qualifying direct forwarding alias or explicitly linked source mailbox exists, the Newsletter page shows an **Include forwarded addresses** control. If none exist, no forwarding control is rendered. Enabling the option stores the derived mailbox tag `moolias-newsletter-forwarded` when the default newsletter base tag is used. With a custom base tag, the forwarding flag is `<base-tag>-forwarded`.
+
+This forwarding flag is mailbox-only and has no domain inheritance. It does not change any Mailcow alias, mailbox, Sieve script or routing configuration.
+
+The existing newsletter-history watermark is still respected. Enabling forwarded addresses does not override an earlier **Detect from now on only** decision. If the mailbox was configured to include available history, matching Rspamd entries for a qualifying forwarded address may be imported while they remain available.
+
+Newsletter rows received through such an address show the configured Mailcow alias/mailbox display name when available, the receiving email address, and a **Forwarded** marker.
 
 ## Discovery flow
 
@@ -97,9 +112,9 @@ Moolias uses Rspamd as a cheap candidate index so it does not have to read the b
 2. Standard candidates are messages for which Rspamd recorded `MAILLIST` or `HAS_LIST_UNSUB`.
 3. The Moolias Mailcow installer additionally installs a zero-score Rspamd Lua detector. It records `MOOLIAS_BODY_UNSUB` when a message body contains a likely unsubscribe action such as `unsubscribe`, `Abbestellen`, `Abmelden`, `opt out` or `manage preferences` and the message contains URLs. The Rspamd symbol contains only the matched indicator and **never the personalized unsubscribe URL**.
 4. A candidate must also have been accepted without a spam action and carry an authentication signal such as DKIM or DMARC allow. Rspamd history may expose symbols either as structured data or as scored strings such as `MAILLIST(-0.18)[generic]`; Moolias normalises both forms.
-5. Moolias associates the Rspamd SMTP recipient with the authenticated user's mailbox, one of that user's normal Mailcow aliases, or an explicitly opted-in qualifying Mailcow forwarding address.
+5. Moolias associates the Rspamd SMTP recipient with the authenticated user's mailbox, one of that user's normal Mailcow aliases, or an explicitly opted-in forwarding/linked address.
 6. The mailbox history watermark is applied before historical observations or message lookups are stored.
-7. For normal `MAILLIST`/`HAS_LIST_UNSUB` candidates, the restricted Newsletter Agent asks Dovecot for a fixed set of headers for the exact mailbox and Message-ID.
+7. For normal `MAILLIST`/`HAS_LIST_UNSUB` candidates, the restricted Newsletter Agent asks Dovecot for a fixed set of headers for the exact target mailbox and Message-ID.
 8. Only for `MOOLIAS_BODY_UNSUB` candidates may the agent additionally request the UTF-8 message text for that exact Message-ID. It searches locally for a nearby HTTPS unsubscribe link and returns only the extracted URL to the Moolias application; the message body itself is not returned or stored by Moolias.
 9. Header-based HTTPS and `mailto:` targets come from `List-Unsubscribe`. `List-Unsubscribe-Post` and DKIM coverage determine whether a header-based HTTPS URL qualifies for RFC 8058 one-click handling. A body-derived URL is always treated as a normal unsubscribe page, never as RFC 8058 one-click.
 
@@ -134,7 +149,7 @@ Unsubscribe URLs are stored in plaintext. This is intentional: the same personal
 
 When a fourth different URL is learned for the same newsletter, the oldest stored URL is removed.
 
-The newsletter policy and forwarded-address opt-in are not stored in SQLite. Mailcow domain/mailbox tags are the source of truth for enablement.
+The newsletter policy and forwarded-address opt-in are not stored in SQLite. Mailcow domain/mailbox tags are the source of truth for enablement and linked-mailbox relationships.
 
 ## One-click unsubscribe
 
@@ -197,7 +212,7 @@ The web application authenticates requests to the agent with a separate HMAC sec
 
 The same installer also installs `scripts/rspamd/moolias_newsletter.lua` into Mailcow's persistent Rspamd configuration and enables it through a managed block in `data/conf/rspamd/rspamd.conf.local`.
 
-The installer runs `rspamadm configtest` before accepting the Rspamd change. If Rspamd rejects the configuration, the previous plugin/configuration files are restored. On success the Rspamd container is restarted so new incoming messages can receive `MOOLIAS_BODY_UNSUB`.
+The installer runs `rspamadm configtest` before accepting the Rspamd change. If Rspamd rejectss the configuration, the previous plugin/configuration files are restored. On success the Rspamd container is restarted so new incoming messages can receive `MOOLIAS_BODY_UNSUB`.
 
 The detector has score `0.0`; it is a classification hint for Moolias and does not make a message more or less spammy.
 
@@ -207,8 +222,10 @@ The detector has score `0.0`; it is a classification hint for Moolias and does n
 # Global administrator switch.
 MOOLIAS_NEWSLETTER_MANAGEMENT=true
 
-# Domain/mailbox policy tag family. The optional forwarding flag derives
-# <this-value>-forwarded as a mailbox-only tag.
+# Domain/mailbox policy tag family. Additional mailbox tags derive from this base:
+# <base>-forwarded
+# <base>-link-<id>-target
+# <base>-link-<id>-source
 MOOLIAS_NEWSLETTER_TAG=moolias-newsletter
 
 # Newsletter observations, unsubscribe metadata and history watermark.
