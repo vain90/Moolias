@@ -25,11 +25,9 @@ def replace_forwarded_newsletter_tag(
     enabled: bool,
 ) -> list[str]:
     marker = forwarded_newsletter_tag(base_tag)
-    existing: Iterable[object]
-    if isinstance(tags, (list, tuple, set, frozenset)):
-        existing = tags
-    else:
-        existing = ()
+    existing: Iterable[object] = (
+        tags if isinstance(tags, (list, tuple, set, frozenset)) else ()
+    )
 
     result = [
         str(tag).strip()
