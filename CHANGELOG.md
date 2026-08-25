@@ -2,6 +2,35 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.2.0 - 2026-08-25
+
+### Added
+
+- optional Newsletter Management with an inheritable Mailcow domain/mailbox tag policy and a dedicated German/English management view
+- newsletter discovery from Mailcow Rspamd history using standard mailing-list signals plus the zero-score `MOOLIAS_BODY_UNSUB` detector for providers that expose unsubscribe actions only in the message body
+- a restricted HMAC-authenticated Newsletter Agent that resolves only an exact mailbox and Message-ID through Dovecot and returns fixed newsletter metadata instead of exposing mail storage to the Moolias web application
+- verified RFC 8058 one-click unsubscribe handling, ordinary HTTPS unsubscribe-page support, manual unsubscribe status tracking and warnings when a sender writes again after an unsubscribe
+- optional inclusion of active direct Mailcow forwarding aliases and administratively linked legacy Mailcow mailboxes using `moolias-newsletter-link-<id>-target` / `moolias-newsletter-link-<id>-source` tags
+- a stable-aware `install-newsletter.sh` bootstrap that retrieves the Newsletter Agent installer, Rspamd installer and Lua detector from the same Moolias release
+- unit, browser and disposable real-Mailcow coverage for newsletter policy, persistence, agent behavior, Rspamd configuration and body-only unsubscribe extraction
+
+### Changed
+
+- enabling Newsletter Management from an effective Off state asks whether still-available history should be included or detection should begin only from that point forward
+- the Newsletter Agent now follows the configured Moolias image and stable tag by default instead of using the unreleased `edge` channel
+- the Newsletter installer recreates the Moolias application after enabling the feature when the standard Mailcow-host Compose installation is present
+- linked legacy mailboxes are resolved from explicit Mailcow tags at most once per authenticated session and cached in the application process; the collector does not parse Sieve filters or fetch the full mailbox list on every polling cycle
+- stable release publication now waits for both the normal CI workflow and the disposable real-Mailcow integration workflow to pass for the same `main` commit
+- Newsletter pagination and navigation styling now follow the existing Alias Management UI, including the Lucide `newspaper` navigation icon
+
+### Security
+
+- the Moolias web container never receives the Dovecot `doveadm_password`, Mailcow mail volume or Docker socket for Newsletter Management
+- the Newsletter Agent runs as uid 10001 with a read-only root filesystem, no host mounts, no published ports, no new privileges and all Linux capabilities dropped
+- message text may be inspected inside the restricted agent only for an exact Message-ID that Rspamd marked with `MOOLIAS_BODY_UNSUB`; the body itself is never returned to or stored by the Moolias application
+- server-side one-click requests accept only HTTPS on port 443, reject credentials and non-public destinations, retain hostname verification for TLS and do not follow redirects
+- the Rspamd body detector has score `0.0` and records no personalized unsubscribe URL in Rspamd history
+
 ## 1.1.8 - 2026-08-24
 
 ### Added
@@ -76,7 +105,7 @@ All notable changes to Moolias are documented here.
 
 ### Changed
 
-- the public Mailcow bootstrap now recognizes an already enabled sender-protection setup during a repair/rerun and preserves it without asking the child installer to install the sidecar again
+- the public Mailcow bootstrap now recognizes an already enabled sender-protection setup during a repair/rerun and preserves it without asking the child installer to install it again
 - failure output filters routine successful nginx warnings and validation chatter while retaining actual nginx errors and the real installer failure
 - the disposable-Mailcow integration test now runs the public installer a second time against the same persisted installation with sender protection already enabled
 
@@ -104,7 +133,7 @@ All notable changes to Moolias are documented here.
 
 ### Changed
 
-- the public Mailcow-host installer now detects the actual Mailcow Docker-network IPv4 CIDR and tells the administrator exactly what to allow for the Moolias read/write API key before asking for the key
+- the public Mailcow bootstrap now detects the actual Mailcow Docker-network IPv4 CIDR and tells the administrator exactly what to allow for the Moolias read/write API key before asking for the key
 - the recommended same-host installation explicitly keeps Mailcow's API IP check enabled and avoids allowlisting a single disposable Moolias container address
 - the Mailcow-host installation guide now documents the API allowlist requirement and uses the stable-aware public bootstrap command
 
