@@ -22,6 +22,10 @@ from fastapi.templating import Jinja2Templates
 
 from moolias import __version__
 from moolias.aliases import is_owned_alias
+from moolias.newsletter_forwarding import (
+    direct_mailcow_forwards_to_mailbox,
+    forwarded_newsletters_enabled,
+)
 from moolias.newsletter_mode import mailbox_newsletter_state
 from moolias.newsletter_store import NewsletterObservation, NewsletterStore
 from moolias.security import require_user, validate_csrf
@@ -311,14 +315,28 @@ class NewsletterCollector:
         mailbox = mailbox.casefold()
         self.track(mailbox)
         async with self._lock:
-            aliases, history = await asyncio.gather(
+            mailbox_details, aliases, history = await asyncio.gather(
+                self.mailcow.get_mailbox(mailbox),
                 self.mailcow.list_aliases(),
                 self.mailcow.get_rspamd_history(self.settings.newsletter_history_count),
             )
             owned_addresses = {mailbox}
+            include_forwarded = forwarded_newsletters_enabled(
+                mailbox_details.get("tags"),
+                self.settings.newsletter_tag,
+            )
+            forwarded_addresses = (
+                {
+                    alias.address.casefold()
+                    for alias in direct_mailcow_forwards_to_mailbox(aliases, mailbox)
+                }
+                if include_forwarded
+                else set()
+            )
             for alias in aliases:
                 if is_owned_alias(alias, mailbox):
                     owned_addresses.add(alias.address.casefold())
+            owned_addresses.update(forwarded_addresses)
 
             candidates: list[tuple[dict[str, Any], str]] = []
             for item in history:
@@ -598,8 +616,10 @@ async def newsletters_page(request: Request):
         per_page = 25
     page = max(1, _query_int(request, "page", 1))
 
-    newsletter_alias_labels: dict[int, dict[str, str]] = {}
+    newsletter_alias_labels: dict[int, dict[str, Any]] = {}
     newsletter_sender_names: dict[int, str] = {}
+    newsletter_forwarded_aliases = []
+    newsletter_forwarded_enabled = False
     status_counts = {"all": 0, "active": 0, "unsubscribed": 0}
     filtered_total = 0
     total_pages = 1
@@ -618,16 +638,37 @@ async def newsletters_page(request: Request):
         collector_error = collector.last_error
         collector_last_success = collector.last_success_at
 
+        all_aliases, mailbox_details = await asyncio.gather(
+            request.app.state.mailcow.list_aliases(),
+            request.app.state.mailcow.get_mailbox(user),
+        )
+        newsletter_forwarded_aliases = direct_mailcow_forwards_to_mailbox(
+            all_aliases,
+            user,
+        )
+        newsletter_forwarded_enabled = forwarded_newsletters_enabled(
+            mailbox_details.get("tags"),
+            settings.newsletter_tag,
+        )
+        forwarded_addresses = {
+            alias.address.casefold() for alias in newsletter_forwarded_aliases
+        }
+
         alias_by_address = {
             alias.address.casefold(): alias
             for alias in state.get("assigned_all", [])
         }
+        alias_by_address.update(
+            {alias.address.casefold(): alias for alias in newsletter_forwarded_aliases}
+        )
         for newsletter in all_newsletters:
-            alias = alias_by_address.get(newsletter.recipient_alias.casefold())
+            recipient_key = newsletter.recipient_alias.casefold()
+            alias = alias_by_address.get(recipient_key)
             alias_name = alias.name.strip() if alias is not None else ""
             newsletter_alias_labels[newsletter.id] = {
                 "name": alias_name,
                 "address": newsletter.recipient_alias,
+                "forwarded": recipient_key in forwarded_addresses,
             }
             newsletter_sender_names[newsletter.id] = (
                 _decode_header_text(newsletter.sender_name)
@@ -682,6 +723,8 @@ async def newsletters_page(request: Request):
             newsletters=newsletters,
             newsletter_alias_labels=newsletter_alias_labels,
             newsletter_sender_names=newsletter_sender_names,
+            newsletter_forwarded_aliases=newsletter_forwarded_aliases,
+            newsletter_forwarded_enabled=newsletter_forwarded_enabled,
             newsletter_search_query=search_query,
             newsletter_status_filter=status_filter,
             newsletter_status_counts=status_counts,
