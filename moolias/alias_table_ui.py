@@ -240,7 +240,7 @@ async def create_alias(
 
     try:
         if mode == "readable":
-            await _create_unique_alias(
+            address = await _create_unique_alias(
                 request,
                 user,
                 lambda: readable_local_part(_language(request)),
@@ -249,7 +249,7 @@ async def create_alias(
                 sogo_visible=sogo_visible,
             )
         elif mode == "named":
-            await _create_unique_alias(
+            address = await _create_unique_alias(
                 request,
                 user,
                 lambda: named_local_part(name),
@@ -272,6 +272,16 @@ async def create_alias(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except MailcowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if "application/json" in request.headers.get("accept", "").lower():
+        return {
+            "kind": "alias_creation",
+            "state": "created",
+            "address": address,
+            "name": name,
+            "description": private_description,
+            "sogo_visible": sogo_visible,
+        }
     return RedirectResponse("/aliases", status_code=303)
 
 
