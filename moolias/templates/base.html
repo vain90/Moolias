@@ -28,6 +28,44 @@
   <link rel="stylesheet" href="/static/shell.css">
   <link rel="stylesheet" href="/static/ui-icons.css?v=20260823-1">
   <link rel="stylesheet" href="/static/ui-polish.css?v=20260822-2">
+  <style>
+    .javascript-warning {
+      position: relative;
+      z-index: 1000;
+      width: 100%;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 11px 20px;
+      border-bottom: 1px solid #f59e0b;
+      background: #fef3c7;
+      color: #78350f;
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .javascript-warning-icon {
+      flex: 0 0 auto;
+      display: inline-grid;
+      place-items: center;
+    }
+
+    .javascript-warning-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    @media (max-width: 640px) {
+      .javascript-warning {
+        align-items: flex-start;
+        padding: 10px 14px;
+        text-align: left;
+      }
+    }
+  </style>
   <script src="/static/dialogs.js" defer></script>
   <script src="/static/app.js" defer></script>
   <script src="/static/stats.js" defer></script>
@@ -51,6 +89,15 @@
   {% if csrf_token is defined %}data-csrf-token="{{ csrf_token }}"{% endif %}
   {% if user is defined %}data-tour-user="{{ user|e }}"{% endif %}
 >
+<noscript>
+  <div class="javascript-warning" data-javascript-warning role="alert">
+    <span class="javascript-warning-icon" aria-hidden="true">{{ icon('triangle-alert') }}</span>
+    <span>
+      <strong>{% if language == 'de' %}JavaScript ist deaktiviert.{% else %}JavaScript is disabled.{% endif %}</strong>
+      {% if language == 'de' %}Moolias ist ohne JavaScript nicht oder nur sehr eingeschränkt nutzbar. Bitte aktiviere JavaScript in deinem Browser.{% else %}Moolias is unavailable or only very limited without JavaScript. Please enable JavaScript in your browser.{% endif %}
+    </span>
+  </div>
+</noscript>
 {% if user is defined %}
   <div class="app-frame">
     <aside class="app-sidebar" data-app-sidebar>
