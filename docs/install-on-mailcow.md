@@ -244,22 +244,28 @@ See [Primary sender protection](sender-protection.md) for its security model and
 
 ## Optional Newsletter Management
 
-Newsletter Management needs a separate restricted sidecar because the Moolias web application deliberately has no access to Dovecot mail storage or the Docker socket. The sidecar exposes only exact mailbox + Message-ID newsletter-header lookups through Mailcow nginx.
+Newsletter Management needs a separate restricted sidecar because the Moolias web application deliberately has no access to Dovecot mail storage or the Docker socket. For an exact mailbox + Message-ID, the sidecar normally returns only the fixed newsletter-related headers. Only when Rspamd has marked that exact message with Moolias's body-unsubscribe signal may the sidecar inspect the message text locally; in that case it returns only an extracted HTTPS unsubscribe URL and never returns the message body.
 
-Install it on the Mailcow host after the normal Moolias installation. Download the installer first and then run it as root:
+Install Newsletter Management on the Mailcow host **after the normal Moolias installation** with the stable-aware bootstrap:
 
 ```bash
-curl -fsSLo /tmp/install-moolias-newsletter-agent.sh \
-  https://raw.githubusercontent.com/vain90/Moolias/main/scripts/install-newsletter-agent.sh
-sudo bash /tmp/install-moolias-newsletter-agent.sh
-rm -f /tmp/install-moolias-newsletter-agent.sh
+curl -fsSL \
+  https://raw.githubusercontent.com/vain90/Moolias/main/install-newsletter.sh \
+  | sudo bash
 ```
 
-The installer updates `/opt/moolias/.env` with the generated agent secret, agent URL and:
+The small bootstrap resolves the latest stable Moolias release and downloads the Newsletter Agent installer, the Rspamd installer and the Lua detector from that same release tag. This prevents mixing an unreleased `main` component with a stable Moolias installation.
 
-```dotenv
-MOOLIAS_NEWSLETTER_MANAGEMENT=true
-```
+The installer:
+
+- configures the restricted Dovecot/Newsletter Agent integration;
+- adds the hardened `moolias-newsletter-agent` sidecar to Mailcow's Compose override;
+- exposes the agent only through Mailcow nginx, without a published host port;
+- installs and validates the zero-score `MOOLIAS_BODY_UNSUB` Rspamd detector;
+- updates `/opt/moolias/.env` with the generated agent secret, private agent URL and `MOOLIAS_NEWSLETTER_MANAGEMENT=true`;
+- recreates the standard Moolias application container so the new feature setting becomes active.
+
+The Newsletter Agent follows the same configured Moolias image/tag as the normal installation by default. An explicit `MOOLIAS_AGENT_IMAGE` override is intended for development and integration testing.
 
 The global switch only makes the feature available. It does **not** automatically enable Newsletter Management for every mailbox. The effective mailbox state follows Mailcow tags, analogous to usage statistics. With the default tag family:
 
@@ -274,7 +280,7 @@ When a Moolias settings change makes the effective state switch from off to on, 
 
 Turning `MOOLIAS_NEWSLETTER_MANAGEMENT=false` later disables the feature server-wide and greys out the mailbox control, but it does not delete Mailcow newsletter tags or already stored newsletter metadata.
 
-See [Newsletter management](newsletter-management.md) for the complete policy, privacy and security model.
+See [Newsletter management](newsletter-management.md) for the complete policy, privacy, linked-mailbox and security model.
 
 ## Re-running the installer
 
@@ -358,4 +364,4 @@ Use the standalone method when:
 - an existing container platform should run Moolias;
 - Mailcow's nginx/ACME stack should not serve the Moolias hostname.
 
-The application behavior and updater are the same in both deployment modes. Newsletter Management still requires its restricted agent to be installed on the Mailcow host because Dovecot remains the source of original newsletter headers.
+The application behavior and updater are the same in both deployment modes. Newsletter Management still requires its restricted agent to be installed on the Mailcow host because Dovecot remains the source of original newsletter metadata.
