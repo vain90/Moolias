@@ -14,6 +14,9 @@ class ForwardedNewsletterAddress:
     source: str = "alias"
 
 
+_LINKED_MAILBOX_CACHE: dict[str, tuple[ForwardedNewsletterAddress, ...]] = {}
+
+
 def forwarded_newsletter_tag(base_tag: str) -> str:
     base = base_tag.strip().casefold()
     if not base:
@@ -80,52 +83,13 @@ def _link_ids(tags: object, base_tag: str, role: str) -> set[str]:
             continue
         if not link_id[0].isalnum():
             continue
-        if any(character not in "abcdefghijklmnopqrstuvwxyz0123456789._-" for character in link_id):
+        if any(
+            character not in "abcdefghijklmnopqrstuvwxyz0123456789._-"
+            for character in link_id
+        ):
             continue
         result.add(link_id)
     return result
-
-
-def direct_mailcow_forwards_to_mailbox(
-    aliases: Iterable[AliasRecord],
-    mailbox: str,
-) -> list[ForwardedNewsletterAddress]:
-    """Return active direct Mailcow alias forwards to the mailbox."""
-
-    mailbox_key = mailbox.strip().casefold()
-    if "@" not in mailbox_key:
-        return []
-
-    forwarded: list[ForwardedNewsletterAddress] = []
-    for alias in aliases:
-        address = alias.address.strip().casefold()
-        if (
-            not alias.active
-            or alias.is_catch_all
-            or address.startswith("@")
-            or "@" not in address
-            or address == mailbox_key
-            or is_owned_alias(alias, mailbox_key)
-        ):
-            continue
-
-        targets = [
-            target.strip().casefold()
-            for target in alias.goto.split(",")
-            if target.strip()
-        ]
-        if len(targets) != 1 or targets[0] != mailbox_key:
-            continue
-
-        forwarded.append(
-            ForwardedNewsletterAddress(
-                address=address,
-                name=alias.name.strip(),
-                source="alias",
-            )
-        )
-
-    return sorted(forwarded, key=lambda item: (item.name.casefold(), item.address))
 
 
 def linked_mailcow_mailboxes(
@@ -180,18 +144,60 @@ def linked_mailcow_mailboxes(
     return sorted(result.values(), key=lambda item: (item.name.casefold(), item.address))
 
 
-def mailcow_forwarded_newsletter_addresses(
-    aliases: Iterable[AliasRecord],
+def cache_linked_mailcow_mailboxes(
     mailboxes: Iterable[dict[str, Any]],
     mailbox: str,
     base_tag: str,
 ) -> list[ForwardedNewsletterAddress]:
-    """Combine direct alias forwards with explicitly tag-linked source mailboxes."""
+    """Refresh the in-process linked-mailbox cache for one target mailbox."""
 
-    forwarded = {
-        item.address.casefold(): item
-        for item in direct_mailcow_forwards_to_mailbox(aliases, mailbox)
-    }
-    for item in linked_mailcow_mailboxes(mailboxes, mailbox, base_tag):
+    mailbox_key = mailbox.strip().casefold()
+    linked = linked_mailcow_mailboxes(mailboxes, mailbox_key, base_tag)
+    if linked:
+        _LINKED_MAILBOX_CACHE[mailbox_key] = tuple(linked)
+    else:
+        _LINKED_MAILBOX_CACHE.pop(mailbox_key, None)
+    return linked
+
+
+def direct_mailcow_forwards_to_mailbox(
+    aliases: Iterable[AliasRecord],
+    mailbox: str,
+) -> list[ForwardedNewsletterAddress]:
+    """Return direct alias forwards plus cached explicitly linked source mailboxes."""
+
+    mailbox_key = mailbox.strip().casefold()
+    if "@" not in mailbox_key:
+        return []
+
+    forwarded: dict[str, ForwardedNewsletterAddress] = {}
+    for alias in aliases:
+        address = alias.address.strip().casefold()
+        if (
+            not alias.active
+            or alias.is_catch_all
+            or address.startswith("@")
+            or "@" not in address
+            or address == mailbox_key
+            or is_owned_alias(alias, mailbox_key)
+        ):
+            continue
+
+        targets = [
+            target.strip().casefold()
+            for target in alias.goto.split(",")
+            if target.strip()
+        ]
+        if len(targets) != 1 or targets[0] != mailbox_key:
+            continue
+
+        forwarded[address] = ForwardedNewsletterAddress(
+            address=address,
+            name=alias.name.strip(),
+            source="alias",
+        )
+
+    for item in _LINKED_MAILBOX_CACHE.get(mailbox_key, ()):
         forwarded.setdefault(item.address.casefold(), item)
+
     return sorted(forwarded.values(), key=lambda item: (item.name.casefold(), item.address))
