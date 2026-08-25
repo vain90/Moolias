@@ -12,10 +12,11 @@ body > noscript {
   width: 100% !important;
   min-height: 56px !important;
   box-sizing: border-box !important;
-  display: flex !important;
+  display: grid !important;
+  grid-template-columns: 18px minmax(0, 1120px) 18px !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 12px !important;
+  column-gap: 12px !important;
   margin: 0 !important;
   padding: 12px 20px !important;
   border-bottom: 1px solid #eab308 !important;
@@ -27,6 +28,13 @@ body > noscript {
   overflow: visible !important;
 }
 
+.javascript-warning::after {
+  content: "";
+  width: 18px;
+  height: 18px;
+  grid-column: 3;
+}
+
 .javascript-warning > span {
   position: static !important;
   inset: auto !important;
@@ -36,16 +44,16 @@ body > noscript {
 }
 
 .javascript-warning > span:last-child {
+  grid-column: 2 !important;
   display: block !important;
-  flex: 0 1 auto !important;
-  width: min(1120px, calc(100% - 52px)) !important;
+  width: 100% !important;
   max-width: 1120px !important;
   color: #78350f !important;
   text-align: center !important;
 }
 
 .javascript-warning-icon {
-  flex: 0 0 auto !important;
+  grid-column: 1 !important;
   display: inline-grid !important;
   place-items: center !important;
 }
@@ -58,12 +66,10 @@ body > noscript {
 @media (max-width: 640px) {
   .javascript-warning {
     min-height: 52px !important;
+    grid-template-columns: 18px minmax(0, 1fr) 18px !important;
+    column-gap: 9px !important;
     padding: 10px 14px !important;
     font-size: 13px !important;
-  }
-
-  .javascript-warning > span:last-child {
-    width: min(100%, 520px) !important;
   }
 }
 
