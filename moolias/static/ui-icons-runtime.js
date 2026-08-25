@@ -159,6 +159,56 @@
     }
   };
 
+  const enhanceOfflinePoolDescriptions = async () => {
+    const dialogs = [...document.querySelectorAll("[data-assign-dialog]")];
+    if (!dialogs.length) return;
+
+    if (!document.querySelector('link[data-alias-description-styles]')) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "/static/alias-descriptions.css?v=20260825-1";
+      link.dataset.aliasDescriptionStyles = "1";
+      document.head.append(link);
+    }
+
+    const german = document.documentElement.lang?.toLowerCase().startsWith("de");
+    const descriptionLabel = german ? "Beschreibung" : "Description";
+    let descriptions = {};
+    try {
+      const response = await fetch("/aliases/private-descriptions", {
+        headers: { Accept: "application/json" },
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        descriptions = payload.descriptions || {};
+      }
+    } catch (error) {
+      console.debug("Offline-pool descriptions could not be loaded", error);
+    }
+
+    dialogs.forEach((dialog) => {
+      const form = dialog.querySelector("form");
+      if (!form || form.querySelector('[name="private_description"]')) return;
+      const nameInput = form.querySelector('input[name="description"]');
+      const nameLabel = nameInput?.closest("label");
+      if (!nameLabel) return;
+
+      const label = document.createElement("label");
+      label.dataset.aliasPrivateDescriptionField = "1";
+      const caption = document.createElement("span");
+      caption.dataset.fieldCaption = "1";
+      caption.textContent = descriptionLabel;
+      const textarea = document.createElement("textarea");
+      textarea.name = "private_description";
+      textarea.maxLength = 160;
+      textarea.rows = 4;
+      textarea.value = descriptions[dialog.dataset.assignDialog] || "";
+      textarea.setAttribute("aria-label", descriptionLabel);
+      label.append(caption, textarea);
+      nameLabel.insertAdjacentElement("afterend", label);
+    });
+  };
+
   document.querySelectorAll(".service-badge").forEach((badge) => {
     if (!badge.querySelector(".ui-icon")) return;
     badge.classList.remove("service-badge");
@@ -187,6 +237,7 @@
 
   enhanceBranding();
   document.querySelectorAll(".language-switch").forEach(enhanceLanguageSwitch);
+  enhanceOfflinePoolDescriptions();
 
   document.addEventListener("click", (event) => {
     document.querySelectorAll("details[data-language-dropdown][open]").forEach((details) => {
