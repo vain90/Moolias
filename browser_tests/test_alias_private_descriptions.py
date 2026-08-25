@@ -33,6 +33,7 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         _login_de(page, base_url)
         page.goto(f"{base_url}/aliases")
 
+        noscript = page.locator("body > noscript")
         warning = page.locator("[data-javascript-warning]")
         expect(warning).to_be_visible()
         expect(warning).to_contain_text("JavaScript ist deaktiviert.")
@@ -48,7 +49,9 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         assert warning_text_box is not None
         assert sidebar_box is not None
         assert viewport is not None
+        assert noscript.evaluate("el => getComputedStyle(el).display") == "contents"
         assert abs(warning_box["x"]) <= 1
+        assert abs(warning_box["y"]) <= 1
         assert warning_box["width"] >= viewport["width"] - 2
         assert sidebar_box["y"] >= warning_box["y"] + warning_box["height"] - 1
         assert warning.evaluate(
