@@ -68,6 +68,19 @@ def test_history_candidate_accepts_authenticated_maillist_symbol():
     assert _history_candidate(item) is True
 
 
+def test_history_candidate_accepts_authenticated_body_unsubscribe_symbol():
+    item = {
+        "action": "no action",
+        "message-id": "sonos@example.org",
+        "unix_time": 1_780_000_000,
+        "symbols": (
+            "R_DKIM_ALLOW(-0.20)[con.example.org:s=mail], "
+            "MOOLIAS_BODY_UNSUB(0.00)[abbestellen]"
+        ),
+    }
+    assert _history_candidate(item) is True
+
+
 def test_history_candidate_requires_clean_authenticated_newsletter_signal():
     item = {
         "action": "no action",
