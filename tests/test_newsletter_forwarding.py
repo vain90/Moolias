@@ -6,6 +6,7 @@ from moolias.newsletter_forwarding import (
     direct_mailcow_forwards_to_mailbox,
     forwarded_newsletter_tag,
     forwarded_newsletters_enabled,
+    linked_mailcow_mailbox_cache_ready,
     linked_mailcow_mailboxes,
     replace_forwarded_newsletter_tag,
 )
@@ -110,12 +111,14 @@ def test_linked_mailbox_cache_is_reused_by_collector_forward_lookup():
     ]
     cache_linked_mailcow_mailboxes(linked, MAILBOX, BASE_TAG)
 
+    assert linked_mailcow_mailbox_cache_ready(MAILBOX) is True
     forwarded = direct_mailcow_forwards_to_mailbox([], MAILBOX)
 
     assert [item.address for item in forwarded] == ["legacy@example.org"]
     assert forwarded[0].source == "linked_mailbox"
 
     cache_linked_mailcow_mailboxes([], MAILBOX, BASE_TAG)
+    assert linked_mailcow_mailbox_cache_ready(MAILBOX) is True
     assert direct_mailcow_forwards_to_mailbox([], MAILBOX) == []
 
 
