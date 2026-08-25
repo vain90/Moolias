@@ -27,7 +27,7 @@ from moolias.newsletter_forwarding import (
     forwarded_newsletters_enabled,
 )
 from moolias.newsletter_mode import mailbox_newsletter_state
-from moolias.newsletter_store import NewsletterObservation, NewsletterStore
+from moolias.newsletter_store import Newsletter, NewsletterObservation, NewsletterStore
 from moolias.security import require_user, validate_csrf
 from moolias.sender_protocol import (
     NONCE_HEADER,
@@ -278,6 +278,28 @@ def _history_candidate(item: dict[str, Any]) -> bool:
         and bool(symbols & AUTH_SYMBOLS)
         and bool(_message_id(item))
         and _event_at(item) is not None
+    )
+
+
+def _normalise_newsletter_status_filter(value: Any) -> str:
+    status = str(value or "active").strip().casefold()
+    return status if status in NEWSLETTER_STATUS_FILTERS else "active"
+
+
+def _newsletter_sort_key(newsletter: Newsletter) -> tuple[int, int, str, int]:
+    if newsletter.is_unsubscribed:
+        priority = 3
+    elif newsletter.resumed_after_unsubscribe:
+        priority = 0
+    elif newsletter.direct_unsubscribe_available:
+        priority = 1
+    else:
+        priority = 2
+    return (
+        priority,
+        -newsletter.last_seen_at,
+        newsletter.sender_address.casefold(),
+        newsletter.id,
     )
 
 
@@ -608,9 +630,7 @@ async def newsletters_page(request: Request):
     collector_last_success: int | None = None
 
     search_query = str(request.query_params.get("q") or "").strip()[:160]
-    status_filter = str(request.query_params.get("status") or "all").strip().casefold()
-    if status_filter not in NEWSLETTER_STATUS_FILTERS:
-        status_filter = "all"
+    status_filter = _normalise_newsletter_status_filter(request.query_params.get("status"))
     per_page = _query_int(request, "per_page", 25)
     if per_page not in PAGE_SIZES:
         per_page = 25
@@ -704,6 +724,7 @@ async def newsletters_page(request: Request):
                 ).casefold()
             ]
 
+        filtered.sort(key=_newsletter_sort_key)
         filtered_total = len(filtered)
         total_pages = max(1, (filtered_total + per_page - 1) // per_page)
         page = min(page, total_pages)
