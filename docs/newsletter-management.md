@@ -4,8 +4,8 @@ Moolias can detect newsletter and mailing-list messages from Mailcow's Rspamd hi
 
 The feature is disabled by default and has two independent enablement levels:
 
-1. An administrator makes newsletter management available server-wide with `MOOLIAS_NEWSLETTER_MANAGEMENT=true` and installs the restricted Newsletter Agent.
-2. Mailcow tags on the domain and/or mailbox decide whether newsletter management is enabled for a particular mailbox.
+1. An administrator makes Newsletter Management available server-wide with `MOOLIAS_NEWSLETTER_MANAGEMENT=true` and installs the restricted Newsletter Agent plus the Moolias Rspamd detector.
+2. Mailcow tags on the domain and/or mailbox decide whether Newsletter Management is enabled for a particular mailbox.
 
 The effective state is therefore **server enabled AND effective Mailcow newsletter policy enabled**.
 
@@ -29,11 +29,11 @@ Examples:
 | `moolias-newsletter-off` | `moolias-newsletter` | enabled by mailbox override |
 | none | none | disabled |
 
-Moolias users may change only this newsletter tag family for their own mailbox through Settings. Unrelated Mailcow tags are preserved. The choices are the same style as statistics: **Use domain setting**, **Off**, or **On**.
+Moolias users may change only this newsletter tag family for their own mailbox through Settings. Unrelated Mailcow tags are preserved. The choices are **Use domain setting**, **Off**, or **On**.
 
-Conflicting tags at the active policy level fail closed. For example, if a mailbox contains both `moolias-newsletter` and `moolias-newsletter-off`, Moolias reports a tag conflict and treats newsletter management as disabled until the conflict is corrected.
+Conflicting tags at the active policy level fail closed. For example, if a mailbox contains both `moolias-newsletter` and `moolias-newsletter-off`, Moolias reports a tag conflict and treats Newsletter Management as disabled until the conflict is corrected.
 
-If the administrator sets `MOOLIAS_NEWSLETTER_MANAGEMENT=false`, newsletter management is disabled regardless of tags. The mailbox control is shown disabled/greyed with a server-side-disabled explanation. Existing Mailcow newsletter tags and already stored newsletter data are not removed.
+If the administrator sets `MOOLIAS_NEWSLETTER_MANAGEMENT=false`, Newsletter Management is disabled regardless of tags. Existing Mailcow newsletter tags and already stored newsletter data are not removed.
 
 There is no additional opt-in prompt at login.
 
@@ -48,21 +48,21 @@ The user can choose:
 
 This question is tied to an actual effective off-to-on transition. It is not shown merely because the source of the setting changes. For example, switching from an explicit mailbox `On` override to an inherited domain `On` value remains effectively enabled and therefore does not ask again.
 
-If newsletter management is later disabled and then enabled again, the question is shown again for that new off-to-on transition. Choosing **Detect from now on only** replaces the previous watermark with the new activation time. Choosing **Include history** opens the watermark to all history that is still available at that point.
+If Newsletter Management is later disabled and then enabled again, the question is shown again for that new off-to-on transition. Choosing **Detect from now on only** replaces the previous watermark with the new activation time. Choosing **Include history** opens the watermark to all history that is still available at that point.
 
 If an administrator enables newsletter tags directly in Mailcow without an interactive Moolias settings change, Moolias defaults to **from now on** rather than silently importing historical messages.
 
-The history watermark is operational collector state stored in `MOOLIAS_NEWSLETTER_DB_PATH`; it is not the source of the user's enable/disable preference. Mailcow tags remain the only newsletter policy source.
+The history watermark is operational collector state stored in `MOOLIAS_NEWSLETTER_DB_PATH`; it is not the source of the user's enable/disable preference. Mailcow tags remain the newsletter policy source.
 
 ## User experience
 
-The Newsletter page shows one compact row per detected sender and recipient alias. The row includes the sender, the alias that received the message, the observed message count, the most recent message and the available unsubscribe action.
+The Newsletter page shows one compact row per detected sender and receiving address. A row includes the sender, the address that received the message, the observed message count, the most recent message and the available unsubscribe action.
 
-The Newsletter navigation entry is shown only when the feature is effectively enabled for the signed-in mailbox. When it is disabled by the mailbox/domain policy, the setting can be changed from Settings if the administrator has enabled the feature server-wide.
+The **Newsletter-Verwaltung / Newsletter Management** navigation entry is shown only when the feature is effectively enabled for the signed-in mailbox. When it is disabled by mailbox/domain policy, the setting can still be changed from Settings when the administrator has enabled the feature server-wide.
 
-The table supports search, active/unsubscribed filtering and pagination. The details control expands technical information only when it is needed.
+The table supports search, active/unsubscribed filtering and pagination. Technical details remain collapsed until requested.
 
-A detected sender remains visible even when Moolias cannot recover a usable HTTPS unsubscribe URL. In that case the direct unsubscribe button is disabled. This can happen when the original message has already been deleted from Dovecot.
+A detected sender remains visible even when Moolias cannot recover a usable HTTPS unsubscribe URL. This can happen when the original message has already been deleted from Dovecot.
 
 Successfully accepted RFC 8058 one-click unsubscribes remain visible as unsubscribed entries. If a newer message from that subscription is observed afterwards, Moolias highlights the row as mail received after unsubscribe instead of silently forgetting the previous unsubscribe state.
 
@@ -78,29 +78,29 @@ A Mailcow alias qualifies automatically when it is active, is not a catch-all, h
 
 For old addresses that still exist as real Mailcow mailboxes and are forwarded by an administrator through Sieve or another routing mechanism, Moolias does **not** inspect or parse the routing rule. Instead, the administrator explicitly links source and target mailboxes with Mailcow mailbox tags.
 
-With the default newsletter base tag, a link named `private` is configured as follows:
+With the default newsletter base tag, a link named `legacy` can be configured as follows:
 
 ```text
 Target/main mailbox:
-  moolias-newsletter-link-private-target
+  moolias-newsletter-link-legacy-target
 
 Old/source mailbox:
-  moolias-newsletter-link-private-source
+  moolias-newsletter-link-legacy-source
 ```
 
 The part between `link-` and `-source`/`-target` is the link ID. It may contain lowercase letters, digits, dots, underscores and hyphens and may be chosen freely. Multiple old mailboxes can use the same source tag to link them to one target mailbox. A target mailbox may also carry multiple target link IDs.
 
-For a custom `MOOLIAS_NEWSLETTER_TAG`, the same pattern derives from that base tag. For example, `MOOLIAS_NEWSLETTER_TAG=company-news` produces `company-news-link-private-target` and `company-news-link-private-source`.
+For a custom `MOOLIAS_NEWSLETTER_TAG`, the same pattern derives from that base tag. For example, `MOOLIAS_NEWSLETTER_TAG=company-news` produces `company-news-link-legacy-target` and `company-news-link-legacy-source`.
 
 Only active Mailcow mailboxes with a source tag matching a target tag on the authenticated mailbox qualify. The tags express the administrative relationship only: Moolias does not create, verify or change the actual Sieve/forwarding configuration.
 
-Moolias reads Mailcow's mailbox list at most once per authenticated browser session when the user first opens the Newsletter page or first uses the forwarding control. The resolved source addresses are cached in the running Moolias process for that target mailbox. The background collector does **not** call `mailbox/all` or inspect Sieve filters on every polling cycle. Repeated page reloads and the normal Newsletter refresh action reuse the session/process cache. After a new login session the links are evaluated again; after an application restart they are also reloaded even if the browser session cookie still exists.
+Moolias reads Mailcow's mailbox list at most once per authenticated browser session when the user first opens the Newsletter page or first uses the additional-address control. The resolved source addresses are cached in the running Moolias process for that target mailbox. The background collector does **not** call `mailbox/all` or inspect Sieve filters on every polling cycle. Repeated page reloads and the normal Newsletter refresh action reuse the session/process cache. After a new login session the links are evaluated again; after an application restart they are also reloaded even if the browser session cookie still exists.
 
-When at least one qualifying direct forwarding alias or explicitly linked source mailbox exists, the Newsletter page shows an **Include forwarded addresses** control. If none exist, no forwarding control is rendered. Enabling the option stores the derived mailbox tag `moolias-newsletter-forwarded` when the default newsletter base tag is used. With a custom base tag, the forwarding flag is `<base-tag>-forwarded`.
+When at least one qualifying direct forwarding alias or explicitly linked source mailbox exists, the Newsletter page shows an **Include additional addresses** control. If none exist, no control is rendered. Enabling it stores the derived mailbox tag `moolias-newsletter-forwarded` when the default newsletter base tag is used. With a custom base tag, the forwarding flag is `<base-tag>-forwarded`.
 
 This forwarding flag is mailbox-only and has no domain inheritance. It does not change any Mailcow alias, mailbox, Sieve script or routing configuration.
 
-The existing newsletter-history watermark is still respected. Enabling forwarded addresses does not override an earlier **Detect from now on only** decision. If the mailbox was configured to include available history, matching Rspamd entries for a qualifying forwarded address may be imported while they remain available.
+The existing newsletter-history watermark is still respected. Enabling additional addresses does not override an earlier **Detect from now on only** decision. If the mailbox was configured to include available history, matching Rspamd entries for a qualifying address may be imported while they remain available.
 
 Newsletter rows received through such an address show the configured Mailcow alias/mailbox display name when available, the receiving email address, and a **Forwarded** marker.
 
@@ -110,15 +110,15 @@ Moolias uses Rspamd as a cheap candidate index so it does not have to read the b
 
 1. Moolias reads the configured Rspamd history window through the existing Mailcow API integration.
 2. Standard candidates are messages for which Rspamd recorded `MAILLIST` or `HAS_LIST_UNSUB`.
-3. The Moolias Mailcow installer additionally installs a zero-score Rspamd Lua detector. It records `MOOLIAS_BODY_UNSUB` when a message body contains a likely unsubscribe action such as `unsubscribe`, `Abbestellen`, `Abmelden`, `opt out` or `manage preferences` and the message contains URLs. The Rspamd symbol contains only the matched indicator and **never the personalized unsubscribe URL**.
+3. The Moolias Newsletter installer additionally installs a zero-score Rspamd Lua detector. It records `MOOLIAS_BODY_UNSUB` when a message body contains a likely unsubscribe action such as `unsubscribe`, `Abbestellen`, `Abmelden`, `opt out` or `manage preferences` and the message contains URLs. The symbol contains only the matched indicator and **never the personalized unsubscribe URL**.
 4. A candidate must also have been accepted without a spam action and carry an authentication signal such as DKIM or DMARC allow. Rspamd history may expose symbols either as structured data or as scored strings such as `MAILLIST(-0.18)[generic]`; Moolias normalises both forms.
-5. Moolias associates the Rspamd SMTP recipient with the authenticated user's mailbox, one of that user's normal Mailcow aliases, or an explicitly opted-in forwarding/linked address.
+5. Moolias associates the Rspamd SMTP recipient with the authenticated user's mailbox, one of that user's normal Mailcow aliases, or an explicitly opted-in additional receiving address.
 6. The mailbox history watermark is applied before historical observations or message lookups are stored.
 7. For normal `MAILLIST`/`HAS_LIST_UNSUB` candidates, the restricted Newsletter Agent asks Dovecot for a fixed set of headers for the exact target mailbox and Message-ID.
 8. Only for `MOOLIAS_BODY_UNSUB` candidates may the agent additionally request the UTF-8 message text for that exact Message-ID. It searches locally for a nearby HTTPS unsubscribe link and returns only the extracted URL to the Moolias application; the message body itself is not returned or stored by Moolias.
 9. Header-based HTTPS and `mailto:` targets come from `List-Unsubscribe`. `List-Unsubscribe-Post` and DKIM coverage determine whether a header-based HTTPS URL qualifies for RFC 8058 one-click handling. A body-derived URL is always treated as a normal unsubscribe page, never as RFC 8058 one-click.
 
-This two-stage design catches providers such as Sonos that put an unsubscribe link only in the footer while avoiding broad IMAP/Dovecot body scans for ordinary mail.
+This two-stage design catches providers that put an unsubscribe link only in the footer while avoiding broad IMAP/Dovecot body scans for ordinary mail.
 
 Header/body lookups are remembered per Message-ID so old messages are not queried again on every polling cycle. A scan performs at most 50 new Dovecot lookups; additional historical candidates are picked up by later scans.
 
@@ -132,7 +132,7 @@ Newsletter metadata is stored in the SQLite database configured with `MOOLIAS_NE
 
 Moolias stores:
 
-- mailbox and receiving alias
+- mailbox and receiving address
 - stable sender identity
 - display name and sender address
 - optional List-ID
@@ -193,12 +193,13 @@ Normal non-one-click unsubscribe pages are opened by the user's browser instead.
 
 The Moolias web application does not receive the Dovecot `doveadm_password` and does not mount the Mailcow mail volume or Docker socket.
 
-`scripts/install-newsletter-agent.sh` installs a dedicated sidecar on the Mailcow network. It:
+The Newsletter installer creates a dedicated sidecar that:
 
 - runs as uid 10001
 - has a read-only root filesystem
 - has no host mounts
 - has no published host ports
+- runs with `no-new-privileges`
 - drops all Linux capabilities
 - exposes only the signed `/v1/headers` API through Mailcow nginx
 - accepts only a mailbox and exact Message-ID
@@ -210,7 +211,7 @@ The web application authenticates requests to the agent with a separate HMAC sec
 
 ## Mailcow Rspamd detector
 
-The same installer also installs `scripts/rspamd/moolias_newsletter.lua` into Mailcow's persistent Rspamd configuration and enables it through a managed block in `data/conf/rspamd/rspamd.conf.local`.
+The installer also installs `scripts/rspamd/moolias_newsletter.lua` into Mailcow's persistent Rspamd configuration and enables it through a managed block in `data/conf/rspamd/rspamd.conf.local`.
 
 The installer runs `rspamadm configtest` before accepting the Rspamd change. If Rspamd rejects the configuration, the previous plugin/configuration files are restored. On success the Rspamd container is restarted so new incoming messages can receive `MOOLIAS_BODY_UNSUB`.
 
@@ -237,15 +238,24 @@ MOOLIAS_NEWSLETTER_POLL_SECONDS=60
 MOOLIAS_NEWSLETTER_HISTORY_COUNT=1000
 ```
 
-The recommended installer creates the agent secret, configures Dovecot remote `doveadm` authentication when necessary, installs the Rspamd body detector, adds the sidecar to Mailcow's Compose override and enables the server-side feature in the Moolias `.env`. The domain/mailbox Mailcow tags then determine which mailboxes actually use newsletter management.
+## Installation
 
-Run it on the Mailcow host with:
+For the recommended same-host Mailcow deployment, install Moolias first and then run the stable-aware Newsletter bootstrap on the Mailcow host:
 
 ```bash
-cd /opt/moolias
-sudo bash scripts/install-newsletter-agent.sh
+curl -fsSL \
+  https://raw.githubusercontent.com/vain90/Moolias/main/install-newsletter.sh \
+  | sudo bash
 ```
 
-The script intentionally requires root because it modifies Mailcow configuration files and restarts/reloads Mailcow services. The script is idempotent for its managed Dovecot, nginx, Compose and Rspamd blocks. If an administrator already configured `doveadm_password`, the installer reuses that setting rather than replacing it.
+The bootstrap follows the latest stable Moolias release and downloads all required Newsletter components from the same release tag:
 
-After installation, restart or rebuild the Moolias application so the new application settings and image are active.
+- `scripts/install-newsletter-agent.sh`
+- `scripts/install-newsletter-rspamd.sh`
+- `scripts/rspamd/moolias_newsletter.lua`
+
+The installer creates the agent secret, configures Dovecot remote `doveadm` authentication when necessary, installs the Rspamd detector, adds the sidecar to Mailcow's Compose override, updates `/opt/moolias/.env` and enables the server-side feature. With the standard Mailcow-host deployment it recreates the Moolias application afterwards so the new settings become active immediately.
+
+The Newsletter Agent uses the configured `MOOLIAS_IMAGE` and `MOOLIAS_TAG` from the Moolias installation by default, which keeps the application and sidecar on the same stable channel. `MOOLIAS_AGENT_IMAGE` can be set explicitly for development or integration testing.
+
+The installer intentionally requires root because it modifies Mailcow Dovecot, nginx, Compose and Rspamd configuration and restarts/reloads the affected Mailcow services. It is idempotent for its managed blocks. If an administrator already configured `doveadm_password`, that setting is reused rather than replaced.
