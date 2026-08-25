@@ -100,6 +100,12 @@ class MailcowClient:
             return []
         return [item for item in payload if isinstance(item, dict)]
 
+    async def list_filters(self) -> list[dict[str, Any]]:
+        payload = await self._request("GET", "/api/v1/get/filters/all")
+        if not isinstance(payload, list):
+            return []
+        return [item for item in payload if isinstance(item, dict)]
+
     async def get_rspamd_history(self, count: int) -> list[dict[str, Any]]:
         payload = await self._request("GET", f"/api/v1/get/logs/rspamd-history/{count}")
         if not isinstance(payload, list):
