@@ -15,6 +15,7 @@ class ForwardedNewsletterAddress:
 
 
 _LINKED_MAILBOX_CACHE: dict[str, tuple[ForwardedNewsletterAddress, ...]] = {}
+_LINKED_MAILBOX_CACHE_READY: set[str] = set()
 
 
 def forwarded_newsletter_tag(base_tag: str) -> str:
@@ -157,7 +158,12 @@ def cache_linked_mailcow_mailboxes(
         _LINKED_MAILBOX_CACHE[mailbox_key] = tuple(linked)
     else:
         _LINKED_MAILBOX_CACHE.pop(mailbox_key, None)
+    _LINKED_MAILBOX_CACHE_READY.add(mailbox_key)
     return linked
+
+
+def linked_mailcow_mailbox_cache_ready(mailbox: str) -> bool:
+    return mailbox.strip().casefold() in _LINKED_MAILBOX_CACHE_READY
 
 
 def direct_mailcow_forwards_to_mailbox(
