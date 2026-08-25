@@ -78,6 +78,44 @@
     </div>
     {% endif %}
 
+    {% if newsletter_forwarded_aliases %}
+    <div class="notice newsletter-forwarding-notice" role="status">
+      <div>
+        <strong>
+          {% if language == 'de' %}
+            {% if newsletter_forwarded_aliases|length == 1 %}1 weitergeleitete Adresse gefunden{% else %}{{ newsletter_forwarded_aliases|length }} weitergeleitete Adressen gefunden{% endif %}
+          {% else %}
+            {% if newsletter_forwarded_aliases|length == 1 %}1 forwarded address found{% else %}{{ newsletter_forwarded_aliases|length }} forwarded addresses found{% endif %}
+          {% endif %}
+        </strong>
+        <div class="muted">
+          {% if newsletter_forwarded_enabled %}
+            {% if language == 'de' %}Newsletter an diese von Mailcow weitergeleiteten Adressen werden berücksichtigt.{% else %}Newsletters sent to these Mailcow-forwarded addresses are included.{% endif %}
+          {% else %}
+            {% if language == 'de' %}Newsletter an diese von Mailcow weitergeleiteten Adressen werden aktuell nicht berücksichtigt.{% else %}Newsletters sent to these Mailcow-forwarded addresses are currently not included.{% endif %}
+          {% endif %}
+        </div>
+        <div class="newsletter-forwarded-addresses">
+          {% for alias in newsletter_forwarded_aliases %}
+            <small>{% if alias.name %}{{ alias.name }} · {% endif %}{{ alias.address }}</small>{% if not loop.last %}<span aria-hidden="true"> · </span>{% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      <form method="post" action="/account/newsletter-forwarded">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="return_to" value="/newsletters">
+        <input type="hidden" name="enabled" value="{% if newsletter_forwarded_enabled %}false{% else %}true{% endif %}">
+        <button class="button compact" type="submit">
+          {% if newsletter_forwarded_enabled %}
+            {% if language == 'de' %}Nicht mehr einbeziehen{% else %}Stop including{% endif %}
+          {% else %}
+            {% if language == 'de' %}Weitergeleitete Adressen einbeziehen{% else %}Include forwarded addresses{% endif %}
+          {% endif %}
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
     <section class="card newsletter-management-card">
       <div class="newsletter-toolbar">
         <div class="search-box newsletter-search-box">
@@ -145,6 +183,7 @@
                 <div class="newsletter-alias-cell">
                   {% if alias_label.get('name') %}<strong>{{ alias_label.get('name') }}</strong>{% endif %}
                   <small>{{ alias_label.get('address', newsletter.recipient_alias) }}</small>
+                  {% if alias_label.get('forwarded') %}<small class="newsletter-forwarded-label">{% if language == 'de' %}Weiterleitung{% else %}Forwarded{% endif %}</small>{% endif %}
                 </div>
               </td>
               <td class="numeric">{{ newsletter.message_count }}</td>
