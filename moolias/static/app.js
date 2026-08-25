@@ -394,20 +394,11 @@ function bindReplacementActions(root = document) {
     const aliasCheckbox = row.querySelector('[data-alias-select]');
     const editDetails = row.querySelector('details.alias-edit-action');
     const panel = editDetails?.querySelector('.edit-panel');
-    if (!aliasCheckbox || !panel || panel.querySelector('[data-replace-alias]')) return;
+    const button = panel?.querySelector('[data-replace-alias]');
+    if (!aliasCheckbox || !editDetails || !button || button.dataset.bound === 'true') return;
 
-    const hint = document.createElement('p');
-    hint.className = 'hint top-gap';
-    hint.textContent = replacementText.hint;
-
-    const button = document.createElement('button');
-    button.className = 'button compact';
-    button.type = 'button';
-    button.dataset.replaceAlias = aliasCheckbox.value;
-    button.textContent = replacementText.action;
+    button.dataset.bound = 'true';
     button.addEventListener('click', () => showReplacementDialog(aliasCheckbox, editDetails));
-
-    panel.append(hint, button);
   });
 }
 
