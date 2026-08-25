@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 MAILCOW_DIR="${MAILCOW_DIR:-/opt/mailcow-dockerized}"
 MOOLIAS_DIR="${MOOLIAS_DIR:-/opt/moolias}"
 MOOLIAS_AGENT_IMAGE="${MOOLIAS_AGENT_IMAGE:-ghcr.io/vain90/moolias:edge}"
@@ -290,7 +291,7 @@ mounts="$(docker inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "
 docker compose exec -T nginx-mailcow nginx -t
 docker compose exec -T nginx-mailcow nginx -s reload
 
-rspamd_installer="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/install-newsletter-rspamd.sh"
+rspamd_installer="${SCRIPT_DIR}/install-newsletter-rspamd.sh"
 [[ -f "$rspamd_installer" ]] || fail "Rspamd detector installer is missing at ${rspamd_installer}."
 MAILCOW_DIR="$MAILCOW_DIR" bash "$rspamd_installer"
 
