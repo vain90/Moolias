@@ -4,7 +4,11 @@ import asyncio
 import json
 import os
 import re
+from email import policy
+from email.parser import Parser
+from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -19,15 +23,23 @@ from moolias.sender_protocol import (
 )
 
 DEFAULT_DOVEADM_HOST = "dovecot-mailcow:12345"
-MAX_DOVEADM_OUTPUT = 512 * 1024
+MAX_DOVEADM_OUTPUT = 2 * 1024 * 1024
+MAX_UNSUBSCRIBE_URL_LENGTH = 8192
 _MESSAGE_ID_RE = re.compile(r"^[^\x00\r\n]{1,998}$")
 _MAILBOX_RE = re.compile(r"^[^\s@]+@[^\s@]+$")
+_BODY_UNSUBSCRIBE_RE = re.compile(
+    r"(?:unsubscribe|abmelden|abbestellen|opt[\s-]*out|manage\s+(?:email\s+)?preferences|"
+    r"newsletter\s+(?:abmelden|abbestellen))",
+    re.IGNORECASE,
+)
+_BODY_URL_RE = re.compile(r"https://[^\s<>\"']+", re.IGNORECASE)
 
 
 class NewsletterHeaderRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mailbox: str = Field(min_length=3, max_length=320)
     message_id: str = Field(min_length=1, max_length=998)
+    include_body_unsubscribe: bool = False
 
 
 class DoveadmError(RuntimeError):
@@ -48,6 +60,102 @@ def _normalise_message_id(value: str) -> str:
     if not _MESSAGE_ID_RE.fullmatch(message_id):
         raise ValueError("Invalid message ID")
     return message_id
+
+
+def _safe_https_url(value: str) -> str | None:
+    candidate = value.strip().rstrip(".,;:)]}")
+    if len(candidate) > MAX_UNSUBSCRIBE_URL_LENGTH or any(
+        char in candidate for char in "\x00\r\n"
+    ):
+        return None
+    parsed = urlsplit(candidate)
+    if parsed.scheme.casefold() != "https" or not parsed.hostname:
+        return None
+    if parsed.username is not None or parsed.password is not None:
+        return None
+    return candidate
+
+
+class _UnsubscribeHTMLParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._href: str | None = None
+        self._text: list[str] = []
+        self.urls: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.casefold() != "a" or self._href is not None:
+            return
+        attributes = {name.casefold(): value for name, value in attrs}
+        href = attributes.get("href")
+        if href:
+            self._href = href
+            self._text = []
+
+    def handle_data(self, data: str) -> None:
+        if self._href is not None:
+            self._text.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.casefold() != "a" or self._href is None:
+            return
+        label = " ".join(self._text)
+        if _BODY_UNSUBSCRIBE_RE.search(label):
+            url = _safe_https_url(self._href)
+            if url:
+                self.urls.append(url)
+        self._href = None
+        self._text = []
+
+
+def _body_text(part: Any) -> str:
+    try:
+        content = part.get_content()
+    except (LookupError, UnicodeError, ValueError):
+        payload = part.get_payload(decode=True)
+        if not isinstance(payload, bytes):
+            return str(payload or "")
+        charset = part.get_content_charset() or "utf-8"
+        return payload.decode(charset, errors="replace")
+    return content if isinstance(content, str) else ""
+
+
+def _extract_body_unsubscribe_url(raw_message: str) -> str | None:
+    if not raw_message.strip():
+        return None
+    try:
+        message = Parser(policy=policy.default).parsestr(raw_message)
+    except (TypeError, ValueError):
+        return None
+
+    parts = message.walk() if message.is_multipart() else (message,)
+    for part in parts:
+        content_type = part.get_content_type().casefold()
+        if content_type not in {"text/plain", "text/html"}:
+            continue
+        text = _body_text(part)
+        if not text:
+            continue
+
+        if content_type == "text/html":
+            parser = _UnsubscribeHTMLParser()
+            try:
+                parser.feed(text)
+                parser.close()
+            except (AssertionError, ValueError):
+                pass
+            if parser.urls:
+                return parser.urls[0]
+
+        for match in _BODY_URL_RE.finditer(text):
+            start = max(0, match.start() - 240)
+            end = min(len(text), match.end() + 160)
+            if not _BODY_UNSUBSCRIBE_RE.search(text[start:end]):
+                continue
+            url = _safe_https_url(match.group(0))
+            if url:
+                return url
+    return None
 
 
 class DoveadmNewsletterReader:
@@ -77,9 +185,18 @@ class DoveadmNewsletterReader:
         self.host = host
         self.timeout = timeout
 
-    async def fetch_headers(self, mailbox: str, message_id: str) -> dict[str, Any] | None:
+    async def fetch_headers(
+        self,
+        mailbox: str,
+        message_id: str,
+        *,
+        include_body_unsubscribe: bool = False,
+    ) -> dict[str, Any] | None:
         mailbox = _normalise_mailbox(mailbox)
         message_id = _normalise_message_id(message_id)
+        fields = list(self.FIELDS)
+        if include_body_unsubscribe:
+            fields.append("text.utf8")
         command = (
             "doveadm",
             "-o",
@@ -91,7 +208,7 @@ class DoveadmNewsletterReader:
             self.host,
             "-u",
             mailbox,
-            " ".join(self.FIELDS),
+            " ".join(fields),
             "mailbox",
             "*",
             "HEADER",
@@ -134,12 +251,15 @@ class DoveadmNewsletterReader:
         if not records:
             return None
 
-        # A message can exist in multiple folders. The header content is identical for
-        # our purpose, so prefer the first record containing List-Unsubscribe.
         selected = next(
             (item for item in records if str(item.get("hdr.list-unsubscribe") or "").strip()),
             records[0],
         )
+        body_unsubscribe_url = ""
+        if include_body_unsubscribe:
+            raw_message = str(selected.get("text.utf8") or "")
+            body_unsubscribe_url = _extract_body_unsubscribe_url(raw_message) or ""
+
         return {
             "matches": len(records),
             "from": str(selected.get("hdr.from") or "").strip(),
@@ -154,6 +274,7 @@ class DoveadmNewsletterReader:
             "authentication_results": str(
                 selected.get("hdr.authentication-results") or ""
             ).strip(),
+            "body_unsubscribe_url": body_unsubscribe_url,
         }
 
 
@@ -218,7 +339,11 @@ def create_newsletter_agent_app(
             ) from exc
 
         try:
-            result = await reader.fetch_headers(mailbox, message_id)
+            result = await reader.fetch_headers(
+                mailbox,
+                message_id,
+                include_body_unsubscribe=payload.include_body_unsubscribe,
+            )
         except DoveadmError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         if result is None:
