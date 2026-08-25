@@ -224,7 +224,7 @@
     <div><h2>{{ t.create_alias }}</h2><p class="muted">{% if language == 'de' %}Erstelle eine neue Adresse für einen bestimmten Zweck.{% else %}Create a new address for a specific purpose.{% endif %}</p></div>
     <button class="dialog-close" type="button" data-close-create-alias aria-label="{{ t.close }}">{{ ui_icon('x') }}</button>
   </div>
-  <form method="post" action="/aliases" class="stack">
+  <form method="post" action="/aliases" class="stack" data-alias-create-form>
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label>{{ t.purpose }}<input name="description" maxlength="160" required placeholder="{{ t.purpose_placeholder }}"></label>
     <fieldset class="mode-picker">
@@ -240,4 +240,5 @@
     <button class="button primary" type="submit">{{ ui_icon('plus') }}{{ t.create_alias_button }}</button>
   </form>
 </dialog>
+<script src="/static/alias-workflow.js"></script>
 {% endblock %}
