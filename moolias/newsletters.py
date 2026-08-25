@@ -38,7 +38,7 @@ router = APIRouter()
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
 CLEAN_ACTIONS = frozenset({"clean", "no action", "accept"})
 AUTH_SYMBOLS = frozenset({"R_DKIM_ALLOW", "DMARC_POLICY_ALLOW"})
-NEWSLETTER_SYMBOLS = frozenset({"MAILLIST", "HAS_LIST_UNSUB"})
+NEWSLETTER_SYMBOLS = frozenset({"MAILLIST", "HAS_LIST_UNSUB", "MOOLIAS_BODY_UNSUB"})
 NEWSLETTER_STATUS_FILTERS = frozenset({"all", "active", "unsubscribed"})
 MAX_UNSUBSCRIBE_URL_LENGTH = 8192
 MAX_RESPONSE_HEADER_BYTES = 65536
@@ -80,10 +80,20 @@ class NewsletterAgentClient:
     async def __aexit__(self, *_args: object) -> None:
         await self.close()
 
-    async def fetch_headers(self, mailbox: str, message_id: str) -> dict[str, Any]:
+    async def fetch_headers(
+        self,
+        mailbox: str,
+        message_id: str,
+        *,
+        include_body_unsubscribe: bool = False,
+    ) -> dict[str, Any]:
         path = "/v1/headers"
         body = json.dumps(
-            {"mailbox": mailbox, "message_id": message_id},
+            {
+                "mailbox": mailbox,
+                "message_id": message_id,
+                "include_body_unsubscribe": include_body_unsubscribe,
+            },
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
@@ -386,8 +396,14 @@ class NewsletterCollector:
         if agent is None or await self.store.headers_checked(base_observation):
             return False
 
+        symbols = _symbols(item)
+        body_candidate = "MOOLIAS_BODY_UNSUB" in symbols
         try:
-            headers = await agent.fetch_headers(mailbox, message_id)
+            headers = await agent.fetch_headers(
+                mailbox,
+                message_id,
+                include_body_unsubscribe=body_candidate,
+            )
         except NewsletterAgentMessageNotFound:
             await self.store.mark_headers_checked(base_observation)
             return True
@@ -399,16 +415,19 @@ class NewsletterCollector:
             sender_address = history_address
 
         list_id = _normalise_list_id(str(headers.get("list_id") or ""))
-        unsubscribe_url, mailto = _unsubscribe_targets(
+        header_unsubscribe_url, mailto = _unsubscribe_targets(
             str(headers.get("list_unsubscribe") or "")
         )
+        body_unsubscribe_url, _ = _unsubscribe_targets(
+            f"<{str(headers.get('body_unsubscribe_url') or '').strip()}>"
+        )
+        unsubscribe_url = header_unsubscribe_url or body_unsubscribe_url
         declared_one_click = (
             str(headers.get("list_unsubscribe_post") or "").strip().casefold()
             == "list-unsubscribe=one-click"
         )
-        symbols = _symbols(item)
         one_click = bool(
-            unsubscribe_url
+            header_unsubscribe_url
             and declared_one_click
             and "R_DKIM_ALLOW" in symbols
             and _dkim_covers_one_click(str(headers.get("dkim_signature") or ""))
