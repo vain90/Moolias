@@ -1,20 +1,12 @@
-body > noscript {
-  display: contents !important;
-}
-
 .javascript-warning {
   position: relative !important;
   z-index: 1000 !important;
   width: 100% !important;
-  min-height: 56px !important;
+  height: auto !important;
+  min-height: 0 !important;
   box-sizing: border-box !important;
-  display: grid !important;
-  grid-template-columns: 18px minmax(0, 1120px) 18px !important;
-  align-items: center !important;
-  justify-content: center !important;
-  column-gap: 12px !important;
   margin: 0 !important;
-  padding: 12px 20px !important;
+  padding: 12px 52px !important;
   border-bottom: 1px solid #eab308 !important;
   background: #fef3c7 !important;
   color: #78350f !important;
@@ -24,34 +16,30 @@ body > noscript {
   overflow: visible !important;
 }
 
-.javascript-warning::after {
-  content: "";
-  width: 18px;
-  height: 18px;
-  grid-column: 3;
-}
-
-.javascript-warning > span {
-  position: static !important;
-  inset: auto !important;
-  transform: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
 .javascript-warning > span:last-child {
-  grid-column: 2 !important;
+  position: static !important;
   display: block !important;
   width: 100% !important;
   max-width: 1120px !important;
+  box-sizing: border-box !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
   color: #78350f !important;
   text-align: center !important;
+  transform: none !important;
 }
 
 .javascript-warning-icon {
-  grid-column: 1 !important;
-  display: inline-grid !important;
+  position: absolute !important;
+  left: 20px !important;
+  top: 50% !important;
+  display: grid !important;
   place-items: center !important;
+  width: 18px !important;
+  height: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateY(-50%) !important;
 }
 
 .javascript-warning-icon svg {
@@ -61,11 +49,12 @@ body > noscript {
 
 @media (max-width: 640px) {
   .javascript-warning {
-    min-height: 52px !important;
-    grid-template-columns: 18px minmax(0, 1fr) 18px !important;
-    column-gap: 9px !important;
-    padding: 10px 14px !important;
+    padding: 10px 44px !important;
     font-size: 13px !important;
+  }
+
+  .javascript-warning-icon {
+    left: 14px !important;
   }
 }
 
