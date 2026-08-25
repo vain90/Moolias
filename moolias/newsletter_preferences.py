@@ -8,6 +8,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from moolias import newsletters as newsletter_core
 from moolias.mailcow import MailcowError
+from moolias.newsletter_forwarding import (
+    direct_mailcow_forwards_to_mailbox,
+    replace_forwarded_newsletter_tag,
+)
 from moolias.newsletter_mode import (
     NewsletterModeSource,
     NewsletterModeState,
@@ -206,6 +210,43 @@ async def update_newsletter_management_setting(
     return RedirectResponse(_safe_return_to(return_to), status_code=303)
 
 
+@router.post("/account/newsletter-forwarded")
+async def update_forwarded_newsletter_setting(
+    request: Request,
+    enabled: bool = Form(...),
+    csrf_token: str = Form(...),
+    return_to: str = Form("/newsletters"),
+):
+    validate_csrf(request, csrf_token)
+    user = require_user(request)
+    await _require_enabled(request, user)
+
+    mailcow = request.app.state.mailcow
+    settings = request.app.state.settings
+    try:
+        mailbox = await mailcow.get_mailbox(user)
+        aliases = await mailcow.list_aliases()
+        forwarded = direct_mailcow_forwards_to_mailbox(aliases, user)
+        if enabled and not forwarded:
+            raise HTTPException(
+                status_code=409,
+                detail="No direct Mailcow forwarding addresses exist for this mailbox",
+            )
+        tags = replace_forwarded_newsletter_tag(
+            mailbox.get("tags"),
+            settings.newsletter_tag,
+            enabled,
+        )
+        await mailcow.set_mailbox_tags(user, tags)
+    except MailcowError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Forwarded newsletter setting could not be updated",
+        ) from exc
+
+    return RedirectResponse(_safe_return_to(return_to, "/newsletters"), status_code=303)
+
+
 @router.get("/newsletters", response_class=HTMLResponse)
 async def newsletters_page(request: Request):
     user = require_user(request)
@@ -237,6 +278,8 @@ async def newsletters_page(request: Request):
             newsletters=[],
             newsletter_alias_labels={},
             newsletter_sender_names={},
+            newsletter_forwarded_aliases=[],
+            newsletter_forwarded_enabled=False,
             newsletter_search_query="",
             newsletter_status_filter="all",
             newsletter_status_counts={"all": 0, "active": 0, "unsubscribed": 0},
