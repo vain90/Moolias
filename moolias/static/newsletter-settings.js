@@ -6,6 +6,17 @@
   if (!setting && !nav) return;
 
   const language = document.documentElement.lang === 'de' ? 'de' : 'en';
+  if (nav) {
+    const iconUse = nav.querySelector('.nav-icon use');
+    const label = nav.querySelector('.nav-icon + span');
+    iconUse?.setAttribute('href', '/static/ui-icons.svg#icon-newspaper');
+    if (label) {
+      label.textContent = language === 'de'
+        ? 'Newsletter-Verwaltung'
+        : 'Newsletter Management';
+    }
+  }
+
   const form = setting?.querySelector('form[action="/account/newsletter-management"]');
   const oldToggle = setting?.querySelector('[data-newsletter-toggle]');
   const oldSwitch = oldToggle?.closest('.switch-control');
