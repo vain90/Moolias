@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 MAILCOW_DIR="${MAILCOW_DIR:-/opt/mailcow-dockerized}"
 MOOLIAS_DIR="${MOOLIAS_DIR:-/opt/moolias}"
-MOOLIAS_AGENT_IMAGE="${MOOLIAS_AGENT_IMAGE:-ghcr.io/vain90/moolias:edge}"
+MOOLIAS_AGENT_IMAGE="${MOOLIAS_AGENT_IMAGE:-}"
 
 DOVECOT_DIR="${MAILCOW_DIR}/data/conf/dovecot"
 DOVECOT_EXTRA="${DOVECOT_DIR}/extra.conf"
@@ -48,6 +48,12 @@ set_env_value() {
   fi
 }
 
+read_env_value() {
+  local file="$1"
+  local key="$2"
+  sed -n "s/^${key}=//p" "$file" | tail -n1
+}
+
 [[ ${EUID} -eq 0 ]] || fail "run this installer as root."
 command -v docker >/dev/null 2>&1 || fail "Docker is required."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is required."
@@ -55,6 +61,16 @@ docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is required."
 [[ -d "$DOVECOT_DIR" ]] || fail "Mailcow Dovecot configuration directory is missing."
 [[ -d "$NGINX_DIR" ]] || fail "Mailcow nginx configuration directory is missing."
 [[ -f "$MOOLIAS_ENV" ]] || fail "Moolias .env not found at ${MOOLIAS_ENV}."
+
+if [[ -z "$MOOLIAS_AGENT_IMAGE" ]]; then
+  moolias_image="$(read_env_value "$MOOLIAS_ENV" MOOLIAS_IMAGE)"
+  moolias_tag="$(read_env_value "$MOOLIAS_ENV" MOOLIAS_TAG)"
+  moolias_image="${moolias_image:-ghcr.io/vain90/moolias}"
+  moolias_tag="${moolias_tag:-latest}"
+  MOOLIAS_AGENT_IMAGE="${moolias_image}:${moolias_tag}"
+fi
+[[ "$MOOLIAS_AGENT_IMAGE" != *$'\n'* && "$MOOLIAS_AGENT_IMAGE" != *$'\r'* ]] \
+  || fail "newsletter agent image contains invalid characters."
 
 install -d -m 0700 "$AGENT_DIR"
 touch "$DOVECOT_EXTRA"
@@ -295,7 +311,21 @@ rspamd_installer="${SCRIPT_DIR}/install-newsletter-rspamd.sh"
 [[ -f "$rspamd_installer" ]] || fail "Rspamd detector installer is missing at ${rspamd_installer}."
 MAILCOW_DIR="$MAILCOW_DIR" bash "$rspamd_installer"
 
+if [[ -f "${MOOLIAS_DIR}/compose.yml" ]]; then
+  (
+    cd "$MOOLIAS_DIR"
+    docker compose up -d --force-recreate moolias
+  )
+  app_status="recreated"
+else
+  app_status="restart-required"
+fi
+
 echo
 echo "Moolias Newsletter Agent installed successfully."
 echo "Moolias configuration updated: ${MOOLIAS_ENV}"
-echo "Restart or rebuild the Moolias application so the new settings and image are active."
+if [[ "$app_status" == "recreated" ]]; then
+  echo "Moolias application recreated with Newsletter Management enabled."
+else
+  echo "Restart or rebuild the Moolias application so the new settings become active."
+fi
