@@ -16,12 +16,12 @@
         confirm: "Abmelden",
         cancel: "Abbrechen",
         processingTitle: "Newsletter wird abgemeldet",
-        processingBody: "Moolias führt die direkte One-Click-Abmeldung durch und probiert bei Bedarf die gespeicherten Links nacheinander. Das kann einige Sekunden dauern.",
+        processingBody: "Die Abmeldung wird durchgeführt. Das kann einige Sekunden dauern.",
         successTitle: "Abmeldung erfolgreich",
-        successBody: "Der Anbieter hat die direkte Abmeldung erfolgreich angenommen. Der Newsletter wurde als abgemeldet markiert.",
+        successBody: "Der Anbieter hat die Abmeldung bestätigt. Der Newsletter wurde als abgemeldet markiert.",
         errorTitle: "Abmeldung nicht möglich",
-        errorBody: "Die direkte One-Click-Abmeldung konnte mit keinem der gespeicherten Links abgeschlossen werden.",
-        errorAdvice: "Empfehlung: Öffne eine aktuelle Newsletter-Mail und nutze dort den angebotenen Abmeldelink. Falls der Anbieter trotzdem weiter sendet oder keine Abmeldung möglich ist, kannst du den verwendeten Alias in Moolias deaktivieren oder ersetzen.",
+        errorBody: "Die Abmeldung konnte nicht abgeschlossen werden.",
+        errorAdvice: "Öffne eine aktuelle Newsletter-Mail und nutze dort den angebotenen Abmeldelink. Falls der Anbieter trotzdem weiter sendet oder keine Abmeldung möglich ist, kannst du den verwendeten Alias in Moolias deaktivieren oder ersetzen.",
         close: "Schließen",
       }
     : {
@@ -30,12 +30,12 @@
         confirm: "Unsubscribe",
         cancel: "Cancel",
         processingTitle: "Unsubscribing",
-        processingBody: "Moolias is performing the direct one-click unsubscribe and will try the stored links in order if needed. This may take a few seconds.",
+        processingBody: "The unsubscribe request is being processed. This may take a few seconds.",
         successTitle: "Unsubscribe successful",
-        successBody: "The provider accepted the direct unsubscribe request. The newsletter has been marked as unsubscribed.",
+        successBody: "The provider confirmed the unsubscribe request. The newsletter has been marked as unsubscribed.",
         errorTitle: "Could not unsubscribe",
-        errorBody: "The direct one-click unsubscribe could not be completed with any of the stored links.",
-        errorAdvice: "Recommendation: Open a recent newsletter message and use the unsubscribe link provided there. If the provider still keeps sending or no unsubscribe works, you can disable or replace the alias in Moolias.",
+        errorBody: "The unsubscribe request could not be completed.",
+        errorAdvice: "Open a recent newsletter message and use the unsubscribe link provided there. If the provider still keeps sending or no unsubscribe works, you can disable or replace the alias in Moolias.",
         close: "Close",
       };
 
@@ -48,8 +48,20 @@
     dialog.dataset.newsletterUnsubscribeProcessing = "1";
     dialog.setAttribute("aria-busy", "true");
 
+    const head = document.createElement("div");
+    head.className = "dialog-head";
+
     const title = document.createElement("h2");
     title.textContent = labels.processingTitle;
+
+    const close = document.createElement("button");
+    close.className = "dialog-close";
+    close.type = "button";
+    close.textContent = "×";
+    close.setAttribute("aria-label", labels.close);
+    close.title = labels.close;
+
+    head.append(title, close);
 
     const body = document.createElement("p");
     body.className = "moolias-dialog-message";
@@ -60,9 +72,23 @@
     progress.className = "newsletter-unsubscribe-progress";
     progress.setAttribute("aria-label", labels.processingBody);
 
-    dialog.append(title, body, progress);
+    dialog.append(head, body, progress);
     document.body.append(dialog);
-    dialog.addEventListener("cancel", (event) => event.preventDefault());
+
+    const dismiss = () => {
+      if (dialog.open) dialog.close();
+      else dialog.remove();
+    };
+    close.addEventListener("click", dismiss);
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      dismiss();
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dismiss();
+    });
+    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+
     dialog.showModal();
     return dialog;
   };
@@ -126,18 +152,20 @@
   });
 
   page.querySelectorAll('form[action^="/newsletters/"][action$="/unsubscribe"]').forEach((form) => {
-    // The newsletter flow has its own asynchronous confirmation so it can continue
-    // into a progress state and a result dialog without falling back to a native or
-    // generic form confirmation.
+    // app.js binds generic data-confirm forms before this page-specific script runs.
+    // The newsletter handler therefore runs in the capture phase and stops the old
+    // listener so the second programmatic submit cannot be blocked by a stale confirm.
     form.removeAttribute("data-confirm");
 
     form.addEventListener("submit", async (event) => {
       if (form.dataset.newsletterProcessingSubmit === "1") {
         delete form.dataset.newsletterProcessingSubmit;
+        event.stopImmediatePropagation();
         return;
       }
 
       event.preventDefault();
+      event.stopImmediatePropagation();
       const api = window.MooliasDialog;
       if (!api) return;
       const submitter = event.submitter;
@@ -156,7 +184,7 @@
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => form.requestSubmit(submitter || undefined));
       });
-    });
+    }, true);
   });
 
   const search = page.querySelector("[data-newsletter-search]");
