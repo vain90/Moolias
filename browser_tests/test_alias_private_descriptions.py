@@ -33,34 +33,46 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         _login_de(page, base_url)
         page.goto(f"{base_url}/aliases")
 
-        noscript = page.locator("body > noscript")
         warning = page.locator("[data-javascript-warning]")
-        expect(noscript).to_be_visible()
-        expect(warning).to_be_hidden()
+        warning_text = warning.locator(":scope > span").last
+        expect(warning).to_be_visible()
+        expect(warning).to_contain_text("JavaScript ist deaktiviert.")
+        expect(warning).to_contain_text("nicht oder nur sehr eingeschränkt nutzbar")
         expect(warning.locator("button")).to_have_count(0)
 
-        banner_box = noscript.bounding_box()
+        warning_box = warning.bounding_box()
+        warning_text_box = warning_text.bounding_box()
         sidebar_box = page.locator("[data-app-sidebar]").bounding_box()
         viewport = page.viewport_size
-        assert banner_box is not None
+        assert warning_box is not None
+        assert warning_text_box is not None
         assert sidebar_box is not None
         assert viewport is not None
-        assert abs(banner_box["x"]) <= 1
-        assert abs(banner_box["y"]) <= 1
-        assert banner_box["width"] >= viewport["width"] - 2
-        assert sidebar_box["y"] >= banner_box["y"] + banner_box["height"] - 1
-        assert noscript.evaluate(
+        assert abs(warning_box["x"]) <= 1
+        assert abs(warning_box["y"]) <= 1
+        assert warning_box["width"] >= viewport["width"] - 2
+        assert sidebar_box["y"] >= warning_box["y"] + warning_box["height"] - 1
+        assert warning.evaluate(
             "el => getComputedStyle(el).backgroundColor"
         ) == "rgb(254, 243, 199)"
-        assert noscript.evaluate(
+        assert warning.evaluate("el => getComputedStyle(el).display") == "block"
+        assert warning.evaluate(
             "el => getComputedStyle(el).textAlign"
         ) == "center"
-        assert "JavaScript ist deaktiviert." in noscript.evaluate(
-            "el => getComputedStyle(el, '::before').content"
+        assert warning_text.evaluate(
+            "el => getComputedStyle(el).backgroundColor"
+        ) == "rgba(0, 0, 0, 0)"
+        assert warning_text.evaluate(
+            "el => getComputedStyle(el).textAlign"
+        ) == "center"
+        assert warning_text_box["y"] >= warning_box["y"] - 1
+        assert (
+            warning_text_box["y"] + warning_text_box["height"]
+            <= warning_box["y"] + warning_box["height"] + 1
         )
-        assert "Moolias ist ohne JavaScript" in noscript.evaluate(
-            "el => getComputedStyle(el, '::after').content"
-        )
+        warning_center = warning_box["x"] + warning_box["width"] / 2
+        text_center = warning_text_box["x"] + warning_text_box["width"] / 2
+        assert abs(text_center - warning_center) <= 2
 
         expect(page.locator('link[data-alias-description-styles="1"]')).to_have_count(1)
         expect(page.locator(".alias-table-head > span").nth(1)).to_contain_text(
