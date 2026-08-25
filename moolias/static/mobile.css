@@ -1,43 +1,51 @@
-body > noscript:has(> .javascript-warning) {
+.javascript-warning {
+  position: relative !important;
+  z-index: 1000 !important;
   display: block !important;
   width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
   box-sizing: border-box !important;
   margin: 0 !important;
-  padding: 12px 20px !important;
+  padding: 13px 20px !important;
+  border: 0 !important;
   border-bottom: 1px solid #eab308 !important;
   background: #fef3c7 !important;
   color: #78350f !important;
   font-size: 14px !important;
   line-height: 1.45 !important;
   text-align: center !important;
+  overflow: visible !important;
 }
 
-body > noscript:has(> .javascript-warning)::before {
-  content: "JavaScript ist deaktiviert. ";
-  font-weight: 800;
+.javascript-warning > span {
+  position: static !important;
+  inset: auto !important;
+  display: block !important;
+  width: auto !important;
+  max-width: 1200px !important;
+  height: auto !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  text-align: center !important;
+  transform: none !important;
 }
 
-body > noscript:has(> .javascript-warning)::after {
-  content: "Moolias ist ohne JavaScript nicht oder nur sehr eingeschränkt nutzbar. Bitte aktiviere JavaScript in deinem Browser.";
-  font-weight: 400;
-}
-
-html[lang="en"] body > noscript:has(> .javascript-warning)::before {
-  content: "JavaScript is disabled. ";
-}
-
-html[lang="en"] body > noscript:has(> .javascript-warning)::after {
-  content: "Moolias is unavailable or only very limited without JavaScript. Please enable JavaScript in your browser.";
-}
-
-body > noscript:has(> .javascript-warning) > .javascript-warning {
+.javascript-warning > .javascript-warning-icon {
   display: none !important;
 }
 
+.javascript-warning strong {
+  color: inherit !important;
+}
+
 @media (max-width: 640px) {
-  body > noscript:has(> .javascript-warning) {
-    padding: 10px 14px !important;
+  .javascript-warning {
+    padding: 11px 14px !important;
     font-size: 13px !important;
+    text-align: center !important;
   }
 }
 
