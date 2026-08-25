@@ -111,7 +111,7 @@ jobs:
         run: bash .github/scripts/mailcow-feasibility.sh
       - name: Upload Mailcow integration diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mailcow-integration-diagnostics-${{ matrix.scenario }}
           path: /tmp/mailcow-integration
