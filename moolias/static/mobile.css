@@ -1,3 +1,43 @@
+.javascript-warning {
+  position: relative !important;
+  z-index: 1000 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  padding: 12px 20px !important;
+  border-bottom: 1px solid #eab308 !important;
+  background: #fef3c7 !important;
+  color: #78350f !important;
+  font-size: 14px !important;
+  line-height: 1.45 !important;
+  text-align: center !important;
+}
+
+.javascript-warning > span:last-child {
+  max-width: 1120px;
+}
+
+.javascript-warning-icon {
+  flex: 0 0 auto !important;
+  display: inline-grid !important;
+  place-items: center !important;
+}
+
+.javascript-warning-icon svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+@media (max-width: 640px) {
+  .javascript-warning {
+    padding: 10px 14px !important;
+    font-size: 13px !important;
+  }
+}
+
 .app-body:has(.javascript-warning) .app-sidebar {
   position: sticky;
   inset: 0 auto auto 0;
