@@ -9,8 +9,8 @@
       body: "Du kannst diese Adresse jetzt beim Dienst, Shop oder Anbieter eintragen.",
       aliasName: "Aliasname",
       description: "Beschreibung",
-      address: "Alias-Adresse",
-      copy: "Alias-Adresse kopieren",
+      address: "Deine neue Alias-Adresse",
+      copy: "Kopieren",
       done: "Fertig",
       close: "Schließen",
       failedTitle: "Alias konnte nicht erstellt werden",
@@ -21,14 +21,29 @@
       body: "You can now use this address with the service, shop, or provider.",
       aliasName: "Alias name",
       description: "Description",
-      address: "Alias address",
-      copy: "Copy alias address",
+      address: "Your new alias address",
+      copy: "Copy",
       done: "Done",
       close: "Close",
       failedTitle: "Alias could not be created",
       failed: "The alias could not be created.",
     },
   }[language];
+
+  function metadataRow(labelText, value, dataAttribute) {
+    const row = document.createElement("div");
+    row.className = "alias-workflow-meta-row";
+
+    const label = document.createElement("dt");
+    label.textContent = labelText;
+
+    const valueElement = document.createElement("dd");
+    if (dataAttribute) valueElement.dataset[dataAttribute] = "1";
+    valueElement.textContent = value;
+
+    row.append(label, valueElement);
+    return row;
+  }
 
   function workflowDialog(payload) {
     const dialog = document.createElement("dialog");
@@ -51,56 +66,52 @@
     head.append(heading, close);
 
     const body = document.createElement("p");
-    body.className = "muted";
+    body.className = "muted alias-workflow-intro";
     body.textContent = text.body;
 
-    const details = document.createElement("div");
-    details.className = "stack small top-gap";
+    const addressCard = document.createElement("section");
+    addressCard.className = "alias-workflow-address-card";
 
-    const nameLabel = document.createElement("span");
-    nameLabel.className = "hint";
-    nameLabel.textContent = text.aliasName;
-    const name = document.createElement("strong");
-    name.dataset.aliasWorkflowName = "1";
-    name.textContent = payload.name;
-    details.append(nameLabel, name);
-
-    if (payload.description) {
-      const descriptionLabel = document.createElement("span");
-      descriptionLabel.className = "hint";
-      descriptionLabel.textContent = text.description;
-      const description = document.createElement("span");
-      description.dataset.aliasWorkflowDescription = "1";
-      description.textContent = payload.description;
-      details.append(descriptionLabel, description);
-    }
+    const addressCopy = document.createElement("div");
+    addressCopy.className = "alias-workflow-address-copy";
 
     const addressLabel = document.createElement("span");
-    addressLabel.className = "hint";
+    addressLabel.className = "alias-workflow-address-label";
     addressLabel.textContent = text.address;
+
     const address = document.createElement("code");
-    address.className = "assign-address";
     address.dataset.aliasWorkflowAddress = "1";
     address.textContent = payload.address;
-    details.append(addressLabel, address);
-
-    const actions = document.createElement("div");
-    actions.className = "button-row top-gap";
+    addressCopy.append(addressLabel, address);
 
     const copy = document.createElement("button");
-    copy.className = "button primary";
+    copy.className = "button primary compact alias-workflow-copy";
     copy.type = "button";
     copy.dataset.aliasWorkflowCopy = "1";
     copy.textContent = text.copy;
 
+    addressCard.append(addressCopy, copy);
+
+    const metadata = document.createElement("dl");
+    metadata.className = "alias-workflow-meta";
+    metadata.append(metadataRow(text.aliasName, payload.name, "aliasWorkflowName"));
+    if (payload.description) {
+      metadata.append(
+        metadataRow(text.description, payload.description, "aliasWorkflowDescription"),
+      );
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "button-row alias-workflow-actions";
+
     const done = document.createElement("button");
-    done.className = "button";
+    done.className = "button primary";
     done.type = "button";
     done.dataset.aliasWorkflowDone = "1";
     done.textContent = text.done;
 
-    actions.append(copy, done);
-    dialog.append(head, body, details, actions);
+    actions.append(done);
+    dialog.append(head, body, addressCard, metadata, actions);
     return { dialog, close, copy, done };
   }
 
