@@ -2,12 +2,17 @@ name: Release
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["CI", "Mailcow integration"]
     types: [completed]
 
 permissions:
+  actions: read
   contents: write
   packages: write
+
+concurrency:
+  group: stable-release-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -69,21 +74,82 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-python@v7
+      - name: Verify stable release gates
+        id: gates
         if: steps.release_state.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+          CURRENT_WORKFLOW: ${{ github.event.workflow_run.name }}
+          CURRENT_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${TARGET_SHA}&event=push&per_page=100" \
+            > /tmp/moolias-release-runs.json
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          required = ("CI", "Mailcow integration")
+          data = json.loads(Path("/tmp/moolias-release-runs.json").read_text(encoding="utf-8"))
+          latest = {}
+
+          for run in data.get("workflow_runs", []):
+              name = str(run.get("name") or "")
+              if name not in required or run.get("head_branch") != "main":
+                  continue
+              previous = latest.get(name)
+              if previous is None or int(run.get("run_number") or 0) > int(previous.get("run_number") or 0):
+                  latest[name] = run
+
+          current_name = os.environ.get("CURRENT_WORKFLOW", "")
+          if current_name in required:
+              latest.setdefault(
+                  current_name,
+                  {
+                      "name": current_name,
+                      "status": "completed",
+                      "conclusion": os.environ.get("CURRENT_CONCLUSION", ""),
+                      "run_number": 0,
+                  },
+              )
+
+          ready = True
+          for name in required:
+              run = latest.get(name)
+              if run is None:
+                  print(f"Release gate {name}: no push run for this commit yet")
+                  ready = False
+                  continue
+              status = str(run.get("status") or "")
+              conclusion = str(run.get("conclusion") or "")
+              print(f"Release gate {name}: {status} / {conclusion or 'pending'}")
+              if status != "completed" or conclusion != "success":
+                  ready = False
+
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as handle:
+              handle.write(f"ready={'true' if ready else 'false'}\n")
+          PY
+
+      - uses: actions/setup-python@v7
+        if: steps.release_state.outputs.exists != 'true' && steps.gates.outputs.ready == 'true'
         with:
           python-version: "3.13"
           cache: pip
 
       - name: Generate release service icons
-        if: steps.release_state.outputs.exists != 'true'
+        if: steps.release_state.outputs.exists != 'true' && steps.gates.outputs.ready == 'true'
         run: |
           python -m pip install --upgrade pip
           python -m pip install simple-icons-pack==16.28.0
           python -m moolias.service_icon_assets
 
       - name: Extract changelog section
-        if: steps.release_state.outputs.exists != 'true'
+        if: steps.release_state.outputs.exists != 'true' && steps.gates.outputs.ready == 'true'
         env:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
@@ -109,17 +175,17 @@ jobs:
           PY
 
       - uses: docker/setup-buildx-action@v4
-        if: steps.release_state.outputs.exists != 'true'
+        if: steps.release_state.outputs.exists != 'true' && steps.gates.outputs.ready == 'true'
 
       - uses: docker/login-action@v4
-        if: steps.release_state.outputs.exists != 'true'
+        if: steps.release_state.outputs.exists != 'true' && steps.gates.outputs.ready == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish stable container image
-        if: steps.release_state.outputs.exists != 'true'
+        if: steps.release_state.outputs.exists != 'true' && steps.gates.outputs.ready == 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -138,7 +204,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Create GitHub release and tag
-        if: steps.release_state.outputs.exists != 'true'
+        if: steps.release_state.outputs.exists != 'true' && steps.gates.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.meta.outputs.tag }}
