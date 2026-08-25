@@ -48,6 +48,13 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         assert abs(warning_box["x"]) <= 1
         assert warning_box["width"] >= viewport["width"] - 2
         assert sidebar_box["y"] >= warning_box["y"] + warning_box["height"] - 1
+        assert warning.evaluate(
+            "el => getComputedStyle(el).backgroundColor"
+        ) == "rgb(254, 243, 199)"
+        assert warning.evaluate(
+            "el => getComputedStyle(el).justifyContent"
+        ) == "center"
+        assert warning.evaluate("el => getComputedStyle(el).display") == "flex"
 
         expect(page.locator('link[data-alias-description-styles="1"]')).to_have_count(1)
         expect(page.locator(".alias-table-head > span").nth(1)).to_contain_text(
