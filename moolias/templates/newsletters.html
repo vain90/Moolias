@@ -83,16 +83,16 @@
       <div>
         <strong>
           {% if language == 'de' %}
-            {% if newsletter_forwarded_aliases|length == 1 %}1 weitergeleitete Adresse gefunden{% else %}{{ newsletter_forwarded_aliases|length }} weitergeleitete Adressen gefunden{% endif %}
+            {% if newsletter_forwarded_aliases|length == 1 %}1 zusätzliche Adresse gefunden{% else %}{{ newsletter_forwarded_aliases|length }} zusätzliche Adressen gefunden{% endif %}
           {% else %}
-            {% if newsletter_forwarded_aliases|length == 1 %}1 forwarded address found{% else %}{{ newsletter_forwarded_aliases|length }} forwarded addresses found{% endif %}
+            {% if newsletter_forwarded_aliases|length == 1 %}1 additional address found{% else %}{{ newsletter_forwarded_aliases|length }} additional addresses found{% endif %}
           {% endif %}
         </strong>
         <div class="muted">
           {% if newsletter_forwarded_enabled %}
-            {% if language == 'de' %}Newsletter an diese von Mailcow weitergeleiteten Adressen werden berücksichtigt.{% else %}Newsletters sent to these Mailcow-forwarded addresses are included.{% endif %}
+            {% if language == 'de' %}Newsletter an diese von Mailcow weitergeleiteten oder administrativ verknüpften Adressen werden berücksichtigt.{% else %}Newsletters sent to these Mailcow-forwarded or administratively linked addresses are included.{% endif %}
           {% else %}
-            {% if language == 'de' %}Newsletter an diese von Mailcow weitergeleiteten Adressen werden aktuell nicht berücksichtigt.{% else %}Newsletters sent to these Mailcow-forwarded addresses are currently not included.{% endif %}
+            {% if language == 'de' %}Newsletter an diese von Mailcow weitergeleiteten oder administrativ verknüpften Adressen werden aktuell nicht berücksichtigt.{% else %}Newsletters sent to these Mailcow-forwarded or administratively linked addresses are currently not included.{% endif %}
           {% endif %}
         </div>
         <div class="newsletter-forwarded-addresses">
@@ -109,7 +109,7 @@
           {% if newsletter_forwarded_enabled %}
             {% if language == 'de' %}Nicht mehr einbeziehen{% else %}Stop including{% endif %}
           {% else %}
-            {% if language == 'de' %}Weitergeleitete Adressen einbeziehen{% else %}Include forwarded addresses{% endif %}
+            {% if language == 'de' %}Zusätzliche Adressen einbeziehen{% else %}Include additional addresses{% endif %}
           {% endif %}
         </button>
       </form>
@@ -322,32 +322,41 @@
       </div>
       {% endif %}
 
-      <div class="list-footer newsletter-list-footer">
-        <div class="range-summary">
-          {% if newsletter_filtered_total %}
-            {% if language == 'de' %}{{ newsletter_range_start }}–{{ newsletter_range_end }} von {{ newsletter_filtered_total }}{% else %}{{ newsletter_range_start }}–{{ newsletter_range_end }} of {{ newsletter_filtered_total }}{% endif %}
+      {% if newsletter_filtered_total %}
+      <div class="pagination-bar newsletter-pagination-bar">
+        <span class="pagination-summary">
+          {% if language == 'de' %}
+            {{ newsletter_range_start }}–{{ newsletter_range_end }} von {{ newsletter_filtered_total }}
           {% else %}
-            {% if language == 'de' %}0 Einträge{% else %}0 entries{% endif %}
+            {{ newsletter_range_start }}–{{ newsletter_range_end }} of {{ newsletter_filtered_total }}
           {% endif %}
-        </div>
+        </span>
+        <nav class="pagination" aria-label="{% if language == 'de' %}Newsletter-Seiten{% else %}Newsletter pages{% endif %}">
+          {% set base_query = 'status=' ~ newsletter_status_filter ~ '&q=' ~ (newsletter_search_query|urlencode) ~ '&per_page=' ~ newsletter_per_page %}
+          <a class="page-link {% if newsletter_page <= 1 %}disabled{% endif %}" href="/newsletters?{{ base_query }}&page={{ newsletter_page - 1 }}" {% if newsletter_page <= 1 %}aria-disabled="true" tabindex="-1"{% endif %}>{{ icon('chevron-left') }}</a>
+          {% for item in newsletter_pagination_items %}
+            {% if item is none %}
+              <span class="page-ellipsis">…</span>
+            {% else %}
+              <a class="page-link {% if item == newsletter_page %}current{% endif %}" href="/newsletters?{{ base_query }}&page={{ item }}" {% if item == newsletter_page %}aria-current="page"{% endif %}>{{ item }}</a>
+            {% endif %}
+          {% endfor %}
+          <a class="page-link {% if newsletter_page >= newsletter_total_pages %}disabled{% endif %}" href="/newsletters?{{ base_query }}&page={{ newsletter_page + 1 }}" {% if newsletter_page >= newsletter_total_pages %}aria-disabled="true" tabindex="-1"{% endif %}>{{ icon('chevron-right') }}</a>
+        </nav>
         <form method="get" action="/newsletters" class="page-size-form">
-          <input type="hidden" name="q" value="{{ newsletter_search_query }}">
           <input type="hidden" name="status" value="{{ newsletter_status_filter }}">
+          <input type="hidden" name="q" value="{{ newsletter_search_query }}">
           <label>
-            {% if language == 'de' %}Zeilen pro Seite{% else %}Rows per page{% endif %}
-            <select name="per_page" data-newsletter-page-size>
-              {% for size in newsletter_page_sizes %}<option value="{{ size }}" {% if size == newsletter_per_page %}selected{% endif %}>{{ size }}</option>{% endfor %}
+            <span class="sr-only">{% if language == 'de' %}Zeilen pro Seite{% else %}Rows per page{% endif %}</span>
+            <select name="per_page" onchange="this.form.submit()">
+              {% for size in newsletter_page_sizes %}
+                <option value="{{ size }}" {% if size == newsletter_per_page %}selected{% endif %}>{{ size }}</option>
+              {% endfor %}
             </select>
           </label>
         </form>
-        {% if newsletter_total_pages > 1 %}
-        <nav class="pagination" aria-label="{% if language == 'de' %}Newsletter-Seiten{% else %}Newsletter pages{% endif %}">
-          {% if newsletter_page > 1 %}<a class="page-link" href="/newsletters?status={{ newsletter_status_filter }}&q={{ newsletter_search_query|urlencode }}&per_page={{ newsletter_per_page }}&page={{ newsletter_page - 1 }}">{% if language == 'de' %}Zurück{% else %}Previous{% endif %}</a>{% endif %}
-          {% for item in newsletter_pagination_items %}{% if item is none %}<span class="page-ellipsis">…</span>{% elif item == newsletter_page %}<span class="page-link current" aria-current="page">{{ item }}</span>{% else %}<a class="page-link" href="/newsletters?status={{ newsletter_status_filter }}&q={{ newsletter_search_query|urlencode }}&per_page={{ newsletter_per_page }}&page={{ item }}">{{ item }}</a>{% endif %}{% endfor %}
-          {% if newsletter_page < newsletter_total_pages %}<a class="page-link" href="/newsletters?status={{ newsletter_status_filter }}&q={{ newsletter_search_query|urlencode }}&per_page={{ newsletter_per_page }}&page={{ newsletter_page + 1 }}">{% if language == 'de' %}Weiter{% else %}Next{% endif %}</a>{% endif %}
-        </nav>
-        {% endif %}
       </div>
+      {% endif %}
     </section>
   {% endif %}
 </section>
