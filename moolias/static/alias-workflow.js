@@ -98,10 +98,7 @@
         });
         if (!response.ok) return;
         const workflow = await response.json();
-        if (
-          workflow.state !== workflowDialog.dataset.aliasWorkflowState
-          || String(Boolean(workflow.completed)) !== workflowDialog.dataset.aliasWorkflowCompleted
-        ) {
+        if (workflow.state !== workflowDialog.dataset.aliasWorkflowState) {
           window.location.reload();
         }
       } catch (error) {
