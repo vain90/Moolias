@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import fcntl
 import hmac
 import json
@@ -10,6 +11,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,7 @@ from moolias.sender_protocol import (
 BLOCKED_OWNER = "__moolias_blocked_primary_sender__"
 DEFAULT_STATE_DIR = "/state"
 DEFAULT_POLICY_PATH = "/postfix-policy/blocked_sender_login.pcre"
+DEFAULT_BYPASS_MAP_PATH = "/rspamd-custom/moolias_firstmail_recipients.map"
 DEFAULT_COOLDOWN_SECONDS = 10
 MAX_CLOCK_SKEW_SECONDS = 30
 NONCE_TTL_SECONDS = 60
@@ -61,6 +64,13 @@ class MailboxRequest(BaseModel):
 
 class ProtectionRequest(MailboxRequest):
     blocked: bool
+
+
+class DeliveryBypassRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    recipients: list[str]
+    enabled: bool
+    expires_at: int | None = None
 
 
 class AgentAuthenticator:
@@ -134,6 +144,7 @@ class AgentStateStore:
         cooldown_seconds: int = DEFAULT_COOLDOWN_SECONDS,
         *,
         policy_path: str | Path | None = None,
+        bypass_map_path: str | Path | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
         if cooldown_seconds < 1 or cooldown_seconds > 300:
@@ -147,15 +158,22 @@ class AgentStateStore:
             if policy_path is not None
             else self.state_dir / "blocked_sender_login.pcre"
         )
+        self.bypass_map_path = (
+            Path(bypass_map_path)
+            if bypass_map_path is not None
+            else self.state_dir / "moolias_firstmail_recipients.map"
+        )
         self.lock_path = self.state_dir / ".lock"
 
     def ensure_files(self) -> None:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.policy_path.parent.mkdir(parents=True, exist_ok=True)
+        self.bypass_map_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock_file:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
             state = self._load_state()
-            self._write_state_and_policy(state)
+            self._expire_bypass_entries(state)
+            self._write_state_and_files(state)
 
     def status(self, mailbox: str) -> dict[str, Any]:
         mailbox = normalize_mailbox(mailbox)
@@ -164,7 +182,7 @@ class AgentStateStore:
         with self.lock_path.open("a+", encoding="utf-8") as lock_file:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
             state = self._load_state()
-            self._reconcile_policy(state)
+            self._reconcile_files(state)
             blocked_set = set(state["blocked"])
             external_set = set(state["external_blocked"])
             externally_managed = mailbox in external_set
@@ -186,7 +204,7 @@ class AgentStateStore:
             external_set = set(state["external_blocked"])
             if mailbox in external_set:
                 if blocked:
-                    self._reconcile_policy(state)
+                    self._reconcile_files(state)
                     return {
                         "mailbox": mailbox,
                         "blocked": True,
@@ -201,7 +219,7 @@ class AgentStateStore:
             blocked_set = set(state["blocked"])
             current = mailbox in blocked_set
             if current == blocked:
-                self._reconcile_policy(state)
+                self._reconcile_files(state)
                 return {
                     "mailbox": mailbox,
                     "blocked": current,
@@ -228,7 +246,7 @@ class AgentStateStore:
             }
             last_changed[mailbox] = now
             state["last_changed"] = last_changed
-            self._write_state_and_policy(state)
+            self._write_state_and_files(state)
             return {
                 "mailbox": mailbox,
                 "blocked": blocked,
@@ -236,6 +254,65 @@ class AgentStateStore:
                 "changed": True,
                 "retry_after": self.cooldown_seconds,
             }
+
+    def set_delivery_bypass(
+        self,
+        recipients: list[str],
+        *,
+        enabled: bool,
+        expires_at: int | None,
+    ) -> dict[str, Any]:
+        normalized = sorted({normalize_mailbox(item) for item in recipients})
+        if not normalized or len(normalized) > 2:
+            raise InvalidMailbox("Delivery bypass requires one or two recipient addresses")
+        now = int(self.clock())
+        if enabled and (expires_at is None or int(expires_at) <= now):
+            raise AgentStateError("Delivery bypass expiry must be in the future")
+
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.bypass_map_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            state = self._load_state()
+            self._expire_bypass_entries(state)
+            active = dict(state["delivery_bypass"])
+            if enabled:
+                assert expires_at is not None
+                expiry = int(expires_at)
+                for recipient in normalized:
+                    active[recipient] = expiry
+            else:
+                for recipient in normalized:
+                    active.pop(recipient, None)
+            state["delivery_bypass"] = dict(sorted(active.items()))
+            self._write_state_and_files(state)
+            return {
+                "recipients": normalized,
+                "enabled": enabled,
+                "expires_at": int(expires_at) if enabled and expires_at is not None else None,
+            }
+
+    def expire_delivery_bypass(self) -> list[str]:
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.bypass_map_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            state = self._load_state()
+            before = set(state["delivery_bypass"])
+            changed = self._expire_bypass_entries(state)
+            if changed:
+                self._write_state_and_files(state)
+            return sorted(before - set(state["delivery_bypass"]))
+
+    def delivery_bypass_status(self) -> dict[str, int]:
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.bypass_map_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            state = self._load_state()
+            if self._expire_bypass_entries(state):
+                self._write_state_and_files(state)
+            return dict(state["delivery_bypass"])
 
     def _retry_after(self, state: dict[str, Any], mailbox: str) -> int:
         changed_at = state["last_changed"].get(mailbox)
@@ -247,26 +324,29 @@ class AgentStateStore:
     def _load_state(self) -> dict[str, Any]:
         if not self.state_path.exists():
             return {
-                "version": 1,
+                "version": 2,
                 "blocked": [],
                 "external_blocked": [],
                 "last_changed": {},
+                "delivery_bypass": {},
             }
         try:
             payload = json.loads(self.state_path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
-            raise AgentStateError("Could not read sender protection state") from exc
-        if not isinstance(payload, dict) or payload.get("version") != 1:
-            raise AgentStateError("Unsupported sender protection state")
+            raise AgentStateError("Could not read Mailcow agent state") from exc
+        if not isinstance(payload, dict) or payload.get("version") not in {1, 2}:
+            raise AgentStateError("Unsupported Mailcow agent state")
         blocked_raw = payload.get("blocked")
         external_raw = payload.get("external_blocked", [])
         changed_raw = payload.get("last_changed")
+        bypass_raw = payload.get("delivery_bypass", {})
         if (
             not isinstance(blocked_raw, list)
             or not isinstance(external_raw, list)
             or not isinstance(changed_raw, dict)
+            or not isinstance(bypass_raw, dict)
         ):
-            raise AgentStateError("Invalid sender protection state")
+            raise AgentStateError("Invalid Mailcow agent state")
         try:
             blocked = sorted({normalize_mailbox(str(item)) for item in blocked_raw})
             external_blocked = sorted(
@@ -276,14 +356,30 @@ class AgentStateStore:
                 normalize_mailbox(str(key)): float(value)
                 for key, value in changed_raw.items()
             }
+            delivery_bypass = {
+                normalize_mailbox(str(key)): int(value)
+                for key, value in bypass_raw.items()
+            }
         except (InvalidMailbox, TypeError, ValueError) as exc:
-            raise AgentStateError("Invalid sender protection state") from exc
+            raise AgentStateError("Invalid Mailcow agent state") from exc
         return {
-            "version": 1,
+            "version": 2,
             "blocked": blocked,
             "external_blocked": external_blocked,
             "last_changed": last_changed,
+            "delivery_bypass": dict(sorted(delivery_bypass.items())),
         }
+
+    def _expire_bypass_entries(self, state: dict[str, Any]) -> bool:
+        now = int(self.clock())
+        active = {
+            address: int(expires_at)
+            for address, expires_at in state["delivery_bypass"].items()
+            if int(expires_at) > now
+        }
+        changed = active != state["delivery_bypass"]
+        state["delivery_bypass"] = dict(sorted(active.items()))
+        return changed
 
     def _render_policy(self, state: dict[str, Any]) -> str:
         lines = [
@@ -295,24 +391,43 @@ class AgentStateStore:
             lines.append(f"/^{escaped}$/    {BLOCKED_OWNER}")
         return "\n".join(lines) + "\n"
 
-    def _reconcile_policy(self, state: dict[str, Any]) -> None:
-        expected = self._render_policy(state)
-        try:
-            current = self.policy_path.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            current = ""
-        if current != expected:
-            self._atomic_write(self.policy_path, expected, mode=0o644)
+    def _render_bypass_map(self, state: dict[str, Any]) -> str:
+        lines = [
+            "# Managed by Moolias Mailcow Agent. Do not edit manually.",
+            "# Exact recipients temporarily exempt from first-delivery greylisting.",
+        ]
+        lines.extend(sorted(state["delivery_bypass"]))
+        return "\n".join(lines) + "\n"
 
-    def _write_state_and_policy(self, state: dict[str, Any]) -> None:
+    def _reconcile_files(self, state: dict[str, Any]) -> None:
+        self._expire_bypass_entries(state)
+        expected_policy = self._render_policy(state)
+        expected_bypass = self._render_bypass_map(state)
+        try:
+            current_policy = self.policy_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            current_policy = ""
+        try:
+            current_bypass = self.bypass_map_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            current_bypass = ""
+        if current_policy != expected_policy:
+            self._atomic_write(self.policy_path, expected_policy, mode=0o644)
+        if current_bypass != expected_bypass:
+            self._atomic_write(self.bypass_map_path, expected_bypass, mode=0o644)
+
+    def _write_state_and_files(self, state: dict[str, Any]) -> None:
+        state["version"] = 2
         state_text = json.dumps(
             state,
             sort_keys=True,
             separators=(",", ":"),
         ) + "\n"
         policy_text = self._render_policy(state)
+        bypass_text = self._render_bypass_map(state)
         self._atomic_write(self.state_path, state_text, mode=0o600)
         self._atomic_write(self.policy_path, policy_text, mode=0o644)
+        self._atomic_write(self.bypass_map_path, bypass_text, mode=0o644)
 
     def _atomic_write(self, path: Path, content: str, *, mode: int) -> None:
         temporary = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
@@ -333,6 +448,7 @@ def create_agent_app(
     secret: str | None = None,
     state_dir: str | Path | None = None,
     policy_path: str | Path | None = None,
+    bypass_map_path: str | Path | None = None,
     cooldown_seconds: int | None = None,
     clock: Callable[[], float] = time.time,
 ) -> FastAPI:
@@ -341,6 +457,10 @@ def create_agent_app(
     resolved_policy_path = policy_path or os.environ.get(
         "MOOLIAS_AGENT_POLICY_PATH",
         DEFAULT_POLICY_PATH,
+    )
+    resolved_bypass_map_path = bypass_map_path or os.environ.get(
+        "MOOLIAS_AGENT_BYPASS_MAP_PATH",
+        DEFAULT_BYPASS_MAP_PATH,
     )
     if cooldown_seconds is None:
         raw_cooldown = os.environ.get(
@@ -359,9 +479,27 @@ def create_agent_app(
         resolved_state_dir,
         cooldown_seconds,
         policy_path=resolved_policy_path,
+        bypass_map_path=resolved_bypass_map_path,
         clock=clock,
     )
     store.ensure_files()
+
+    async def expiry_loop() -> None:
+        while True:
+            await asyncio.sleep(1)
+            await asyncio.to_thread(store.expire_delivery_bypass)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        task = asyncio.create_task(expiry_loop())
+        try:
+            yield
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     app = FastAPI(
         title="Moolias Mailcow Agent",
@@ -369,6 +507,7 @@ def create_agent_app(
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
+        lifespan=lifespan,
     )
     app.state.authenticator = authenticator
     app.state.store = store
@@ -379,6 +518,7 @@ def create_agent_app(
             "status": "ok",
             "protocol": PROTOCOL_VERSION,
             "version": __version__,
+            "capabilities": ["sender_protection", "first_mail_delivery_bypass"],
         }
 
     async def authenticated_payload(
@@ -424,5 +564,19 @@ def create_agent_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except AgentStateError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    @app.post("/v1/delivery-bypass")
+    async def delivery_bypass_endpoint(request: Request):
+        payload = await authenticated_payload(request, DeliveryBypassRequest)
+        try:
+            return store.set_delivery_bypass(
+                payload.recipients,
+                enabled=payload.enabled,
+                expires_at=payload.expires_at,
+            )
+        except InvalidMailbox as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except AgentStateError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return app
