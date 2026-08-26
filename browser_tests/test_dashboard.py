@@ -182,7 +182,7 @@ def test_action_required_can_disable_per_alias_unexpected_review(
     expect(page.locator("[data-unexpected-filter] span")).to_have_text("0", timeout=5000)
 
 
-def test_action_required_can_replace_alias_and_continue(
+def test_action_required_starts_guided_alias_change_and_keeps_both_active(
     page: Page,
     base_url: str,
 ) -> None:
@@ -194,32 +194,47 @@ def test_action_required_can_replace_alias_and_continue(
     expect(replace_button).to_be_visible()
     replace_button.click()
 
-    replacement_dialog = page.locator("dialog.assign-dialog[open]").filter(
-        has=page.locator('input[name="replacement-mode"]')
+    expect(page).to_have_url(
+        re.compile(rf"{re.escape(base_url)}/aliases\?replace=1$"),
+        timeout=5000,
     )
+    replacement_dialog = page.locator("dialog[data-alias-replacement-dialog][open]")
     expect(replacement_dialog).to_be_visible()
+    expect(replacement_dialog).to_contain_text(AMAZON)
     replacement_dialog.locator(
-        'label.mode-option:has(input[value="custom"])'
+        'label.mode-option:has(input[name="mode"][value="custom"])'
     ).click()
-    replacement_dialog.locator(".address-input input").fill("amazon-safe")
-    replacement_dialog.locator(".button.primary").click()
+    replacement_dialog.locator('input[name="local_part"]').fill("amazon-safe")
+    replacement_dialog.locator('button[type="submit"]').click()
 
-    result_dialog = page.locator("dialog.assign-dialog-single[open]").filter(
-        has_text="Alias replaced"
-    )
-    expect(result_dialog).to_be_visible(timeout=5000)
-    expect(result_dialog).to_contain_text("amazon-safe@example.org")
-    with page.expect_navigation(wait_until="load"):
-        result_dialog.locator(".dialog-close").click()
+    workflow_dialog = page.locator("dialog[data-alias-workflow-dialog][open]")
+    expect(workflow_dialog).to_be_visible(timeout=5000)
+    expect(workflow_dialog).to_contain_text("Alias change")
+    expect(workflow_dialog).to_contain_text(AMAZON)
+    expect(workflow_dialog).to_contain_text("amazon-safe@example.org")
+    expect(workflow_dialog).to_contain_text("Waiting for the first email")
+    expect(workflow_dialog).to_contain_text("old and new addresses stay active")
 
     page.goto(f"{base_url}/aliases")
     old_alias = _alias_row(page, AMAZON)
-    expect(old_alias).to_have_count(1)
-    expect(old_alias.locator("[data-alias-select]")).to_have_attribute("data-active", "0")
     new_alias = _alias_row(page, "amazon-safe@example.org")
+    expect(old_alias).to_have_count(1)
     expect(new_alias).to_have_count(1)
+    expect(old_alias.locator("[data-alias-select]")).to_have_attribute("data-active", "1")
+    expect(new_alias.locator("[data-alias-select]")).to_have_attribute("data-active", "1")
+    expect(old_alias).to_have_attribute("data-alias-workflow-role", "old")
+    expect(new_alias).to_have_attribute("data-alias-workflow-role", "new")
+    expect(old_alias.locator(".alias-workflow-badge")).to_have_text("OLD")
+    expect(new_alias.locator(".alias-workflow-badge")).to_have_text("NEW")
     expect(new_alias.locator(".alias-info strong")).to_have_text("Amazon")
     expect(new_alias.locator("[data-alias-select]")).to_have_attribute("data-sogo", "1")
+
+    page.goto(f"{base_url}/overview")
+    pending = page.locator("[data-pending-alias-workflow]")
+    expect(pending).to_have_count(1)
+    expect(pending).to_contain_text(AMAZON)
+    expect(pending).to_contain_text("amazon-safe@example.org")
+    expect(pending).to_contain_text("Confirm alias change")
 
 
 def test_used_offline_alias_stays_protected_and_pool_export_excludes_it(
