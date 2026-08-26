@@ -11,7 +11,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -496,10 +496,8 @@ def create_agent_app(
             yield
         finally:
             task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await task
-            except asyncio.CancelledError:
-                pass
 
     app = FastAPI(
         title="Moolias Mailcow Agent",
