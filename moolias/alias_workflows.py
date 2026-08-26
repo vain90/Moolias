@@ -114,7 +114,11 @@ class AliasWorkflowStore:
                 CREATE INDEX IF NOT EXISTS idx_alias_workflows_deactivation
                     ON alias_workflows(scheduled_deactivation_at, completed_at);
                 CREATE INDEX IF NOT EXISTS idx_alias_workflows_bypass
-                    ON alias_workflows(bypass_clear_requested_at, bypass_cleared_at, bypass_expires_at);
+                    ON alias_workflows(
+                        bypass_clear_requested_at,
+                        bypass_cleared_at,
+                        bypass_expires_at
+                    );
                 """
             )
 
@@ -370,7 +374,10 @@ class AliasWorkflowStore:
                             """,
                             (event_at, event_at, workflow_id),
                         )
-                    elif row["old_address"] is not None and str(row["old_address"]).lower() == recipient:
+                    elif (
+                        row["old_address"] is not None
+                        and str(row["old_address"]).lower() == recipient
+                    ):
                         connection.execute(
                             """
                             UPDATE alias_workflows
