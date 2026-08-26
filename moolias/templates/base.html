@@ -169,7 +169,7 @@
       <div>
         <h2>{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}</h2>
       </div>
-      <button class="drawer-close" type="button" aria-label="{{ t.close }}" title="{{ t.close }}" data-close-settings>{{ icon('x') }}</button>
+      <button class="drawer-close" type="button" data-close-settings aria-label="{{ t.close }}">{{ icon('x') }}</button>
     </div>
 
     <div class="settings-drawer-content">
@@ -285,7 +285,7 @@
             {% if language == 'de' %}
               Wie bei der Statistik werden Newsletter-Tags direkt an Domain und Postfach in Mailcow ausgewertet. Beim tatsächlichen Aktivieren kannst du entscheiden, ob noch verfügbare historische Daten einbezogen werden sollen. Ist die Funktion serverseitig deaktiviert, kann die Einstellung nicht geändert werden.
             {% else %}
-              As with statistics, newsletter tags are evaluated directly on the Mailcow domain and mailbox. When the feature is actually enabled, you can choose whether still-available historical data should be included. If the feature is disabled server-side, the setting cannot be changed.
+              As with statistics, newsletter tags are evaluated directly on Mailcow domain and mailbox tags. When the feature is actually enabled, you can choose whether still-available historical data should be included. If the feature is disabled server-side, the setting cannot be changed.
             {% endif %}
           </p>
         </div>
