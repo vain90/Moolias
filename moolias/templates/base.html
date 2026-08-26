@@ -52,7 +52,7 @@
   {% if user is defined %}data-tour-user="{{ user|e }}"{% endif %}
 >
 <noscript>
-  <span class="javascript-warning" data-javascript-warning role="alert">{% if language == 'de' %}⚠ JavaScript ist deaktiviert. Moolias ist ohne JavaScript nicht oder nur sehr eingeschränkt nutzbar. Bitte aktiviere JavaScript in deinem Browser.{% else %}⚠ JavaScript is disabled. Moolias is unavailable or only very limited without JavaScript. Please enable JavaScript in your browser.{% endif %}</span>
+  <span class="javascript-warning" data-javascript-warning role="alert">{% if language == 'de' %}⚠ <strong>JavaScript ist deaktiviert.</strong> Moolias ist ohne JavaScript nicht oder nur sehr eingeschränkt nutzbar. Bitte aktiviere JavaScript in deinem Browser.{% else %}⚠ <strong>JavaScript is disabled.</strong> Moolias is unavailable or only very limited without JavaScript. Please enable JavaScript in your browser.{% endif %}</span>
 </noscript>
 {% if user is defined %}
   <div class="app-frame">
@@ -169,7 +169,7 @@
       <div>
         <h2>{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}</h2>
       </div>
-      <button class="drawer-close" type="button" data-close-settings aria-label="{{ t.close }}">{{ icon('x') }}</button>
+      <button class="drawer-close" type="button" aria-label="{{ t.close }}" title="{{ t.close }}" data-close-settings>{{ icon('x') }}</button>
     </div>
 
     <div class="settings-drawer-content">
