@@ -1,0 +1,195 @@
+.alias-workflow-dialog {
+  width: min(620px, calc(100vw - 28px));
+}
+
+.alias-workflow-address-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+}
+
+.alias-workflow-address-copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.alias-workflow-address-label,
+.alias-workflow-status-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.alias-workflow-address-copy code {
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.alias-workflow-meta {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.alias-workflow-meta-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+}
+
+.alias-workflow-meta-row dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.alias-workflow-meta-row dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.alias-workflow-status {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #b2ddff;
+  border-radius: 10px;
+  background: #eff8ff;
+}
+
+.alias-workflow-status.received {
+  border-color: #abefc6;
+  background: #ecfdf3;
+}
+
+.alias-workflow-status.old-received {
+  border-color: #fedf89;
+  background: #fffaeb;
+}
+
+.alias-workflow-status.stopped {
+  border-color: var(--line);
+  background: var(--panel-2);
+}
+
+.alias-workflow-status strong {
+  font-size: 13px;
+}
+
+.alias-workflow-status p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.alias-workflow-wait-actions,
+.alias-workflow-deactivation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.alias-workflow-deactivation {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.alias-workflow-deactivation h3 {
+  margin: 0 0 5px;
+  font-size: 14px;
+}
+
+.alias-workflow-deactivation p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.alias-row.alias-migration-old,
+.alias-row.alias-migration-new {
+  position: relative;
+}
+
+.alias-row.alias-migration-old {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  box-shadow: inset 3px 0 0 #fdb022;
+}
+
+.alias-row.alias-migration-new {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.alias-workflow-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 19px;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eff8ff;
+  color: #175cd3;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.alias-migration-old .alias-workflow-badge {
+  background: #fffaeb;
+  color: #b54708;
+}
+
+.alias-workflow-row-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.alias-workflow-row-state button {
+  min-height: 26px;
+}
+
+.overview-workflow-action .action-icon {
+  color: #175cd3;
+  background: #eff8ff;
+}
+
+@media (max-width: 640px) {
+  .alias-workflow-address-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .alias-workflow-address-card .button {
+    width: 100%;
+  }
+
+  .alias-workflow-meta-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .alias-workflow-wait-actions .button,
+  .alias-workflow-deactivation-actions .button {
+    flex: 1 1 100%;
+  }
+}
