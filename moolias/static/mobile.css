@@ -1,40 +1,62 @@
 .javascript-warning {
   position: relative !important;
   z-index: 1000 !important;
-  display: block !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: nowrap !important;
+  gap: 10px !important;
   width: 100% !important;
   height: auto !important;
   min-height: 0 !important;
   box-sizing: border-box !important;
   margin: 0 !important;
-  padding: 13px 20px !important;
+  padding: 11px 20px !important;
   border: 0 !important;
-  border-bottom: 1px solid #eab308 !important;
+  border-bottom: 1px solid #f59e0b !important;
   background: #fef3c7 !important;
   color: #78350f !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
   line-height: 1.45 !important;
   text-align: center !important;
-  overflow: visible !important;
 }
 
 .javascript-warning > span {
   position: static !important;
   inset: auto !important;
-  display: block !important;
-  width: auto !important;
-  max-width: 1200px !important;
+  box-sizing: border-box !important;
   height: auto !important;
-  margin: 0 auto !important;
+  margin: 0 !important;
   padding: 0 !important;
   background: transparent !important;
   color: inherit !important;
-  text-align: center !important;
   transform: none !important;
 }
 
-.javascript-warning > .javascript-warning-icon {
-  display: none !important;
+.javascript-warning > span:last-child {
+  display: block !important;
+  min-width: 0 !important;
+  max-width: 1200px !important;
+  text-align: center !important;
+  overflow-wrap: anywhere !important;
+}
+
+.javascript-warning-icon {
+  position: static !important;
+  flex: 0 0 auto !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 18px !important;
+  height: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+}
+
+.javascript-warning-icon svg {
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
 }
 
 .javascript-warning strong {
@@ -43,9 +65,20 @@
 
 @media (max-width: 640px) {
   .javascript-warning {
-    padding: 11px 14px !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    gap: 9px !important;
+    padding: 10px 14px !important;
     font-size: 13px !important;
-    text-align: center !important;
+    text-align: left !important;
+  }
+
+  .javascript-warning > span:last-child {
+    text-align: left !important;
+  }
+
+  .javascript-warning-icon {
+    margin-top: 1px !important;
   }
 }
 
