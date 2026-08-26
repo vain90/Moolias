@@ -48,7 +48,8 @@
     replacementForm.action = `/aliases/${aliasId}/replace`;
     if (replacementOldAddress) replacementOldAddress.textContent = address;
     if (replacementDomain) replacementDomain.textContent = `@${domain}`;
-    replacementForm.querySelector('input[name="local_part"]')?.value = "";
+    const localPart = replacementForm.querySelector('input[name="local_part"]');
+    if (localPart) localPart.value = "";
     const named = replacementModes.find((option) => option.value === "named");
     if (named) named.checked = true;
     syncReplacementMode();
