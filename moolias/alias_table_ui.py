@@ -11,8 +11,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from moolias.alias_delivery_agent import AliasDeliveryAgentClient, alias_delivery_agent_url
 from moolias.alias_workflow_coordinator import AliasWorkflowCoordinator
 from moolias.alias_workflows import (
-    DEACTIVATION_30_DAYS,
-    DEACTIVATION_7_DAYS,
     DEACTIVATION_LATER,
     DEACTIVATION_MODES,
     DEACTIVATION_NOW,
@@ -205,6 +203,26 @@ def _group_pages(groups: list[dict], per_page: int) -> list[list[dict]]:
     if current or not pages:
         pages.append(current)
     return pages
+
+
+@router.get("/overview", response_class=HTMLResponse)
+async def overview_with_alias_workflows(request: Request):
+    state = await _load_ui_state(request)
+    user = state["user"]
+    store = await _workflow_store(request)
+    pending = await store.pending_replacements(user)
+
+    action_required = dict(state["action_required"])
+    action_required["replacements"] = len(pending)
+    action_required["base_count"] = int(action_required.get("base_count") or 0) + len(pending)
+    state["action_required"] = action_required
+    state["pending_alias_replacements"] = pending
+
+    return TEMPLATES.TemplateResponse(
+        request,
+        "overview.html",
+        _template_context(request, active_nav="overview", **state),
+    )
 
 
 @router.get("/aliases", response_class=HTMLResponse)
