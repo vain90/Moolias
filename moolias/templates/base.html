@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="/static/dialogs.css">
   <link rel="stylesheet" href="/static/sender-protection.css">
   <link rel="stylesheet" href="/static/newsletters.css">
-  <link rel="stylesheet" href="/static/mobile.css?v=20260826-2">
+  <link rel="stylesheet" href="/static/mobile.css?v=20260826-3">
   <link rel="stylesheet" href="/static/theme.css">
   <link rel="stylesheet" href="/static/shell.css">
   <link rel="stylesheet" href="/static/ui-icons.css?v=20260823-1">
@@ -52,13 +52,7 @@
   {% if user is defined %}data-tour-user="{{ user|e }}"{% endif %}
 >
 <noscript>
-  <span class="javascript-warning" data-javascript-warning role="alert">
-    <span class="javascript-warning-icon" aria-hidden="true">{{ icon('triangle-alert') }}</span>
-    <span>
-      <strong>{% if language == 'de' %}JavaScript ist deaktiviert.{% else %}JavaScript is disabled.{% endif %}</strong>
-      {% if language == 'de' %}Moolias ist ohne JavaScript nicht oder nur sehr eingeschränkt nutzbar. Bitte aktiviere JavaScript in deinem Browser.{% else %}Moolias is unavailable or only very limited without JavaScript. Please enable JavaScript in your browser.{% endif %}
-    </span>
-  </span>
+  <span class="javascript-warning" data-javascript-warning role="alert">{% if language == 'de' %}⚠ JavaScript ist deaktiviert. Moolias ist ohne JavaScript nicht oder nur sehr eingeschränkt nutzbar. Bitte aktiviere JavaScript in deinem Browser.{% else %}⚠ JavaScript is disabled. Moolias is unavailable or only very limited without JavaScript. Please enable JavaScript in your browser.{% endif %}</span>
 </noscript>
 {% if user is defined %}
   <div class="app-frame">
@@ -160,7 +154,7 @@
         </nav>
         <div class="header-actions">
           <button class="header-icon-button" type="button" data-open-settings aria-label="{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}" title="{% if language == 'de' %}Einstellungen{% else %}Settings{% endif %}">{{ icon('settings') }}</button>
-          <button class="header-icon-button help-trigger" type="button" data-open-help-dialog aria-label="{{ t.help_open }}" title="{{ t.help_open }}">{{ icon('circle-question-mark') }}</button>
+          <button class="header-icon-button help-trigger" type="button" data-open-help-dialog aria-label="{{ t.help_open }}" title="{{ t.help_open }}" data-close-help-dialog>{{ icon('circle-question-mark') }}</button>
         </div>
       </header>
 
@@ -206,7 +200,7 @@
           <h3>{{ t.usage_settings_title }}</h3>
           {% if not stats_available %}
             <p class="muted"><strong>{% if language == 'de' %}Nutzungsstatistik ist serverseitig deaktiviert.{% else %}Usage statistics are disabled server-side.{% endif %}</strong></p>
-            <p class="muted">{% if language == 'de' %}Ein Administrator muss die Statistikfunktion in der Moolias-Serverkonfiguration aktivieren, bevor du einen Statistikmodus auswählen kannst.{% else %}An administrator must enable statistics in the Moolias server configuration before you can select a statistics mode.{% endif %}</p>
+            <p class="muted">{% if language == 'de' %}Ein Administrator muss die Statistikfunktion in der Moolias-Serverkonfiguration aktivieren, bevor du einen Statistikmodus auswählen kannst.{% else %}An administrator must enable statistics on the Moolias server before you can choose a statistics mode.{% endif %}</p>
             <a class="button compact" href="https://github.com/vain90/Moolias/blob/main/docs/statistics.md" target="_blank" rel="noopener noreferrer">{% if language == 'de' %}So aktivierst du Statistiken{% else %}How to enable statistics{% endif %}</a>
           {% elif stats_error or not stats_state %}
             <p class="muted">{{ t.usage_settings_unavailable }}</p>
