@@ -34,17 +34,21 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         page.goto(f"{base_url}/aliases")
 
         warning = page.locator("[data-javascript-warning]")
+        warning_icon = warning.locator(".javascript-warning-icon")
         warning_text = warning.locator(":scope > span").last
         expect(warning).to_be_visible()
+        expect(warning_icon).to_be_visible()
         expect(warning).to_contain_text("JavaScript ist deaktiviert.")
         expect(warning).to_contain_text("nicht oder nur sehr eingeschränkt nutzbar")
         expect(warning.locator("button")).to_have_count(0)
 
         warning_box = warning.bounding_box()
+        warning_icon_box = warning_icon.bounding_box()
         warning_text_box = warning_text.bounding_box()
         sidebar_box = page.locator("[data-app-sidebar]").bounding_box()
         viewport = page.viewport_size
         assert warning_box is not None
+        assert warning_icon_box is not None
         assert warning_text_box is not None
         assert sidebar_box is not None
         assert viewport is not None
@@ -55,7 +59,13 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         assert warning.evaluate(
             "el => getComputedStyle(el).backgroundColor"
         ) == "rgb(254, 243, 199)"
-        assert warning.evaluate("el => getComputedStyle(el).display") == "block"
+        assert warning.evaluate("el => getComputedStyle(el).display") == "flex"
+        assert warning.evaluate(
+            "el => getComputedStyle(el).alignItems"
+        ) == "center"
+        assert warning.evaluate(
+            "el => getComputedStyle(el).justifyContent"
+        ) == "center"
         assert warning.evaluate(
             "el => getComputedStyle(el).textAlign"
         ) == "center"
@@ -65,14 +75,44 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         assert warning_text.evaluate(
             "el => getComputedStyle(el).textAlign"
         ) == "center"
-        assert warning_text_box["y"] >= warning_box["y"] - 1
-        assert (
-            warning_text_box["y"] + warning_text_box["height"]
-            <= warning_box["y"] + warning_box["height"] + 1
-        )
-        warning_center = warning_box["x"] + warning_box["width"] / 2
-        text_center = warning_text_box["x"] + warning_text_box["width"] / 2
-        assert abs(text_center - warning_center) <= 2
+        for child_box in (warning_icon_box, warning_text_box):
+            assert child_box["x"] >= warning_box["x"] - 1
+            assert child_box["y"] >= warning_box["y"] - 1
+            assert child_box["x"] + child_box["width"] <= (
+                warning_box["x"] + warning_box["width"] + 1
+            )
+            assert child_box["y"] + child_box["height"] <= (
+                warning_box["y"] + warning_box["height"] + 1
+            )
+
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.reload()
+        expect(warning).to_be_visible()
+        expect(warning_icon).to_be_visible()
+        assert warning.evaluate(
+            "el => getComputedStyle(el).justifyContent"
+        ) == "flex-start"
+        assert warning.evaluate(
+            "el => getComputedStyle(el).alignItems"
+        ) == "flex-start"
+        assert warning_text.evaluate(
+            "el => getComputedStyle(el).textAlign"
+        ) == "left"
+        mobile_warning_box = warning.bounding_box()
+        mobile_icon_box = warning_icon.bounding_box()
+        mobile_text_box = warning_text.bounding_box()
+        assert mobile_warning_box is not None
+        assert mobile_icon_box is not None
+        assert mobile_text_box is not None
+        for child_box in (mobile_icon_box, mobile_text_box):
+            assert child_box["x"] >= mobile_warning_box["x"] - 1
+            assert child_box["y"] >= mobile_warning_box["y"] - 1
+            assert child_box["x"] + child_box["width"] <= (
+                mobile_warning_box["x"] + mobile_warning_box["width"] + 1
+            )
+            assert child_box["y"] + child_box["height"] <= (
+                mobile_warning_box["y"] + mobile_warning_box["height"] + 1
+            )
 
         expect(page.locator('link[data-alias-description-styles="1"]')).to_have_count(1)
         expect(page.locator(".alias-table-head > span").nth(1)).to_contain_text(
