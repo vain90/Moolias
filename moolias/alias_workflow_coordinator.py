@@ -59,7 +59,7 @@ class AliasWorkflowCoordinator:
         settings: Settings,
         mailcow: MailcowClient,
         store: AliasWorkflowStore,
-        agent: AliasDeliveryAgentClient,
+        agent: AliasDeliveryAgentClient | None,
         *,
         clock: Callable[[], float] = time.time,
     ) -> None:
@@ -70,7 +70,8 @@ class AliasWorkflowCoordinator:
         self.clock = clock
 
     async def close(self) -> None:
-        await self.agent.close()
+        if self.agent is not None:
+            await self.agent.close()
 
     async def run_forever(self) -> None:
         while True:
@@ -87,6 +88,8 @@ class AliasWorkflowCoordinator:
             return True
         if workflow.bypass_expires_at <= int(self.clock()):
             return True
+        if self.agent is None:
+            return False
         try:
             await self.agent.set_bypass(
                 workflow.bypass_recipients,
@@ -102,6 +105,8 @@ class AliasWorkflowCoordinator:
         return True
 
     async def clear_workflow_bypass(self, workflow: AliasWorkflow) -> bool:
+        if self.agent is None:
+            return False
         try:
             await self.agent.clear_bypass(workflow.bypass_recipients)
         except AliasDeliveryAgentError:
@@ -115,15 +120,17 @@ class AliasWorkflowCoordinator:
 
     async def reconcile_once(self) -> None:
         now = int(self.clock())
-        for workflow in await self.store.bypass_provisioning_due(now=now):
-            await self.provision_workflow(workflow)
+        if self.agent is not None:
+            for workflow in await self.store.bypass_provisioning_due(now=now):
+                await self.provision_workflow(workflow)
 
         watchers = await self.store.active_watchers()
         if watchers:
             await self._scan_delivery_history(watchers)
 
-        for workflow in await self.store.bypass_clear_due():
-            await self.clear_workflow_bypass(workflow)
+        if self.agent is not None:
+            for workflow in await self.store.bypass_clear_due():
+                await self.clear_workflow_bypass(workflow)
 
         for workflow in await self.store.due_deactivations(now=now):
             if workflow.old_alias_id is None:
@@ -160,9 +167,10 @@ class AliasWorkflowCoordinator:
         if not deliveries:
             return
         changed = await self.store.record_deliveries(deliveries)
-        for workflow in changed:
-            if workflow.bypass_clear_requested_at is not None:
-                await self.clear_workflow_bypass(workflow)
+        if self.agent is not None:
+            for workflow in changed:
+                if workflow.bypass_clear_requested_at is not None:
+                    await self.clear_workflow_bypass(workflow)
 
     async def _fetch_history_covering(self, earliest_at: int) -> list[dict[str, Any]]:
         maximum = self.settings.alias_workflow_history_count
@@ -171,7 +179,15 @@ class AliasWorkflowCoordinator:
             sizes.append(maximum)
         history: list[dict[str, Any]] = []
         for count in sizes:
-            history = await self.mailcow.get_rspamd_history(count)
+            raw_history = await self.mailcow.get_rspamd_history(count)
+            history = [
+                {
+                    "action": item.get("action"),
+                    "unix_time": item.get("unix_time"),
+                    "rcpt_smtp": item.get("rcpt_smtp"),
+                }
+                for item in raw_history
+            ]
             if len(history) < count:
                 break
             timestamps = [
