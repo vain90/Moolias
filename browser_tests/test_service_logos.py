@@ -106,9 +106,10 @@ def test_alias_edit_panel_uses_compact_logo_and_bottom_actions(
         "Alias name"
     )
 
-    replace = panel.locator("[data-replace-alias]")
+    replace = panel.locator("[data-alias-workflow-replace]")
     disable = panel.locator(".alias-toggle-action button")
     expect(replace).to_have_text("Replace alias")
+    expect(replace).to_have_attribute("href", "/aliases?replace=1")
     expect(disable).to_have_text("Disable alias")
 
     trigger_box = trigger.bounding_box()
