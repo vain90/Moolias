@@ -221,7 +221,7 @@ def test_offline_pool_assignment_accepts_description(page: Page, base_url: str) 
     page.goto(f"{base_url}/offline-pool")
 
     row = page.locator('.offline-pool-row[data-alias-id="10"]')
-    details = page.locator('details[data-pool-inline-assign="10"]')
+    details = row.locator('details[data-pool-inline-assign="10"]')
     expect(details).to_be_visible(timeout=5000)
     details.locator("summary").click()
     expect(details).to_have_attribute("open", "")
