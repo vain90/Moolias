@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from playwright.sync_api import Locator, Page, expect
+from playwright.sync_api import Browser, Locator, Page, expect
 
 
 def _login_de(page: Page, base_url: str) -> None:
@@ -23,9 +23,126 @@ def _amazon_row(page: Page) -> Locator:
     return _alias_row(page, "amazon-k7@example.org")
 
 
+def test_alias_description_fields_are_server_rendered_without_javascript(
+    browser: Browser,
+    base_url: str,
+) -> None:
+    context = browser.new_context(java_script_enabled=False)
+    try:
+        page = context.new_page()
+        _login_de(page, base_url)
+        page.goto(f"{base_url}/aliases")
+
+        warning = page.locator("[data-javascript-warning]")
+        expect(warning).to_be_visible()
+        expect(warning).to_contain_text("⚠ JavaScript ist deaktiviert.")
+        expect(warning).to_contain_text("nicht oder nur sehr eingeschränkt nutzbar")
+        expect(warning.locator("button")).to_have_count(0)
+        expect(warning.locator("span")).to_have_count(0)
+
+        warning_box = warning.bounding_box()
+        content_box = warning.evaluate(
+            """
+            el => {
+              const range = document.createRange();
+              range.selectNodeContents(el);
+              const rect = range.getBoundingClientRect();
+              return {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+              };
+            }
+            """
+        )
+        sidebar_box = page.locator("[data-app-sidebar]").bounding_box()
+        viewport = page.viewport_size
+        assert warning_box is not None
+        assert sidebar_box is not None
+        assert viewport is not None
+        assert abs(warning_box["x"]) <= 1
+        assert abs(warning_box["y"]) <= 1
+        assert warning_box["width"] >= viewport["width"] - 2
+        assert sidebar_box["y"] >= warning_box["y"] + warning_box["height"] - 1
+        assert warning.evaluate(
+            "el => getComputedStyle(el).backgroundColor"
+        ) == "rgb(254, 243, 199)"
+        assert warning.evaluate("el => getComputedStyle(el).display") == "block"
+        assert warning.evaluate(
+            "el => getComputedStyle(el).textAlign"
+        ) == "center"
+        assert content_box["x"] >= warning_box["x"] - 1
+        assert content_box["y"] >= warning_box["y"] - 1
+        assert content_box["x"] + content_box["width"] <= (
+            warning_box["x"] + warning_box["width"] + 1
+        )
+        assert content_box["y"] + content_box["height"] <= (
+            warning_box["y"] + warning_box["height"] + 1
+        )
+
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.reload()
+        expect(warning).to_be_visible()
+        assert warning.evaluate(
+            "el => getComputedStyle(el).textAlign"
+        ) == "left"
+        mobile_warning_box = warning.bounding_box()
+        mobile_content_box = warning.evaluate(
+            """
+            el => {
+              const range = document.createRange();
+              range.selectNodeContents(el);
+              const rect = range.getBoundingClientRect();
+              return {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+              };
+            }
+            """
+        )
+        assert mobile_warning_box is not None
+        assert mobile_content_box["x"] >= mobile_warning_box["x"] - 1
+        assert mobile_content_box["y"] >= mobile_warning_box["y"] - 1
+        assert mobile_content_box["x"] + mobile_content_box["width"] <= (
+            mobile_warning_box["x"] + mobile_warning_box["width"] + 1
+        )
+        assert mobile_content_box["y"] + mobile_content_box["height"] <= (
+            mobile_warning_box["y"] + mobile_warning_box["height"] + 1
+        )
+
+        expect(page.locator('link[data-alias-description-styles="1"]')).to_have_count(1)
+        expect(page.locator(".alias-table-head > span").nth(1)).to_contain_text(
+            "Alias Name / Alias-Adresse"
+        )
+
+        row = _amazon_row(page)
+        expect(row.locator("[data-alias-edit-address] code")).to_have_text(
+            "amazon-k7@example.org"
+        )
+        expect(
+            row.locator('.edit-panel textarea[name="private_description"]')
+        ).to_have_count(1)
+        expect(row.locator("[data-replace-alias]")).to_have_text("Alias ersetzen")
+        expect(row.locator(".alias-toggle-action button")).to_have_text(
+            "Alias deaktivieren"
+        )
+        expect(
+            page.locator(
+                'dialog[data-create-alias-dialog] textarea[name="private_description"]'
+            )
+        ).to_have_count(1)
+    finally:
+        context.close()
+
+
 def test_alias_description_edit_and_table_preview(page: Page, base_url: str) -> None:
     _login_de(page, base_url)
     page.goto(f"{base_url}/aliases")
+
+    expect(page.locator("[data-javascript-warning]")).to_have_count(0)
 
     identity_heading = page.locator(".alias-table-head > span").nth(1)
     expect(identity_heading).to_contain_text("Alias Name / Alias-Adresse")

@@ -2,6 +2,7 @@
 {% from "_icons.html" import icon %}
 {% block title %}Offline-Pool · Moolias{% endblock %}
 {% block content %}
+<link rel="stylesheet" href="/static/alias-descriptions.css?v=20260825-1" data-alias-description-styles="1">
 <header class="page-heading page-heading-actions">
   <div>
     <h1>Offline-Pool</h1>
@@ -173,6 +174,7 @@
     </div>
     {% endif %}
     <label>{% if language == 'de' %}Alias Name / Zweck{% else %}Alias name / purpose{% endif %}<input name="description" maxlength="160" required placeholder="{{ t.used_for_placeholder }}"></label>
+    <label data-alias-private-description-field="1"><span data-field-caption="1">{% if language == 'de' %}Beschreibung{% else %}Description{% endif %}</span><textarea name="private_description" maxlength="160" rows="4" aria-label="{% if language == 'de' %}Beschreibung{% else %}Description{% endif %}">{{ alias.private_description }}</textarea></label>
     <label class="check-row"><input type="checkbox" name="sogo_visible" value="1"><span>{{ t.show_in_sogo }}</span></label>
     <button class="button primary" type="submit">{{ t.assign }}</button>
   </form>

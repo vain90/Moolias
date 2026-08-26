@@ -2,6 +2,7 @@
 {% from "_icons.html" import icon as ui_icon %}
 {% block title %}{% if language == 'de' %}Aliase{% else %}Aliases{% endif %} · Moolias{% endblock %}
 {% block content %}
+<link rel="stylesheet" href="/static/alias-descriptions.css?v=20260825-1" data-alias-description-styles="1">
 <header class="page-heading page-heading-actions">
   <div>
     <h1>{% if language == 'de' %}Aliase{% else %}Aliases{% endif %}</h1>
@@ -88,7 +89,7 @@
     <div class="alias-table-wrap">
       <div class="alias-table-head" aria-hidden="true">
         <span></span>
-        <span>{% if language == 'de' %}Zweck / Alias-Adresse{% else %}Purpose / alias address{% endif %}</span>
+        <span>{% if language == 'de' %}Alias Name / Alias-Adresse{% else %}Alias name / alias address{% endif %}</span>
         <span>{% if language == 'de' %}Status{% else %}Status{% endif %}</span>
         <span>{% if language == 'de' %}Nutzung{% else %}Usage{% endif %}</span>
         <span>{% if language == 'de' %}Zuletzt benutzt{% else %}Last used{% endif %}</span>
@@ -110,6 +111,15 @@
             <span class="service-badge tone-{{ icon.tone if icon else 'neutral' }}" data-service-icon-for="{{ alias.id }}" title="{{ icon.label if icon else '' }}">{{ icon.glyph if icon else 'AL' }}</span>
             <div class="alias-info">
               <strong>{{ alias.description or t.no_purpose }}</strong>
+              {% if alias.private_description %}
+              <details class="alias-description-details" data-alias-private-description-preview="1">
+                <summary class="alias-description-summary" title="{% if language == 'de' %}Beschreibung vollständig anzeigen{% else %}Show full description{% endif %}" aria-label="{% if language == 'de' %}Beschreibung vollständig anzeigen{% else %}Show full description{% endif %}">
+                  <span class="alias-description-preview">{{ alias.private_description }}</span>
+                  <span class="alias-description-info" aria-hidden="true">i</span>
+                </summary>
+                <div class="alias-description-popover">{{ alias.private_description }}</div>
+              </details>
+              {% endif %}
               <code>{{ alias.address }}</code>
               {% if stats_state and stats_state.sender_detail_enabled %}
               <details class="sender-stats">
@@ -171,26 +181,36 @@
                 <form method="post" action="/aliases/{{ alias.id }}/metadata" class="stack small">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="return_to" value="{{ return_to }}">
-                  <label>{{ t.purpose }}<input name="description" maxlength="160" value="{{ alias.description }}"></label>
+                  <div class="alias-edit-address" data-alias-edit-address="1">
+                    <span>{% if language == 'de' %}Alias-Adresse{% else %}Alias address{% endif %}</span>
+                    <code>{{ alias.address }}</code>
+                  </div>
+                  <div class="alias-edit-purpose-row">
+                    <div class="icon-preference">
+                      <label>
+                        <span>{% if language == 'de' %}Alias-Logo{% else %}Alias logo{% endif %}</span>
+                        <select data-alias-icon-select data-alias-id="{{ alias.id }}">
+                          <option value="auto" {% if not icon_overrides.get(alias.address|lower) %}selected{% endif %}>{% if language == 'de' %}Automatisch erkennen{% else %}Detect automatically{% endif %}</option>
+                          {% for option in icon_catalog %}
+                          <option value="{{ option.key }}" {% if icon_overrides.get(alias.address|lower) == option.key %}selected{% endif %}>{{ option.label }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                    </div>
+                    <label><span class="alias-field-caption" data-field-caption="1">{% if language == 'de' %}Alias Name{% else %}Alias name{% endif %}</span><input name="description" maxlength="160" value="{{ alias.description }}"></label>
+                  </div>
+                  <label data-alias-private-description-field="1">
+                    <span data-field-caption="1">{% if language == 'de' %}Beschreibung{% else %}Description{% endif %}</span>
+                    <textarea name="private_description" maxlength="160" rows="4" aria-label="{% if language == 'de' %}Beschreibung{% else %}Description{% endif %}">{{ alias.private_description }}</textarea>
+                  </label>
                   <label class="check-row"><input type="checkbox" name="sogo_visible" value="1" {% if alias.sogo_visible %}checked{% endif %}><span>{{ t.show_in_sogo }}</span></label>
                   <button class="button primary compact" type="submit">{{ t.save }}</button>
                 </form>
-                <div class="icon-preference top-gap">
-                  <label>
-                    <span>{% if language == 'de' %}Dienstsymbol{% else %}Service icon{% endif %}</span>
-                    <select data-alias-icon-select data-alias-id="{{ alias.id }}">
-                      <option value="auto" {% if not icon_overrides.get(alias.address|lower) %}selected{% endif %}>{% if language == 'de' %}Automatisch erkennen{% else %}Detect automatically{% endif %}</option>
-                      {% for option in icon_catalog %}
-                      <option value="{{ option.key }}" {% if icon_overrides.get(alias.address|lower) == option.key %}selected{% endif %}>{{ option.label }}</option>
-                      {% endfor %}
-                    </select>
-                  </label>
-                  <p class="hint">{% if language == 'de' %}Moolias ordnet bekannte Dienste anhand von Aliasname und Zweck zu. Du kannst die Zuordnung jederzeit überschreiben.{% else %}Moolias detects known services from the alias name and purpose. You can override it at any time.{% endif %}</p>
-                </div>
+                <button class="button compact alias-replace-action" type="button" data-replace-alias="{{ alias.id }}">{% if language == 'de' %}Alias ersetzen{% else %}Replace alias{% endif %}</button>
                 <form class="alias-toggle-action top-gap" method="post" action="/aliases/{{ alias.id }}/toggle">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="return_to" value="{{ return_to }}">
-                  <button class="button compact {{ 'danger' if alias.active else '' }}" type="submit">{{ t.disable if alias.active else t.enable }}</button>
+                  <button class="button compact {{ 'danger' if alias.active else '' }}" type="submit">{% if alias.active %}{% if language == 'de' %}Alias deaktivieren{% else %}Disable alias{% endif %}{% else %}{% if language == 'de' %}Alias aktivieren{% else %}Enable alias{% endif %}{% endif %}</button>
                 </form>
               </div>
             </details>
@@ -224,9 +244,13 @@
     <div><h2>{{ t.create_alias }}</h2><p class="muted">{% if language == 'de' %}Erstelle eine neue Adresse für einen bestimmten Zweck.{% else %}Create a new address for a specific purpose.{% endif %}</p></div>
     <button class="dialog-close" type="button" data-close-create-alias aria-label="{{ t.close }}">{{ ui_icon('x') }}</button>
   </div>
-  <form method="post" action="/aliases" class="stack">
+  <form method="post" action="/aliases" class="stack" data-alias-create-form>
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label>{{ t.purpose }}<input name="description" maxlength="160" required placeholder="{{ t.purpose_placeholder }}"></label>
+    <label><span data-field-caption="1">{% if language == 'de' %}Alias Name{% else %}Alias name{% endif %}</span><input name="description" maxlength="160" required placeholder="{{ t.purpose_placeholder }}"></label>
+    <label data-alias-private-description-field="1">
+      <span data-field-caption="1">{% if language == 'de' %}Beschreibung{% else %}Description{% endif %}</span>
+      <textarea name="private_description" maxlength="160" rows="4" aria-label="{% if language == 'de' %}Beschreibung{% else %}Description{% endif %}"></textarea>
+    </label>
     <fieldset class="mode-picker">
       <legend>{{ t.address_style }}</legend>
       <p class="hint mode-picker-hint">{{ t.address_style_hint }}</p>
@@ -240,4 +264,5 @@
     <button class="button primary" type="submit">{{ ui_icon('plus') }}{{ t.create_alias_button }}</button>
   </form>
 </dialog>
+<script src="/static/alias-workflow.js"></script>
 {% endblock %}

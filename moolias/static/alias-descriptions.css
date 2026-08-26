@@ -178,6 +178,88 @@ html[lang="de"] .alias-management-card .alias-table-head > span:nth-child(2)::af
   display: block;
 }
 
+.alias-workflow-dialog {
+  width: min(620px, calc(100vw - 28px));
+}
+
+.alias-workflow-intro {
+  margin-bottom: 18px;
+}
+
+.alias-workflow-address-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-soft) 58%, var(--panel));
+}
+
+.alias-workflow-address-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.alias-workflow-address-label {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.alias-workflow-address-card code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.alias-workflow-copy {
+  min-width: 96px;
+}
+
+.alias-workflow-meta {
+  margin: 16px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.alias-workflow-meta-row {
+  display: grid;
+  grid-template-columns: minmax(105px, .45fr) minmax(0, 1fr);
+  gap: 18px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.alias-workflow-meta dt,
+.alias-workflow-meta dd {
+  margin: 0;
+}
+
+.alias-workflow-meta dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.alias-workflow-meta dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.alias-workflow-actions {
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
 @media (max-width: 720px) {
   .alias-management-card .alias-table-head > span:nth-child(2),
   .alias-management-card .alias-info {
@@ -230,6 +312,19 @@ html[lang="de"] .alias-management-card .alias-table-head > span:nth-child(2)::af
 
   [data-alias-private-description-field] textarea {
     min-height: 104px;
+  }
+
+  .alias-workflow-address-card {
+    grid-template-columns: 1fr;
+  }
+
+  .alias-workflow-copy {
+    width: 100%;
+  }
+
+  .alias-workflow-meta-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
 

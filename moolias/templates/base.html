@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="/static/dialogs.css">
   <link rel="stylesheet" href="/static/sender-protection.css">
   <link rel="stylesheet" href="/static/newsletters.css">
-  <link rel="stylesheet" href="/static/mobile.css">
+  <link rel="stylesheet" href="/static/mobile.css?v=20260826-3">
   <link rel="stylesheet" href="/static/theme.css">
   <link rel="stylesheet" href="/static/shell.css">
   <link rel="stylesheet" href="/static/ui-icons.css?v=20260823-1">
@@ -51,6 +51,9 @@
   {% if csrf_token is defined %}data-csrf-token="{{ csrf_token }}"{% endif %}
   {% if user is defined %}data-tour-user="{{ user|e }}"{% endif %}
 >
+<noscript>
+  <span class="javascript-warning" data-javascript-warning role="alert">{% if language == 'de' %}⚠ <strong>JavaScript ist deaktiviert.</strong> Moolias ist ohne JavaScript nicht oder nur sehr eingeschränkt nutzbar. Bitte aktiviere JavaScript in deinem Browser.{% else %}⚠ <strong>JavaScript is disabled.</strong> Moolias is unavailable or only very limited without JavaScript. Please enable JavaScript in your browser.{% endif %}</span>
+</noscript>
 {% if user is defined %}
   <div class="app-frame">
     <aside class="app-sidebar" data-app-sidebar>
