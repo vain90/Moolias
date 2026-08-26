@@ -35,20 +35,11 @@
     replacementCustom.classList.toggle("hidden", selected !== "custom");
   }
 
-  replacementModes.forEach((option) => option.addEventListener("change", syncReplacementMode));
-  syncReplacementMode();
-
-  document.addEventListener("click", (event) => {
-    const trigger = event.target.closest?.("[data-alias-workflow-replace]");
-    if (!trigger || !replacementDialog || !replacementForm) return;
-
-    const aliasId = trigger.dataset.aliasWorkflowReplace;
-    const address = trigger.dataset.aliasWorkflowAddress || "";
+  function openReplacement(aliasId, address, editDetails = null) {
+    if (!replacementDialog || !replacementForm || !aliasId || !address) return;
     const domain = address.includes("@") ? address.split("@").slice(1).join("@") : "";
-    if (!aliasId || !address || !domain) return;
+    if (!domain) return;
 
-    event.preventDefault();
-    event.stopImmediatePropagation();
     replacementForm.action = `/aliases/${aliasId}/replace`;
     if (replacementOldAddress) replacementOldAddress.textContent = address;
     if (replacementDomain) replacementDomain.textContent = `@${domain}`;
@@ -56,8 +47,28 @@
     const named = replacementModes.find((option) => option.value === "named");
     if (named) named.checked = true;
     syncReplacementMode();
-    trigger.closest("details.alias-edit-action")?.removeAttribute("open");
+    editDetails?.removeAttribute("open");
     showDialog(replacementDialog);
+  }
+
+  replacementModes.forEach((option) => option.addEventListener("change", syncReplacementMode));
+  syncReplacementMode();
+
+  window.showReplacementDialog = (aliasSelect, editDetails = null) => {
+    openReplacement(aliasSelect?.value, aliasSelect?.dataset.address || "", editDetails);
+  };
+
+  document.addEventListener("click", (event) => {
+    const trigger = event.target.closest?.("[data-alias-workflow-replace]");
+    if (!trigger) return;
+
+    const aliasId = trigger.dataset.aliasWorkflowReplace;
+    const address = trigger.dataset.aliasWorkflowAddress || "";
+    if (!aliasId || !address) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openReplacement(aliasId, address, trigger.closest("details.alias-edit-action"));
   }, true);
 
   replacementDialog?.querySelectorAll("[data-close-alias-replacement]").forEach((control) => {
