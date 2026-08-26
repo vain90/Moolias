@@ -82,7 +82,7 @@
   }
 }
 
-.app-body:has(> noscript > .javascript-warning) .app-sidebar {
+.app-body:has(.javascript-warning) .app-sidebar {
   position: sticky;
   inset: 0 auto auto 0;
   height: 100vh;
