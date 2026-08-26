@@ -117,6 +117,16 @@ def _workflow_payload(workflow: AliasWorkflow) -> dict[str, object]:
     }
 
 
+def _wants_json(request: Request) -> bool:
+    return "application/json" in request.headers.get("accept", "").lower()
+
+
+def _workflow_response(request: Request, workflow: AliasWorkflow):
+    if _wants_json(request):
+        return _workflow_payload(workflow)
+    return RedirectResponse(f"/aliases?workflow={workflow.id}", status_code=303)
+
+
 async def _provision_now(request: Request, workflow: AliasWorkflow) -> None:
     coordinator = await _workflow_coordinator(request)
     if coordinator is not None:
@@ -206,6 +216,9 @@ async def aliases_page(
     status_filter: str = Query(default="all", alias="status"),
     sort: str = Query(default="attention"),
     direction: str = Query(default="desc"),
+    workflow_id: int | None = Query(default=None, alias="workflow", ge=1),
+    replace_alias_id: int | None = Query(default=None, alias="replace", ge=1),
+    open_create_alias: bool = Query(default=False, alias="create"),
 ):
     state = await _load_ui_state(request)
     user = state["user"]
@@ -227,6 +240,31 @@ async def aliases_page(
 
     store = await _workflow_store(request)
     pending_workflows = await store.pending_replacements(user)
+    selected_workflow = await store.get(user, workflow_id) if workflow_id is not None else None
+    if workflow_id is not None and selected_workflow is None:
+        raise HTTPException(status_code=404, detail="Alias workflow not found")
+
+    replacement_alias = None
+    if replace_alias_id is not None:
+        try:
+            candidate = await request.app.state.mailcow.get_alias(replace_alias_id)
+        except MailcowError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        if (
+            not is_owned_alias(candidate, user)
+            or candidate.is_reserved
+            or is_primary_mailbox_alias(candidate, user)
+        ):
+            raise HTTPException(status_code=404, detail="Alias cannot be replaced")
+        existing = next(
+            (item for item in pending_workflows if item.old_alias_id == replace_alias_id),
+            None,
+        )
+        if existing is not None:
+            selected_workflow = existing
+        else:
+            replacement_alias = candidate
+
     aliases_by_address = {alias.address.lower(): alias for alias in assigned_all}
     grouped_addresses: set[str] = set()
     groups: list[dict] = []
@@ -374,7 +412,11 @@ async def aliases_page(
             "range_start": preceding + 1 if filtered_total else 0,
             "range_end": preceding + len(assigned),
             "alias_workflow_rows": workflow_rows,
-            "pending_replacements": [_workflow_payload(item) for item in pending_workflows],
+            "pending_replacements": pending_workflows,
+            "selected_workflow": selected_workflow,
+            "replacement_alias": replacement_alias,
+            "open_create_alias": open_create_alias,
+            "alias_workflow_poll_seconds": request.app.state.settings.alias_workflow_poll_seconds,
         }
     )
     return TEMPLATES.TemplateResponse(
@@ -414,7 +456,7 @@ async def stop_alias_workflow(
     workflow = await store.stop_waiting(user, workflow_id)
     if workflow is None:
         raise HTTPException(status_code=404, detail="Alias workflow not found")
-    return _workflow_payload(workflow)
+    return _workflow_response(request, workflow)
 
 
 @router.post("/aliases/workflows/{workflow_id}/resume")
@@ -430,7 +472,7 @@ async def resume_alias_workflow(
     if workflow is None:
         raise HTTPException(status_code=404, detail="Alias workflow not found")
     if workflow.completed_at is not None or workflow.new_mail_received_at is not None:
-        return _workflow_payload(workflow)
+        return _workflow_response(request, workflow)
     await asyncio.to_thread(
         _resume_waiting_sync,
         str(store.path),
@@ -439,7 +481,7 @@ async def resume_alias_workflow(
     )
     resumed = await store.get(user, workflow_id)
     assert resumed is not None
-    return _workflow_payload(resumed)
+    return _workflow_response(request, resumed)
 
 
 @router.post("/aliases/workflows/{workflow_id}/deactivation")
@@ -460,7 +502,7 @@ async def update_replacement_deactivation(
     if workflow is None or not workflow.is_replacement:
         raise HTTPException(status_code=404, detail="Replacement workflow not found")
     if workflow.completed_at is not None:
-        return _workflow_payload(workflow)
+        return _workflow_response(request, workflow)
     if mode != DEACTIVATION_LATER and workflow.new_mail_received_at is None:
         raise HTTPException(
             status_code=409,
@@ -479,10 +521,10 @@ async def update_replacement_deactivation(
         completed = await store.complete_replacement(user, workflow_id)
         if completed is None:
             raise HTTPException(status_code=404, detail="Replacement workflow not found")
-        return _workflow_payload(completed)
+        return _workflow_response(request, completed)
 
     updated = await store.set_deactivation(user, workflow_id, mode)
-    return _workflow_payload(updated)
+    return _workflow_response(request, updated)
 
 
 @router.post("/aliases")
@@ -552,7 +594,7 @@ async def create_alias(
     )
     await _provision_now(request, workflow)
 
-    if "application/json" in request.headers.get("accept", "").lower():
+    if _wants_json(request):
         return {
             "kind": "alias_creation",
             "state": "created",
@@ -562,7 +604,7 @@ async def create_alias(
             "sogo_visible": sogo_visible,
             "workflow": _workflow_payload(workflow),
         }
-    return RedirectResponse("/aliases", status_code=303)
+    return RedirectResponse(f"/aliases?workflow={workflow.id}", status_code=303)
 
 
 @router.post("/aliases/{alias_id}/metadata")
@@ -678,6 +720,8 @@ async def replace_alias(
     pending = await store.pending_replacements(user)
     existing = next((item for item in pending if item.old_alias_id == alias_id), None)
     if existing is not None:
+        if not _wants_json(request):
+            return RedirectResponse(f"/aliases?workflow={existing.id}", status_code=303)
         raise HTTPException(
             status_code=409,
             detail={
@@ -737,12 +781,14 @@ async def replace_alias(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     await _provision_now(request, workflow)
 
-    return {
-        "kind": "alias_replacement",
-        "state": "created",
-        "address": new_address,
-        "old_address": alias.address,
-        "name": alias.name,
-        "description": alias.private_description,
-        "workflow": _workflow_payload(workflow),
-    }
+    if _wants_json(request):
+        return {
+            "kind": "alias_replacement",
+            "state": "created",
+            "address": new_address,
+            "old_address": alias.address,
+            "name": alias.name,
+            "description": alias.private_description,
+            "workflow": _workflow_payload(workflow),
+        }
+    return RedirectResponse(f"/aliases?workflow={workflow.id}", status_code=303)
