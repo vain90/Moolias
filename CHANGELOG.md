@@ -2,6 +2,23 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.2.1 - 2026-08-26
+
+### Added
+
+- a dedicated success dialog after alias creation with the new alias address, clipboard action and compact alias metadata
+- a non-dismissible, full-width warning when JavaScript is disabled, rendered server-side and styled without JavaScript
+
+### Changed
+
+- alias address, private description, replacement controls and activate/deactivate labels are rendered in the initial server response instead of being rebuilt asynchronously in the browser
+- Offline-Pool assignment descriptions are rendered server-side so the no-JavaScript and interactive views use the same final content
+
+### Fixed
+
+- the JavaScript-disabled warning remains a single stable banner with its text physically inside the yellow background, including Firefox setups where a NoScript-style extension rewrites `<noscript>` markup
+- JavaScript-disabled browser coverage now verifies the warning geometry and server-rendered alias UI directly in Firefox as well as Chromium
+
 ## 1.2.0 - 2026-08-25
 
 ### Added
