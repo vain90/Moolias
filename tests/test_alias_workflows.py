@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from moolias.alias_workflows import (
-    DEACTIVATION_30_DAYS,
     DEACTIVATION_7_DAYS,
+    DEACTIVATION_30_DAYS,
     DEACTIVATION_LATER,
     AliasWorkflowStore,
 )
@@ -54,7 +54,7 @@ async def test_new_delivery_finishes_waiting_and_requests_early_bypass_clear(tmp
 async def test_replacement_tracks_old_and_new_independently(tmp_path):
     store = AliasWorkflowStore(tmp_path / "state.sqlite3")
     await store.initialize()
-    workflow = await store.create_replacement(
+    await store.create_replacement(
         mailbox="user@example.org",
         old_alias_id=7,
         old_address="old@example.org",
