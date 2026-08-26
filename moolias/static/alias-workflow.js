@@ -36,7 +36,12 @@
   }
 
   function openReplacement(aliasId, address, editDetails = null) {
-    if (!replacementDialog || !replacementForm || !aliasId || !address) return;
+    if (!aliasId) return;
+    if (!replacementDialog || !replacementForm) {
+      window.location.assign(`/aliases?replace=${encodeURIComponent(aliasId)}`);
+      return;
+    }
+    if (!address) return;
     const domain = address.includes("@") ? address.split("@").slice(1).join("@") : "";
     if (!domain) return;
 
