@@ -23,6 +23,25 @@ class Settings(BaseSettings):
         alias="MOOLIAS_SENDER_PROTECTION_COOLDOWN_SECONDS",
     )
 
+    alias_workflow_bypass_seconds: int = Field(
+        default=900,
+        ge=60,
+        le=86400,
+        alias="MOOLIAS_ALIAS_WORKFLOW_BYPASS_SECONDS",
+    )
+    alias_workflow_poll_seconds: int = Field(
+        default=2,
+        ge=1,
+        le=30,
+        alias="MOOLIAS_ALIAS_WORKFLOW_POLL_SECONDS",
+    )
+    alias_workflow_history_count: int = Field(
+        default=1000,
+        ge=100,
+        le=10000,
+        alias="MOOLIAS_ALIAS_WORKFLOW_HISTORY_COUNT",
+    )
+
     newsletter_management: bool = Field(
         default=False,
         alias="MOOLIAS_NEWSLETTER_MANAGEMENT",
