@@ -1,11 +1,7 @@
 .javascript-warning {
   position: relative !important;
   z-index: 1000 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex-wrap: nowrap !important;
-  gap: 10px !important;
+  display: block !important;
   width: 100% !important;
   height: auto !important;
   min-height: 0 !important;
@@ -19,66 +15,15 @@
   font-size: 13px !important;
   line-height: 1.45 !important;
   text-align: center !important;
-}
-
-.javascript-warning > span {
-  position: static !important;
-  inset: auto !important;
-  box-sizing: border-box !important;
-  height: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  color: inherit !important;
-  transform: none !important;
-}
-
-.javascript-warning > span:last-child {
-  display: block !important;
-  min-width: 0 !important;
-  max-width: 1200px !important;
-  text-align: center !important;
+  white-space: normal !important;
   overflow-wrap: anywhere !important;
-}
-
-.javascript-warning-icon {
-  position: static !important;
-  flex: 0 0 auto !important;
-  display: inline-grid !important;
-  place-items: center !important;
-  width: 18px !important;
-  height: 18px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  transform: none !important;
-}
-
-.javascript-warning-icon svg {
-  display: block !important;
-  width: 18px !important;
-  height: 18px !important;
-}
-
-.javascript-warning strong {
-  color: inherit !important;
 }
 
 @media (max-width: 640px) {
   .javascript-warning {
-    align-items: flex-start !important;
-    justify-content: flex-start !important;
-    gap: 9px !important;
     padding: 10px 14px !important;
     font-size: 13px !important;
     text-align: left !important;
-  }
-
-  .javascript-warning > span:last-child {
-    text-align: left !important;
-  }
-
-  .javascript-warning-icon {
-    margin-top: 1px !important;
   }
 }
 
