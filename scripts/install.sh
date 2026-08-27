@@ -648,7 +648,7 @@ if [[ "$sender_protection_enabled" == "true" && "$tty_available" == "true" ]]; t
 else
   MAILCOW_DIR="$MAILCOW_DIR" \
   MOOLIAS_AGENT_IMAGE="${IMAGE_REPOSITORY}:${IMAGE_TAG}" \
-  MOOLIAS_IMPORT_EXISTING_SENDER_RULES=no \
+  MOOLIAS_IMPORT_EXISTING_SENDER_RULES="${MOOLIAS_IMPORT_EXISTING_SENDER_RULES:-no}" \
   bash "$agent_installer"
 fi
 
