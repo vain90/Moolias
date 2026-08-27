@@ -90,6 +90,7 @@ jobs:
       MAILCOW_HTTP_PORT: "8080"
       MAILCOW_API_KEY: moolias-ci-integration
       MOOLIAS_AGENT_IMAGE: moolias:sender-agent-ci
+      MOOLIAS_MAILCOW_AGENT_SECRET: moolias-ci-mailcow-agent-secret-0001
       MOOLIAS_TEST_SCENARIO: ${{ matrix.scenario }}
       MAILCOW_READY_COMMAND: >-
         set -o pipefail;
