@@ -120,8 +120,8 @@ class AliasDeliveryAgentClient:
         return parsed
 
 
-def alias_delivery_agent_url(settings: Any) -> str:
-    configured = str(settings.sender_agent_url or "").strip()
+def mailcow_agent_url(settings: Any) -> str:
+    configured = str(settings.mailcow_agent_url or "").strip()
     if configured:
         return configured.rstrip("/")
     return f"{settings.mailcow_url.rstrip('/')}/moolias-agent"
