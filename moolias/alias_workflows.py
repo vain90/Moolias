@@ -239,10 +239,15 @@ class AliasWorkflowStore:
                     WHERE mailbox = ? COLLATE NOCASE
                       AND completed_at IS NULL
                       AND kind = 'replacement'
-                      AND (old_address = ? COLLATE NOCASE OR new_address = ? COLLATE NOCASE)
+                      AND (
+                          old_address = ? COLLATE NOCASE
+                          OR old_address = ? COLLATE NOCASE
+                          OR new_address = ? COLLATE NOCASE
+                          OR new_address = ? COLLATE NOCASE
+                      )
                     LIMIT 1
                     """,
-                    (mailbox, old_address, old_address),
+                    (mailbox, old_address, new_address, old_address, new_address),
                 ).fetchone()
                 if existing is not None:
                     raise ValueError("an active replacement already exists for this alias")
