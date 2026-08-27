@@ -3,10 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from moolias.aliases import AliasRecord
-from moolias.alias_workflows import AliasWorkflowStore
-
 import moolias.alias_table_ui as alias_table_module
+from moolias.alias_workflows import AliasWorkflowStore
+from moolias.aliases import AliasRecord
 
 
 class FakeMailcow:
