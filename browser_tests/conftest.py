@@ -59,6 +59,8 @@ def base_url(e2e_db_path: Path) -> str:
             "MOOLIAS_USAGE_DB_PATH": str(e2e_db_path),
             "MOOLIAS_USAGE_POLL_SECONDS": "60",
             "MOOLIAS_USAGE_HISTORY_COUNT": "1000",
+            "MOOLIAS_MAILCOW_AGENT_SECRET": "e2e-mailcow-agent-secret-0000000001",
+            "MOOLIAS_MAILCOW_AGENT_URL": "http://127.0.0.1:9",
             "MAILCOW_URL": "https://mail.example.org",
             "MAILCOW_API_KEY": "e2e-api-key",
             "MAILCOW_OAUTH_CLIENT_ID": "e2e-client",
