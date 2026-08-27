@@ -16,35 +16,34 @@ POSTFIX_HOOK="${POSTFIX_HOOK_DIR}/moolias-sender-protection.sh"
 RSPAMD_DIR="${MAILCOW_DIR}/data/conf/rspamd"
 RSPAMD_PLUGIN_DIR="${RSPAMD_DIR}/plugins.d"
 RSPAMD_CONF="${RSPAMD_DIR}/rspamd.conf.local"
-RSPAMD_CUSTOM_DIR="${RSPAMD_DIR}/custom/moolias-sender-agent"
+RSPAMD_CUSTOM_DIR="${RSPAMD_DIR}/custom/moolias-agent"
 RSPAMD_BYPASS_MAP="${RSPAMD_CUSTOM_DIR}/moolias_firstmail_recipients.map"
 RSPAMD_PLUGIN="${RSPAMD_PLUGIN_DIR}/moolias_firstmail.lua"
 RSPAMD_HOOK_DIR="${MAILCOW_DIR}/data/hooks/rspamd"
 RSPAMD_HOOK="${RSPAMD_HOOK_DIR}/moolias-firstmail.sh"
 NGINX_DIR="${MAILCOW_DIR}/data/conf/nginx"
-AGENT_DIR="${MAILCOW_DIR}/data/conf/moolias-sender-agent"
+AGENT_DIR="${MAILCOW_DIR}/data/conf/moolias-agent"
 STATE_DIR="${AGENT_DIR}/state"
-POLICY_DIR="${POSTFIX_DIR}/moolias-sender-agent"
+POLICY_DIR="${POSTFIX_DIR}/moolias-agent"
 EXTRA_CF="${POSTFIX_DIR}/extra.cf"
 LEGACY_PCRE="${POSTFIX_DIR}/blocked_sender_login.pcre"
-NGINX_CUSTOM="${NGINX_DIR}/site.moolias-sender-agent.custom"
+NGINX_CUSTOM="${NGINX_DIR}/site.moolias-agent.custom"
 OVERRIDE_FILE="${MAILCOW_DIR}/docker-compose.override.yml"
 AGENT_ENV="${AGENT_DIR}/agent.env"
 
-PCRE_MAP="pcre:/opt/postfix/conf/moolias-sender-agent/blocked_sender_login.pcre"
+PCRE_MAP="pcre:/opt/postfix/conf/moolias-agent/blocked_sender_login.pcre"
 LEGACY_MAP="pcre:/opt/postfix/conf/blocked_sender_login.pcre"
-OLD_PCRE_MAP="pcre:/opt/moolias-sender-agent/blocked_sender_login.pcre"
 SQL_SENDER_MAP="proxy:mysql:/opt/postfix/conf/sql/mysql_virtual_sender_acl.cf"
 BEGIN_MARKER="# BEGIN MOOLIAS SENDER PROTECTION"
 END_MARKER="# END MOOLIAS SENDER PROTECTION"
-COMPOSE_BEGIN="# BEGIN MOOLIAS SENDER AGENT"
-COMPOSE_END="# END MOOLIAS SENDER AGENT"
+COMPOSE_BEGIN="# BEGIN MOOLIAS MAILCOW AGENT"
+COMPOSE_END="# END MOOLIAS MAILCOW AGENT"
 RSPAMD_BEGIN="# BEGIN MOOLIAS FIRST MAIL DELIVERY"
 RSPAMD_END="# END MOOLIAS FIRST MAIL DELIVERY"
 HOOK_MARKER="# Managed by Moolias Sender Protection."
 RSPAMD_HOOK_MARKER="# Managed by Moolias First Mail Delivery."
 RSPAMD_PLUGIN_MARKER="Managed by Moolias Mailcow Agent installer."
-NGINX_MARKER="# Managed by Moolias Sender Protection."
+NGINX_MARKER="# Managed by Moolias Mailcow Agent."
 
 die() {
   echo "Moolias Mailcow Agent installer: $*" >&2
@@ -100,8 +99,8 @@ fi
 stamp="$(date +%Y%m%d-%H%M%S)"
 touch "$EXTRA_CF"
 
-# Preserve whether a previous installer-owned sender map still referenced the
-# administrator's legacy PCRE. This makes reruns safe after a partial install.
+# Preserve whether the installer-owned sender map references the administrator's
+# separate PCRE. This keeps reruns safe without treating old Moolias layouts as API.
 managed_block_had_legacy=false
 if awk -v begin="$BEGIN_MARKER" -v end="$END_MARKER" -v legacy="$LEGACY_MAP" '
   index($0, begin) { managed = 1; next }
@@ -137,14 +136,13 @@ if [[ -n "$sender_assignment" ]]; then
   normalized_assignment="$(printf '%s' "$sender_assignment" | tr -d '[:space:]')"
   expected_legacy="smtpd_sender_login_maps=${LEGACY_MAP},${SQL_SENDER_MAP}"
   expected_current="smtpd_sender_login_maps=${PCRE_MAP},${SQL_SENDER_MAP}"
-  expected_old="smtpd_sender_login_maps=${OLD_PCRE_MAP},${SQL_SENDER_MAP}"
   expected_both="smtpd_sender_login_maps=${LEGACY_MAP},${PCRE_MAP},${SQL_SENDER_MAP}"
 
   case "$normalized_assignment" in
     "$expected_legacy")
       legacy_was_active=true
       ;;
-    "$expected_current"|"$expected_old")
+    "$expected_current")
       ;;
     "$expected_both")
       legacy_was_active=true
@@ -156,7 +154,7 @@ if [[ -n "$sender_assignment" ]]; then
   esac
 fi
 
-# Remove the compatible old assignment. It is replaced below with the complete
+# Remove the compatible assignment. It is replaced below with the complete
 # ordered map list, while all unrelated extra.cf settings remain untouched.
 extra_base="$(mktemp "${POSTFIX_DIR}/.extra.cf.base.XXXXXX")"
 awk '
@@ -344,7 +342,7 @@ done
 EOF
 chmod 0755 "$POSTFIX_HOOK"
 
-if [[ -f "$RSPAMD_HOOK" ]] && ! grep -Fq "$RSPAMD_HOOK_MARKER" "$RSPAMD_HOOK"; then
+if [[ -f "$RSPAMD_HOOK" ]] && ! grep -Fq -- "$RSPAMD_HOOK_MARKER" "$RSPAMD_HOOK"; then
   rm -f "$extra_base"
   die "Rspamd hook path is already managed outside Moolias: $RSPAMD_HOOK"
 fi
@@ -354,16 +352,16 @@ cat > "$RSPAMD_HOOK" <<EOF
 set -euo pipefail
 
 ${RSPAMD_HOOK_MARKER}
-install -d -m 0755 -o 10001 -g 10001 /etc/rspamd/custom/moolias-sender-agent
-if [[ ! -e /etc/rspamd/custom/moolias-sender-agent/moolias_firstmail_recipients.map ]]; then
-  touch /etc/rspamd/custom/moolias-sender-agent/moolias_firstmail_recipients.map
+install -d -m 0755 -o 10001 -g 10001 /etc/rspamd/custom/moolias-agent
+if [[ ! -e /etc/rspamd/custom/moolias-agent/moolias_firstmail_recipients.map ]]; then
+  touch /etc/rspamd/custom/moolias-agent/moolias_firstmail_recipients.map
 fi
-chown 10001:10001 /etc/rspamd/custom/moolias-sender-agent/moolias_firstmail_recipients.map
-chmod 0644 /etc/rspamd/custom/moolias-sender-agent/moolias_firstmail_recipients.map
+chown 10001:10001 /etc/rspamd/custom/moolias-agent/moolias_firstmail_recipients.map
+chmod 0644 /etc/rspamd/custom/moolias-agent/moolias_firstmail_recipients.map
 EOF
 chmod 0755 "$RSPAMD_HOOK"
 
-if [[ -f "$RSPAMD_PLUGIN" ]] && ! grep -Fq "$RSPAMD_PLUGIN_MARKER" "$RSPAMD_PLUGIN"; then
+if [[ -f "$RSPAMD_PLUGIN" ]] && ! grep -Fq -- "$RSPAMD_PLUGIN_MARKER" "$RSPAMD_PLUGIN"; then
   rm -f "$extra_base"
   die "Rspamd plugin path is already managed outside Moolias: $RSPAMD_PLUGIN"
 fi
@@ -422,7 +420,7 @@ strip_managed_block "$RSPAMD_CONF" "$RSPAMD_BEGIN" "$RSPAMD_END" > "$rspamd_conf
 cat >> "$rspamd_conf_new" <<EOF
 ${RSPAMD_BEGIN}
 moolias_firstmail {
-  map = "file:///etc/rspamd/custom/moolias-sender-agent/moolias_firstmail_recipients.map";
+  map = "file:///etc/rspamd/custom/moolias-agent/moolias_firstmail_recipients.map";
 }
 ${RSPAMD_END}
 EOF
@@ -439,9 +437,9 @@ else
   : > "$compose_base"
 fi
 
-if grep -Eq '^[[:space:]]+moolias-sender-agent:[[:space:]]*$' "$compose_base"; then
+if grep -Eq '^[[:space:]]+moolias-agent:[[:space:]]*$' "$compose_base"; then
   rm -f "$compose_base" "$extra_base"
-  die "docker-compose.override.yml already defines moolias-sender-agent outside the managed block."
+  die "docker-compose.override.yml already defines moolias-agent outside the managed block."
 fi
 
 # Match the indentation already used for service names in an existing override.
@@ -466,12 +464,12 @@ service_indent="${service_indent:-2}"
 agent_compose="$(mktemp "${MAILCOW_DIR}/.moolias-agent-compose.XXXXXX")"
 cat > "$agent_compose" <<EOF
   ${COMPOSE_BEGIN}
-  moolias-sender-agent:
+  moolias-agent:
     image: ${MOOLIAS_AGENT_IMAGE}
     user: "10001:10001"
     restart: unless-stopped
     env_file:
-      - ./data/conf/moolias-sender-agent/agent.env
+      - ./data/conf/moolias-agent/agent.env
     command:
       - uvicorn
       - moolias.mailcow_agent:create_agent_app
@@ -484,9 +482,9 @@ cat > "$agent_compose" <<EOF
       - --forwarded-allow-ips
       - "*"
     volumes:
-      - ./data/conf/moolias-sender-agent/state:/state
-      - ./data/conf/postfix/moolias-sender-agent:/postfix-policy
-      - ./data/conf/rspamd/custom/moolias-sender-agent:/rspamd-custom
+      - ./data/conf/moolias-agent/state:/state
+      - ./data/conf/postfix/moolias-agent:/postfix-policy
+      - ./data/conf/rspamd/custom/moolias-agent:/rspamd-custom
     networks:
       - mailcow-network
     read_only: true
@@ -573,7 +571,7 @@ backup_file "$NGINX_CUSTOM"
 cat > "$NGINX_CUSTOM" <<EOF
 ${NGINX_MARKER}
 location ^~ /moolias-agent/ {
-    proxy_pass http://moolias-sender-agent:8081/;
+    proxy_pass http://moolias-agent:8081/;
     proxy_http_version 1.1;
     proxy_set_header Host \$host;
     proxy_set_header X-Real-IP \$remote_addr;
@@ -608,11 +606,11 @@ if ! docker image inspect "$MOOLIAS_AGENT_IMAGE" >/dev/null 2>&1; then
   docker pull "$MOOLIAS_AGENT_IMAGE"
 fi
 
-docker compose up -d moolias-sender-agent
+docker compose up -d moolias-agent
 
 agent_ready=false
 for _ in $(seq 1 30); do
-  if docker compose exec -T moolias-sender-agent \
+  if docker compose exec -T moolias-agent \
     python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=2)" \
     >/dev/null 2>&1; then
     agent_ready=true
@@ -622,11 +620,11 @@ for _ in $(seq 1 30); do
 done
 [[ "$agent_ready" == true ]] || die "agent container did not become healthy."
 
-agent_id="$(docker compose ps -q moolias-sender-agent)"
+agent_id="$(docker compose ps -q moolias-agent)"
 [[ -n "$agent_id" ]] || die "could not resolve the running agent container."
 
-agent_uid="$(docker compose exec -T moolias-sender-agent id -u | tr -d '[:space:]')"
-agent_gid="$(docker compose exec -T moolias-sender-agent id -g | tr -d '[:space:]')"
+agent_uid="$(docker compose exec -T moolias-agent id -u | tr -d '[:space:]')"
+agent_gid="$(docker compose exec -T moolias-agent id -g | tr -d '[:space:]')"
 [[ "$agent_uid" == "10001" && "$agent_gid" == "10001" ]] \
   || die "agent must run as uid/gid 10001:10001."
 
@@ -701,7 +699,7 @@ for service in smtps submission 588; do
 done
 
 docker compose exec -T postfix-mailcow \
-  test -r /opt/postfix/conf/moolias-sender-agent/blocked_sender_login.pcre \
+  test -r /opt/postfix/conf/moolias-agent/blocked_sender_login.pcre \
   || die "Postfix cannot read the Moolias sender policy."
 
 # Mailcow normalizes permissions below /etc/rspamd/custom on every Rspamd start.
@@ -719,9 +717,9 @@ done
 [[ "$rspamd_ready" == true ]] || die "Rspamd did not become ready with the Moolias configuration."
 
 docker compose exec -T rspamd-mailcow \
-  test -r /etc/rspamd/custom/moolias-sender-agent/moolias_firstmail_recipients.map \
+  test -r /etc/rspamd/custom/moolias-agent/moolias_firstmail_recipients.map \
   || die "Rspamd cannot read the Moolias first-delivery recipient map."
-docker compose exec -T moolias-sender-agent test -w /rspamd-custom \
+docker compose exec -T moolias-agent test -w /rspamd-custom \
   || die "Mailcow Agent cannot update the first-delivery recipient map after Rspamd restart."
 
 cat <<EOF
@@ -730,23 +728,19 @@ cat <<EOF
 Moolias Mailcow Agent installed successfully
 ============================================================
 
-NEXT STEP: Configure Moolias
-
-Copy these values into the Moolias .env file:
+Configure Moolias with the shared Agent secret:
 
 ------------------------------------------------------------
-MOOLIAS_SENDER_PROTECTION=true
-MOOLIAS_SENDER_AGENT_SECRET=${secret}
+MOOLIAS_MAILCOW_AGENT_SECRET=${secret}
 ------------------------------------------------------------
 
-Keep MOOLIAS_SENDER_AGENT_SECRET private. Do not share it or commit it to Git.
+Keep MOOLIAS_MAILCOW_AGENT_SECRET private. Do not share it or commit it to Git.
+Moolias uses MAILCOW_URL + /moolias-agent unless MOOLIAS_MAILCOW_AGENT_URL is set.
 
-Moolias automatically uses MAILCOW_URL + /moolias-agent.
-Only set MOOLIAS_SENDER_AGENT_URL when the agent is reachable at a different URL.
+Primary sender protection is a separate optional Moolias feature. Installing the
+Mailcow Agent does not enable that feature by itself.
 
-After updating the Moolias .env file, restart Moolias.
-
-The agent uses Mailcow's existing Postfix and Rspamd configuration mounts. Existing
+The Agent uses Mailcow's existing Postfix and Rspamd configuration mounts. Existing
 manual blocked_sender_login.pcre rules remain separate unless they were explicitly imported.
 
 ============================================================
