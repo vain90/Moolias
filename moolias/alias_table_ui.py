@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import APIRouter, Form, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from moolias.alias_delivery_agent import AliasDeliveryAgentClient, alias_delivery_agent_url
+from moolias.alias_delivery_agent import AliasDeliveryAgentClient, mailcow_agent_url
 from moolias.alias_workflow_coordinator import AliasWorkflowCoordinator
 from moolias.alias_workflows import (
     DEACTIVATION_LATER,
@@ -51,13 +51,11 @@ async def _workflow_lifespan(app):
     store = AliasWorkflowStore(settings.usage_db_path)
     await store.initialize()
 
-    agent = None
-    if len(settings.sender_agent_secret.strip()) >= 32:
-        agent = AliasDeliveryAgentClient(
-            alias_delivery_agent_url(settings),
-            settings.sender_agent_secret,
-            verify_tls=settings.mailcow_verify_tls,
-        )
+    agent = AliasDeliveryAgentClient(
+        mailcow_agent_url(settings),
+        settings.mailcow_agent_secret,
+        verify_tls=settings.mailcow_verify_tls,
+    )
 
     coordinator = AliasWorkflowCoordinator(
         settings,
