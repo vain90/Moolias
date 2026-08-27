@@ -43,7 +43,7 @@ RSPAMD_BEGIN="# BEGIN MOOLIAS FIRST MAIL DELIVERY"
 RSPAMD_END="# END MOOLIAS FIRST MAIL DELIVERY"
 HOOK_MARKER="# Managed by Moolias Sender Protection."
 RSPAMD_HOOK_MARKER="# Managed by Moolias First Mail Delivery."
-RSPAMD_PLUGIN_MARKER="-- Managed by Moolias Mailcow Agent installer."
+RSPAMD_PLUGIN_MARKER="Managed by Moolias Mailcow Agent installer."
 NGINX_MARKER="# Managed by Moolias Sender Protection."
 
 die() {
