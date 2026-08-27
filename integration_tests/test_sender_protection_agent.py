@@ -12,20 +12,20 @@ import httpx
 import pytest
 
 from moolias.sender_protection import (
-    SenderAgentClient,
-    SenderAgentExternalPolicy,
+    MailcowAgentClient,
+    SenderProtectionExternalPolicy,
 )
 
-DOMAIN = "moolias-sender-agent.test"
+DOMAIN = "moolias-agent.test"
 MAILBOX = f"owner@{DOMAIN}"
 ALIAS = f"service@{DOMAIN}"
-PASSWORD = "Moolias-Sender-Agent-CI-4f9d!A7"
+PASSWORD = "Moolias-Agent-CI-4f9d!A7"
 LEGACY_MAILBOX = "legacy.blocked@example.org"
 LEGACY_MAILBOX_2 = "legacy.second@example.org"
 BLOCKED_OWNER = "__moolias_blocked_primary_sender__"
-PCRE_MAP = "pcre:/opt/postfix/conf/moolias-sender-agent/blocked_sender_login.pcre"
+PCRE_MAP = "pcre:/opt/postfix/conf/moolias-agent/blocked_sender_login.pcre"
 LEGACY_MAP = "pcre:/opt/postfix/conf/blocked_sender_login.pcre"
-POLICY_PATH = "/opt/postfix/conf/moolias-sender-agent/blocked_sender_login.pcre"
+POLICY_PATH = "/opt/postfix/conf/moolias-agent/blocked_sender_login.pcre"
 
 
 def _scenario() -> str:
@@ -120,7 +120,7 @@ print(json.dumps([
             "compose",
             "exec",
             "-T",
-            "moolias-sender-agent",
+            "moolias-agent",
             "python",
             "-c",
             script,
@@ -162,7 +162,7 @@ def _postfix_container_id(mailcow_dir: str) -> str:
 
 def _agent_container_id(mailcow_dir: str) -> str:
     result = subprocess.run(
-        ["docker", "compose", "ps", "-q", "moolias-sender-agent"],
+        ["docker", "compose", "ps", "-q", "moolias-agent"],
         cwd=mailcow_dir,
         check=True,
         text=True,
@@ -267,7 +267,7 @@ def _installer_env(mailcow_dir: str) -> dict[str, str]:
     env["MAILCOW_DIR"] = mailcow_dir
     env["MOOLIAS_AGENT_IMAGE"] = os.environ.get(
         "MOOLIAS_AGENT_IMAGE",
-        "moolias:sender-agent-ci",
+        "moolias:agent-ci",
     )
     env["MOOLIAS_AGENT_COOLDOWN_SECONDS"] = "1"
     env["MOOLIAS_IMPORT_EXISTING_SENDER_RULES"] = (
@@ -302,7 +302,7 @@ def _install_agent(mailcow_dir: str) -> str:
             f"--- stdout ---\n{result.stdout}\n"
             f"--- stderr ---\n{result.stderr}"
         )
-    match = re.search(r"^MOOLIAS_SENDER_AGENT_SECRET=(.+)$", result.stdout, re.MULTILINE)
+    match = re.search(r"^MOOLIAS_MAILCOW_AGENT_SECRET=(.+)$", result.stdout, re.MULTILINE)
     if match is None:
         raise AssertionError(f"Installer did not print the agent secret:\n{result.stdout}")
     return match.group(1).strip()
@@ -337,10 +337,10 @@ def _assert_agent_runtime_hardening(mailcow_dir: str) -> None:
     assert mounts["/postfix-policy"]["RW"] is True
     assert mounts["/rspamd-custom"]["RW"] is True
     assert mounts["/postfix-policy"]["Source"].endswith(
-        "/data/conf/postfix/moolias-sender-agent"
+        "/data/conf/postfix/moolias-agent"
     )
     assert mounts["/rspamd-custom"]["Source"].endswith(
-        "/data/conf/rspamd/custom/moolias-sender-agent"
+        "/data/conf/rspamd/custom/moolias-agent"
     )
     assert "/var/run/docker.sock" not in mounts
 
@@ -350,8 +350,8 @@ def _assert_compose_override_preserved(mailcow_dir: str) -> None:
     with open(override, encoding="utf-8") as handle:
         content = handle.read()
     assert "unrelated-test-service:" in content
-    assert "# BEGIN MOOLIAS SENDER AGENT" in content
-    assert "moolias-sender-agent:" in content
+    assert "# BEGIN MOOLIAS MAILCOW AGENT" in content
+    assert "moolias-agent:" in content
     assert "postfix-mailcow:" not in content
 
 
@@ -412,7 +412,7 @@ async def test_sender_protection_on_disposable_mailcow() -> None:
                 "aliases": 10,
                 "backupmx": 0,
                 "defquota": 128,
-                "description": "Moolias sender agent integration",
+                "description": "Moolias Mailcow Agent integration",
                 "domain": DOMAIN,
                 "mailboxes": 2,
                 "maxquota": 512,
@@ -430,7 +430,7 @@ async def test_sender_protection_on_disposable_mailcow() -> None:
                 "active": 1,
                 "domain": DOMAIN,
                 "local_part": "owner",
-                "name": "Moolias Sender Agent CI",
+                "name": "Moolias Agent CI",
                 "password": PASSWORD,
                 "password2": PASSWORD,
                 "quota": 128,
@@ -446,7 +446,7 @@ async def test_sender_protection_on_disposable_mailcow() -> None:
                 "active": 1,
                 "address": ALIAS,
                 "goto": MAILBOX,
-                "private_comment": "moolias-sender-agent-integration",
+                "private_comment": "moolias-agent-integration",
                 "public_comment": "",
                 "sender_allowed": 1,
                 "sogo_visible": 1,
@@ -517,7 +517,7 @@ async def test_sender_protection_on_disposable_mailcow() -> None:
         ).stdout
         assert re.search(r"=\s*1\s*$", max_use), max_use
 
-    async with SenderAgentClient(
+    async with MailcowAgentClient(
         public_agent_url,
         secret,
         verify_tls=False,
@@ -533,7 +533,7 @@ async def test_sender_protection_on_disposable_mailcow() -> None:
             external = await agent.status(LEGACY_MAILBOX)
             assert external.blocked is True
             assert external.managed is False
-            with pytest.raises(SenderAgentExternalPolicy):
+            with pytest.raises(SenderProtectionExternalPolicy):
                 await agent.set_blocked(LEGACY_MAILBOX, False)
 
         initial = await agent.status(MAILBOX)
