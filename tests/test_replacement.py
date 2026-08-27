@@ -1,6 +1,9 @@
+import asyncio
 import os
 from contextlib import contextmanager
+from types import SimpleNamespace
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from moolias.aliases import AliasRecord
@@ -266,6 +269,62 @@ def test_replace_alias_rejects_new_side_of_pending_replacement_before_create(mon
     assert response.headers["location"] == "/aliases?workflow=7"
     assert fake.created == []
     assert fake.active_updates == []
+
+
+async def test_parallel_replacements_create_only_one_new_alias(monkeypatch, tmp_path):
+    fake = FakeMailcow(alias_record())
+    original_create = fake.create_alias
+
+    async def delayed_create(*args, **kwargs):
+        await asyncio.sleep(0.05)
+        await original_create(*args, **kwargs)
+
+    monkeypatch.setattr(fake, "create_alias", delayed_create)
+    monkeypatch.setattr(alias_table_module, "require_user", lambda _request: "hidden@example.org")
+    monkeypatch.setattr(alias_table_module, "validate_csrf", lambda _request, _token: None)
+
+    store = alias_table_module.AliasWorkflowStore(tmp_path / "state.sqlite3")
+    await store.initialize()
+    request = SimpleNamespace(
+        app=SimpleNamespace(
+            state=SimpleNamespace(
+                mailcow=fake,
+                settings=SimpleNamespace(alias_workflow_bypass_seconds=900),
+                alias_workflow_store=store,
+                alias_workflow_coordinator=None,
+            )
+        ),
+        headers={"accept": "application/json"},
+    )
+
+    results = await asyncio.gather(
+        alias_table_module.replace_alias(
+            request,
+            42,
+            mode="named",
+            local_part="",
+            csrf_token="test",
+        ),
+        alias_table_module.replace_alias(
+            request,
+            42,
+            mode="named",
+            local_part="",
+            csrf_token="test",
+        ),
+        return_exceptions=True,
+    )
+
+    successes = [item for item in results if isinstance(item, dict)]
+    conflicts = [item for item in results if isinstance(item, HTTPException)]
+    assert len(successes) == 1
+    assert len(conflicts) == 1
+    assert conflicts[0].status_code == 409
+    assert len(fake.created) == 1
+
+    pending = await store.pending_replacements("hidden@example.org")
+    assert len(pending) == 1
+    assert pending[0].new_address == successes[0]["address"]
 
 
 def test_replace_alias_does_not_attempt_immediate_deactivation(monkeypatch):
