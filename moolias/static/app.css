@@ -172,7 +172,7 @@ summary::-webkit-details-marker { display: none; }
 .assign-dialog::backdrop { background: rgba(16, 24, 40, .3); backdrop-filter: blur(2px); }
 .dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 14px; }
 .dialog-head .muted { margin: 0; }
-.dialog-close { width: 32px; height: 32px; flex: 0 0 auto; border: 0; border-radius: 999px; background: #f2f4f7; color: #475467; font-size: 22px; line-height: 1; cursor: pointer; }
+.dialog-close { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 0; border: 0; border-radius: 999px; background: #f2f4f7; color: #475467; font-size: 22px; line-height: 1; text-decoration: none; cursor: pointer; }
 .dialog-close:hover { background: #e4e7ec; color: var(--text); }
 .assign-address { display: block; padding: 10px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); overflow-wrap: anywhere; }
 .assign-dialog .mode-picker.top-gap { margin-top: 18px; }
