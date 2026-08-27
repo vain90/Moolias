@@ -105,6 +105,7 @@
         {% set senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
         {% set unexpected_count = senders|selectattr('expected', 'equalto', false)|list|length %}
         {% set workflow_row = workflow_rows.get(alias.address|lower) %}
+        {% set replacement_links = alias_replacement_history.get(alias.address|lower, []) if alias_replacement_history is defined else [] %}
         <article class="alias-row alias-table-row {% if not alias.active %}disabled-row{% endif %}{% if workflow_row %} alias-migration-{{ workflow_row.role }}{% endif %}"{% if workflow_row %} data-alias-workflow-row="{{ workflow_row.id }}" data-alias-workflow-role="{{ workflow_row.role }}"{% endif %}>
           <label class="alias-select-control">
             <input type="checkbox" value="{{ alias.id }}" aria-label="{{ t.select_alias.format(address=alias.address) }}" data-alias-select data-address="{{ alias.address }}" data-description="{{ alias.description }}" data-active="{{ '1' if alias.active else '0' }}" data-sogo="{{ '1' if alias.sogo_visible else '0' }}">
@@ -125,6 +126,15 @@
               </details>
               {% endif %}
               <code>{{ alias.address }}</code>
+              {% if replacement_links %}
+              <div class="alias-replacement-history">
+                {% for relation in replacement_links %}
+                <a class="alias-replacement-history-link" href="/aliases?q={{ relation.address|urlencode }}" title="{{ relation.address }}">
+                  <span>{% if relation.direction == 'previous' %}← {% if language == 'de' %}Ersetzte{% else %}Replaced{% endif %} · {{ relation.address }}{% else %}{% if language == 'de' %}Ersetzt durch{% else %}Replaced by{% endif %} · {{ relation.address }} →{% endif %}</span>
+                </a>
+                {% endfor %}
+              </div>
+              {% endif %}
               {% if workflow_row %}
               <div class="alias-workflow-row-state">
                 <span>

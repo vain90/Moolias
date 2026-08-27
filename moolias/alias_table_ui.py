@@ -11,7 +11,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from moolias.alias_delivery_agent import AliasDeliveryAgentClient, mailcow_agent_url
 from moolias.alias_workflow_coordinator import AliasWorkflowCoordinator
 from moolias.alias_workflows import (
-    DEACTIVATION_LATER,
     DEACTIVATION_MODES,
     DEACTIVATION_NOW,
     AliasWorkflow,
@@ -152,6 +151,39 @@ def _resume_waiting_sync(path: str, mailbox: str, workflow_id: int) -> None:
         )
 
 
+def _replacement_history_sync(
+    path: str,
+    mailbox: str,
+) -> dict[str, list[dict[str, str]]]:
+    with sqlite3.connect(path, timeout=10) as connection:
+        rows = connection.execute(
+            """
+            SELECT old_address, new_address
+            FROM alias_workflows
+            WHERE mailbox = ? COLLATE NOCASE
+              AND kind = 'replacement'
+              AND completed_at IS NOT NULL
+              AND old_address IS NOT NULL
+            ORDER BY completed_at ASC, id ASC
+            """,
+            (mailbox.strip().lower(),),
+        ).fetchall()
+
+    history: dict[str, list[dict[str, str]]] = {}
+    for old_address, new_address in rows:
+        old_address = str(old_address or "").strip()
+        new_address = str(new_address or "").strip()
+        if not old_address or not new_address:
+            continue
+        history.setdefault(old_address.lower(), []).append(
+            {"direction": "next", "address": new_address}
+        )
+        history.setdefault(new_address.lower(), []).append(
+            {"direction": "previous", "address": old_address}
+        )
+    return history
+
+
 async def _submitted_private_description(
     request: Request,
     parsed_value: str | None,
@@ -264,6 +296,11 @@ async def aliases_page(
 
     store = await _workflow_store(request)
     pending_workflows = await store.pending_replacements(user)
+    replacement_history = await asyncio.to_thread(
+        _replacement_history_sync,
+        str(store.path),
+        user,
+    )
     selected_workflow = await store.get(user, workflow_id) if workflow_id is not None else None
     if workflow_id is not None and selected_workflow is None:
         raise HTTPException(status_code=404, detail="Alias workflow not found")
@@ -436,6 +473,7 @@ async def aliases_page(
             "range_start": preceding + 1 if filtered_total else 0,
             "range_end": preceding + len(assigned),
             "alias_workflow_rows": workflow_rows,
+            "alias_replacement_history": replacement_history,
             "pending_replacements": pending_workflows,
             "selected_workflow": selected_workflow,
             "replacement_alias": replacement_alias,
@@ -513,7 +551,6 @@ async def update_replacement_deactivation(
     request: Request,
     workflow_id: int,
     mode: str = Form(...),
-    confirm_now: bool = Form(False),
     csrf_token: str = Form(...),
 ):
     validate_csrf(request, csrf_token)
@@ -527,15 +564,8 @@ async def update_replacement_deactivation(
         raise HTTPException(status_code=404, detail="Replacement workflow not found")
     if workflow.completed_at is not None:
         return _workflow_response(request, workflow)
-    if mode != DEACTIVATION_LATER and workflow.new_mail_received_at is None:
-        raise HTTPException(
-            status_code=409,
-            detail="Wait until the new address has received its first message",
-        )
 
     if mode == DEACTIVATION_NOW:
-        if not confirm_now:
-            raise HTTPException(status_code=400, detail="Immediate deactivation must be confirmed")
         if workflow.old_alias_id is None:
             raise HTTPException(status_code=409, detail="Previous alias is unavailable")
         try:
@@ -715,6 +745,43 @@ async def assign_reserved_alias_compatibility(
         private_comment=private_comment,
     )
     return RedirectResponse("/aliases", status_code=303)
+
+
+@router.post("/aliases/{alias_id}/toggle")
+async def toggle_alias(
+    request: Request,
+    alias_id: int,
+    csrf_token: str = Form(...),
+    return_to: str = Form("/aliases"),
+):
+    validate_csrf(request, csrf_token)
+    user = require_user(request)
+    alias = await request.app.state.mailcow.get_alias(alias_id)
+    if not is_owned_alias(alias, user):
+        raise HTTPException(status_code=403, detail="Alias is not owned by this mailbox")
+
+    try:
+        await request.app.state.mailcow.set_active(alias_id, not alias.active)
+    except MailcowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if alias.active:
+        store = await _workflow_store(request)
+        pending = await store.pending_replacements(user)
+        alias_address = alias.address.lower()
+        workflow = next(
+            (
+                item
+                for item in pending
+                if item.old_alias_id == alias_id
+                or (item.old_address or "").lower() == alias_address
+            ),
+            None,
+        )
+        if workflow is not None:
+            await store.complete_replacement(user, workflow.id)
+
+    return RedirectResponse(_safe_return_to(return_to), status_code=303)
 
 
 @router.post("/aliases/{alias_id}/replace")

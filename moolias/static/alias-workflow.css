@@ -2,14 +2,6 @@
   width: min(620px, calc(100vw - 28px));
 }
 
-.alias-workflow-dialog .dialog-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  text-decoration: none;
-}
-
 .alias-create-loading-dialog {
   width: min(400px, calc(100vw - 28px));
 }
@@ -124,6 +116,27 @@
   background: var(--panel-2);
 }
 
+.alias-workflow-status-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alias-workflow-wait-spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  color: #175cd3;
+  animation: alias-create-loading-spin .8s linear infinite;
+}
+
+.alias-workflow-status.old_received .alias-workflow-wait-spinner {
+  color: #b54708;
+}
+
 .alias-workflow-status strong {
   font-size: 13px;
 }
@@ -133,8 +146,7 @@
   font-size: 12px;
 }
 
-.alias-workflow-wait-actions,
-.alias-workflow-deactivation-actions {
+.alias-workflow-wait-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -158,20 +170,108 @@
   font-size: 12px;
 }
 
+.alias-workflow-deactivation-form {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+.alias-workflow-deactivation-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.alias-workflow-deactivation-options legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+}
+
+.alias-workflow-deactivation-option {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.alias-workflow-deactivation-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.alias-workflow-deactivation-option span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fff;
+  color: #344054;
+  font-size: 12.5px;
+  font-weight: 650;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.alias-workflow-deactivation-option:hover span {
+  border-color: #98a2b3;
+  background: #fcfcfd;
+}
+
+.alias-workflow-deactivation-option input:focus-visible + span {
+  outline: 3px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.alias-workflow-deactivation-option input:checked + span {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.alias-workflow-deactivation-form .alias-workflow-scheduled {
+  margin: -2px 0 0;
+}
+
 .alias-row.alias-migration-old,
 .alias-row.alias-migration-new {
   position: relative;
 }
 
 .alias-row.alias-migration-old {
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  border-bottom-color: transparent;
   box-shadow: inset 3px 0 0 #fdb022;
 }
 
+.alias-row.alias-migration-old::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  bottom: -6px;
+  width: 3px;
+  height: 12px;
+  background: linear-gradient(to bottom, #fdb022 0 50%, var(--accent) 50% 100%);
+  pointer-events: none;
+}
+
 .alias-row.alias-migration-new {
-  border-top-left-radius: 4px;
-  border-top-right-radius: 4px;
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
@@ -209,9 +309,52 @@
   min-height: 26px;
 }
 
+.alias-replacement-history {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.alias-replacement-history-link {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.alias-replacement-history-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alias-replacement-history-link:hover,
+.alias-replacement-history-link:focus-visible {
+  border-color: var(--line-strong);
+  background: #f2f4f7;
+  color: #344054;
+}
+
 .overview-workflow-action .action-icon {
   color: #175cd3;
   background: #eff8ff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alias-create-loading-spinner,
+  .alias-workflow-wait-spinner {
+    animation-duration: 1.6s;
+  }
 }
 
 @media (max-width: 640px) {
@@ -229,8 +372,19 @@
     gap: 2px;
   }
 
-  .alias-workflow-wait-actions .button,
-  .alias-workflow-deactivation-actions .button {
+  .alias-workflow-wait-actions .button {
     flex: 1 1 100%;
+  }
+
+  .alias-workflow-deactivation-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .alias-workflow-deactivation-option,
+  .alias-workflow-deactivation-option span,
+  .alias-workflow-deactivation-form > .button {
+    width: 100%;
   }
 }

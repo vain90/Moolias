@@ -47,10 +47,12 @@ def _record_delivery(
         )
 
 
-def _deactivation_form(workflow, mode: str):
-    return workflow.locator(
-        f'form:has(input[name="mode"][value="{mode}"])'
-    )
+def _deactivation_form(workflow):
+    return workflow.locator("form.alias-workflow-deactivation-form")
+
+
+def _deactivation_option(workflow, mode: str):
+    return _deactivation_form(workflow).locator(f'input[name="mode"][value="{mode}"]')
 
 
 def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
@@ -75,6 +77,34 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     assert workflow_id_text
     workflow_id = int(workflow_id_text)
     expect(workflow).to_have_attribute("data-alias-workflow-state", "waiting")
+    expect(workflow.locator(".alias-workflow-wait-spinner")).to_be_visible()
+
+    deactivation = workflow.locator(".alias-workflow-deactivation")
+    expect(deactivation).to_be_visible()
+    expect(_deactivation_option(workflow, "later")).to_be_checked()
+    expect(_deactivation_option(workflow, "now")).to_have_count(1)
+    expect(_deactivation_option(workflow, "7d")).to_have_count(1)
+    expect(_deactivation_option(workflow, "30d")).to_have_count(1)
+    expect(workflow.locator('input[name="confirm_now"]')).to_have_count(0)
+
+    initial_url = page.url
+    deactivation.locator('label:has(input[name="mode"][value="7d"])').click()
+    expect(_deactivation_option(workflow, "7d")).to_be_checked()
+    assert page.url == initial_url
+    expect(workflow).not_to_contain_text("The old address will be disabled in 7 days.")
+
+    _deactivation_form(workflow).locator('button[type="submit"]').click()
+    workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
+    expect(workflow).to_contain_text("The old address will be disabled in 7 days.")
+    expect(_deactivation_option(workflow, "7d")).to_be_checked()
+    expect(workflow.locator(".alias-workflow-wait-spinner")).to_be_visible()
+
+    deactivation = workflow.locator(".alias-workflow-deactivation")
+    deactivation.locator('label:has(input[name="mode"][value="later"])').click()
+    expect(_deactivation_option(workflow, "later")).to_be_checked()
+    _deactivation_form(workflow).locator('button[type="submit"]').click()
+    workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
+    expect(workflow).not_to_contain_text("The old address will be disabled in 7 days.")
 
     _record_delivery(e2e_db_path, workflow_id, old=True)
     workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
@@ -84,8 +114,15 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
         timeout=6000,
     )
     expect(workflow).to_contain_text("An email still arrived at the old address.")
-    expect(workflow).to_contain_text("The new address is still being checked.")
-    expect(workflow.locator(".alias-workflow-deactivation")).to_have_count(0)
+    expect(workflow).to_contain_text("No email has been detected at the new address yet.")
+    expect(workflow.locator(".alias-workflow-wait-spinner")).to_be_visible()
+    expect(workflow.locator(".alias-workflow-deactivation")).to_be_visible()
+
+    deactivation = workflow.locator(".alias-workflow-deactivation")
+    deactivation.locator('label:has(input[name="mode"][value="30d"])').click()
+    _deactivation_form(workflow).locator('button[type="submit"]').click()
+    workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
+    expect(workflow).to_contain_text("The old address will be disabled in 30 days.")
 
     _record_delivery(e2e_db_path, workflow_id, new=True)
     workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
@@ -95,32 +132,12 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
         timeout=6000,
     )
     expect(workflow).to_contain_text("New email received. Please check your inbox.")
+    expect(workflow.locator(".alias-workflow-wait-spinner")).to_have_count(0)
 
     deactivation = workflow.locator(".alias-workflow-deactivation")
-    expect(deactivation).to_be_visible()
-    later = _deactivation_form(workflow, "later")
-    expect(later.locator("button")).to_have_class(re.compile(r"\bprimary\b"))
-
-    _deactivation_form(workflow, "7d").locator("button").click()
-    workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
-    expect(workflow).to_contain_text("The old address will be disabled in 7 days.")
-
-    _deactivation_form(workflow, "later").locator("button").click()
-    workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
-    expect(workflow).not_to_contain_text("The old address will be disabled in 7 days.")
-    expect(_deactivation_form(workflow, "later").locator("button")).to_have_class(
-        re.compile(r"\bprimary\b")
-    )
-
-    _deactivation_form(workflow, "30d").locator("button").click()
-    workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
-    expect(workflow).to_contain_text("The old address will be disabled in 30 days.")
-
-    now_form = _deactivation_form(workflow, "now")
-    confirmation = now_form.locator('input[name="confirm_now"]')
-    expect(confirmation).to_have_attribute("required", "")
-    confirmation.check()
-    now_form.locator('button[type="submit"]').click()
+    deactivation.locator('label:has(input[name="mode"][value="now"])').click()
+    expect(_deactivation_option(workflow, "now")).to_be_checked()
+    _deactivation_form(workflow).locator('button[type="submit"]').click()
 
     workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
     expect(workflow).to_have_attribute("data-alias-workflow-state", "received")
@@ -135,3 +152,27 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     )
     expect(old_row.locator("[data-alias-select]")).to_have_attribute("data-active", "0")
     expect(new_row.locator("[data-alias-select]")).to_have_attribute("data-active", "1")
+    expect(old_row).not_to_have_class(re.compile(r"\balias-migration-(?:old|new)\b"))
+    expect(new_row).not_to_have_class(re.compile(r"\balias-migration-(?:old|new)\b"))
+
+    old_history = old_row.locator(".alias-replacement-history-link")
+    expect(old_history).to_contain_text(f"Replaced by · {NEW_ADDRESS}")
+    expect(old_history).to_have_attribute(
+        "href",
+        f"/aliases?q={NEW_ADDRESS.replace('@', '%40')}",
+    )
+    new_history = new_row.locator(".alias-replacement-history-link")
+    expect(new_history).to_contain_text(f"Replaced · {OLD_ADDRESS}")
+    expect(new_history).to_have_attribute(
+        "href",
+        f"/aliases?q={OLD_ADDRESS.replace('@', '%40')}",
+    )
+
+    old_history.click()
+    expect(page).to_have_url(re.compile(r"/aliases\?q=amazon-migrate%40example\.org$"))
+    expect(
+        page.locator(f'[data-alias-select][data-address="{NEW_ADDRESS}"]')
+    ).to_have_count(1)
+    expect(
+        page.locator(f'[data-alias-select][data-address="{OLD_ADDRESS}"]')
+    ).to_have_count(0)
