@@ -23,7 +23,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "httpx2>=2,<3",
   "playwright>=1.55,<2",
   "pytest>=8.4,<10",
   "pytest-asyncio>=1.1,<2",

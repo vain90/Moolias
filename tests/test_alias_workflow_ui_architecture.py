@@ -2,6 +2,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_JS = (ROOT / "moolias" / "static" / "alias-workflow.js").read_text(encoding="utf-8")
+WORKFLOW_CSS = (ROOT / "moolias" / "static" / "alias-workflow.css").read_text(encoding="utf-8")
 WORKFLOW_TEMPLATE = (ROOT / "moolias" / "templates" / "_alias_workflow.html").read_text(
     encoding="utf-8"
 )
@@ -36,3 +37,8 @@ def test_alias_workflow_ui_does_not_expose_mail_system_internals():
     rendered_source = WORKFLOW_TEMPLATE.casefold()
     for term in ("greylist", "rspamd", "mailcow"):
         assert term not in rendered_source
+
+
+def test_alias_workflow_old_delivery_state_uses_server_state_name():
+    assert ".alias-workflow-status.old_received" in WORKFLOW_CSS
+    assert ".alias-workflow-status.old-received" not in WORKFLOW_CSS
