@@ -10,7 +10,7 @@ LEGACY_MAILBOX_2 = "legacy.second@example.org"
 MOOLIAS_OWNER = "__moolias_blocked_primary_sender__"
 LEGACY_OWNER = "__blocked_hidden_sender__"
 LEGACY_OWNER_2 = "__blocked_hidden_sender_2__"
-MOOLIAS_MAP = "pcre:/opt/postfix/conf/moolias-sender-agent/blocked_sender_login.pcre"
+MOOLIAS_MAP = "pcre:/opt/postfix/conf/moolias-agent/blocked_sender_login.pcre"
 LEGACY_MAP = "pcre:/opt/postfix/conf/blocked_sender_login.pcre"
 
 
