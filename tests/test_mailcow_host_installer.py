@@ -198,6 +198,13 @@ def test_installer_supports_curl_pipe_and_noninteractive_mode():
     assert "MOOLIAS_SKIP_PULL" in INSTALLER
 
 
+def test_installer_preserves_explicit_sender_rule_import_choice_without_tty():
+    assert (
+        'MOOLIAS_IMPORT_EXISTING_SENDER_RULES="${MOOLIAS_IMPORT_EXISTING_SENDER_RULES:-no}"'
+        in INSTALLER
+    )
+
+
 def test_installer_refuses_known_nginx_hostname_conflicts():
     assert "ADDITIONAL_SERVER_NAMES" in INSTALLER
     assert "dedicated Moolias nginx server can own that hostname" in INSTALLER
