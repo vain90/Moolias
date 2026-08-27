@@ -81,7 +81,7 @@
         {% elif workflow_state == 'stopped' %}
           {% if language == 'de' %}Die Prüfung ist pausiert. Du kannst sie jederzeit fortsetzen.{% else %}The check is paused. You can resume it at any time.{% endif %}
         {% else %}
-          {% if language == 'de' %}Warte auf die erste E-Mail an diese Adresse.{% else %}Waiting for the first email to this address.{% endif %}
+          {% if language == 'de' %}Warte auf die erste E-Mail an diesen Alias.{% else %}Waiting for the first email to this alias.{% endif %}
         {% endif %}
       </strong>
     </div>
@@ -105,7 +105,6 @@
   {% if selected_workflow.is_replacement and not selected_workflow.completed_at %}
   <section class="alias-workflow-deactivation">
     <h3>{% if language == 'de' %}Wann soll die alte Adresse deaktiviert werden?{% else %}When should the old address be disabled?{% endif %}</h3>
-    <p>{% if language == 'de' %}Du entscheidest selbst, wann die bisherige Adresse deaktiviert wird. Der E-Mail-Status oben ist nur eine Rückmeldung und keine Voraussetzung.{% else %}You decide when the previous address is disabled. The email status above is only feedback and is not a requirement.{% endif %}</p>
     <form method="post" action="/aliases/workflows/{{ selected_workflow.id }}/deactivation" class="alias-workflow-deactivation-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <fieldset class="alias-workflow-deactivation-options">
@@ -119,6 +118,10 @@
           <span>{% if language == 'de' %}Sofort{% else %}Now{% endif %}</span>
         </label>
         <label class="alias-workflow-deactivation-option">
+          <input type="radio" name="mode" value="1d" {% if selected_workflow.deactivation_mode == '1d' %}checked{% endif %}>
+          <span>{% if language == 'de' %}In 1 Tag{% else %}In 1 day{% endif %}</span>
+        </label>
+        <label class="alias-workflow-deactivation-option">
           <input type="radio" name="mode" value="7d" {% if selected_workflow.deactivation_mode == '7d' %}checked{% endif %}>
           <span>{% if language == 'de' %}In 7 Tagen{% else %}In 7 days{% endif %}</span>
         </label>
@@ -128,9 +131,11 @@
         </label>
       </fieldset>
 
-      {% if selected_workflow.deactivation_mode == '7d' or selected_workflow.deactivation_mode == '30d' %}
+      {% if selected_workflow.deactivation_mode in ['1d', '7d', '30d'] %}
       <p class="alias-workflow-scheduled">
-        {% if selected_workflow.deactivation_mode == '7d' %}
+        {% if selected_workflow.deactivation_mode == '1d' %}
+          {% if language == 'de' %}Die alte Adresse wird in 1 Tag deaktiviert.{% else %}The old address will be disabled in 1 day.{% endif %}
+        {% elif selected_workflow.deactivation_mode == '7d' %}
           {% if language == 'de' %}Die alte Adresse wird in 7 Tagen deaktiviert.{% else %}The old address will be disabled in 7 days.{% endif %}
         {% else %}
           {% if language == 'de' %}Die alte Adresse wird in 30 Tagen deaktiviert.{% else %}The old address will be disabled in 30 days.{% endif %}
