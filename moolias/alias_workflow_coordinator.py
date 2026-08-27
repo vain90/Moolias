@@ -194,6 +194,28 @@ class AliasWorkflowCoordinator:
 
         await self.store.cleanup(before=now - 7 * 86400)
 
+    def _set_sender_expected_if_unset(
+        self,
+        mailbox: str,
+        alias: str,
+        sender_key: str,
+    ) -> None:
+        if self.stats_store is None:
+            return
+        with sqlite3.connect(self.stats_store.path, timeout=10) as connection:
+            connection.execute("PRAGMA busy_timeout = 5000")
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO sender_expectations (
+                    mailbox,
+                    alias,
+                    sender_key,
+                    expected
+                ) VALUES (?, ?, ?, 1)
+                """,
+                (mailbox.lower(), alias.lower(), sender_key.lower()),
+            )
+
     async def _learn_first_mail_senders(
         self,
         watchers: list[AliasWorkflow],
@@ -247,11 +269,11 @@ class AliasWorkflowCoordinator:
                 _, _, sender_address, sender_domain = delivery
                 sender_key = sender_address if mode is StatsMode.FULL else sender_domain
                 try:
-                    await self.stats_store.set_sender_expectation(
+                    await asyncio.to_thread(
+                        self._set_sender_expected_if_unset,
                         workflow.mailbox,
                         recipient,
                         sender_key,
-                        True,
                     )
                 except (OSError, sqlite3.Error):
                     LOGGER.warning(

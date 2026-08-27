@@ -209,6 +209,65 @@ async def test_first_mail_workflow_learns_expected_sender_at_selected_detail_lev
     assert row == (expected_sender_key, 1)
 
 
+async def test_first_mail_workflow_does_not_override_manual_unexpected_sender(tmp_path):
+    db_path = tmp_path / "state.sqlite3"
+    store = AliasWorkflowStore(db_path)
+    await store.initialize()
+    stats_store = StatsStore(str(db_path))
+    await stats_store.initialize()
+    await stats_store.set_sender_expectation(
+        "user@example.org",
+        "fresh-xy@example.org",
+        "verify@unrelated.invalid",
+        False,
+    )
+    workflow = await store.create_creation(
+        mailbox="user@example.org",
+        new_address="fresh-xy@example.org",
+        alias_name="Fresh Alias",
+        alias_description="",
+        started_at=1000,
+        bypass_expires_at=1600,
+    )
+    mailcow = FakeMailcow("moolias-stats-full")
+    mailcow.history = [
+        {
+            "action": "clean",
+            "unix_time": 1010,
+            "rcpt_smtp": ["fresh-xy@example.org"],
+            "sender_mime": "verify@unrelated.invalid",
+            "sender_smtp": "bounce@unrelated.invalid",
+        }
+    ]
+    coordinator = AliasWorkflowCoordinator(
+        settings(tmp_path, usage_stats=True),
+        mailcow,  # type: ignore[arg-type]
+        store,
+        FakeAgent(),  # type: ignore[arg-type]
+        clock=lambda: 1011,
+    )
+
+    await coordinator.reconcile_once()
+
+    current = await store.get("user@example.org", workflow.id)
+    assert current is not None
+    assert current.waiting_state == "received"
+    with sqlite3.connect(db_path) as connection:
+        row = connection.execute(
+            """
+            SELECT expected
+            FROM sender_expectations
+            WHERE mailbox = ? AND alias = ? AND sender_key = ?
+            """,
+            (
+                "user@example.org",
+                "fresh-xy@example.org",
+                "verify@unrelated.invalid",
+            ),
+        ).fetchone()
+    assert row == (0,)
+
+
 async def test_first_mail_sender_is_not_learned_after_bypass_window(tmp_path):
     db_path = tmp_path / "state.sqlite3"
     store = AliasWorkflowStore(db_path)
