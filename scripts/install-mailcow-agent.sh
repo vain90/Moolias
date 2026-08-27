@@ -555,7 +555,7 @@ fi
   echo "$BEGIN_MARKER"
   echo "# Moolias rules are evaluated before Mailcow's normal SQL sender ACL."
   echo "smtpd_sender_login_maps ="
-  if [[ "$legacy_active" == "true" ]]; then
+  if [[ "$legacy_active" == true ]]; then
     echo "  ${LEGACY_MAP},"
   fi
   echo "  ${PCRE_MAP},"
