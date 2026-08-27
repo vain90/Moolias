@@ -11,11 +11,13 @@ WORKFLOW_CREATION = "creation"
 WORKFLOW_REPLACEMENT = "replacement"
 DEACTIVATION_LATER = "later"
 DEACTIVATION_NOW = "now"
+DEACTIVATION_1_DAY = "1d"
 DEACTIVATION_7_DAYS = "7d"
 DEACTIVATION_30_DAYS = "30d"
 DEACTIVATION_MODES = {
     DEACTIVATION_LATER,
     DEACTIVATION_NOW,
+    DEACTIVATION_1_DAY,
     DEACTIVATION_7_DAYS,
     DEACTIVATION_30_DAYS,
 }
@@ -486,6 +488,7 @@ class AliasWorkflowStore:
         schedule = {
             DEACTIVATION_LATER: None,
             DEACTIVATION_NOW: None,
+            DEACTIVATION_1_DAY: current + 86400,
             DEACTIVATION_7_DAYS: current + 7 * 86400,
             DEACTIVATION_30_DAYS: current + 30 * 86400,
         }[mode]
