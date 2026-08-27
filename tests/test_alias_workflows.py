@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from moolias.alias_workflows import (
     DEACTIVATION_7_DAYS,
     DEACTIVATION_30_DAYS,
@@ -79,6 +81,61 @@ async def test_replacement_tracks_old_and_new_independently(tmp_path):
     assert new_changed[0].watcher_active is False
     assert new_changed[0].bypass_clear_requested_at == 1020
     assert new_changed[0].bypass_recipients == ("old@example.org", "new@example.org")
+
+
+async def test_active_replacement_aliases_cannot_be_reused_in_either_role(tmp_path):
+    store = AliasWorkflowStore(tmp_path / "state.sqlite3")
+    await store.initialize()
+    first = await store.create_replacement(
+        mailbox="user@example.org",
+        old_alias_id=7,
+        old_address="a@example.org",
+        new_address="b@example.org",
+        alias_name="Shop",
+        alias_description="",
+        started_at=1000,
+        bypass_expires_at=1600,
+    )
+
+    with pytest.raises(ValueError, match="active replacement"):
+        await store.create_replacement(
+            mailbox="user@example.org",
+            old_alias_id=8,
+            old_address="c@example.org",
+            new_address="B@example.org",
+            alias_name="Other",
+            alias_description="",
+            started_at=1001,
+            bypass_expires_at=1601,
+        )
+
+    with pytest.raises(ValueError, match="active replacement"):
+        await store.create_replacement(
+            mailbox="user@example.org",
+            old_alias_id=9,
+            old_address="B@example.org",
+            new_address="c@example.org",
+            alias_name="Other",
+            alias_description="",
+            started_at=1001,
+            bypass_expires_at=1601,
+        )
+
+    completed = await store.complete_replacement("user@example.org", first.id, now=1100)
+    assert completed is not None
+
+    next_workflow = await store.create_replacement(
+        mailbox="user@example.org",
+        old_alias_id=9,
+        old_address="B@example.org",
+        new_address="c@example.org",
+        alias_name="Other",
+        alias_description="",
+        started_at=1200,
+        bypass_expires_at=1800,
+    )
+    assert next_workflow.old_address == "b@example.org"
+    assert next_workflow.new_address == "c@example.org"
 
 
 async def test_replacement_deactivation_modes_are_persistent_and_changeable(tmp_path):
