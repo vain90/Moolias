@@ -54,5 +54,17 @@ def test_updater_requires_mailcow_agent_before_recreating_application():
     )
 
 
+def test_beta_agent_migration_guidance_keeps_main_and_edge_together():
+    assert (
+        "MOOLIAS_INSTALL_REF=main MOOLIAS_IMAGE_TAG=edge bash"
+        in UPDATER
+    )
+    assert (
+        'migration_command="curl -fsSL '
+        'https://raw.githubusercontent.com/vain90/Moolias/main/install.sh | sudo bash"'
+        in UPDATER
+    )
+
+
 def test_updater_version_is_0_1_5():
     assert 'UPDATER_VERSION="0.1.5"' in UPDATER
