@@ -262,6 +262,8 @@ class AgentStateStore:
         enabled: bool,
         expires_at: int | None,
     ) -> dict[str, Any]:
+        if any("*" in item for item in recipients):
+            raise InvalidMailbox("Delivery bypass requires exact recipient addresses")
         normalized = sorted({normalize_mailbox(item) for item in recipients})
         if not normalized or len(normalized) > 2:
             raise InvalidMailbox("Delivery bypass requires one or two recipient addresses")

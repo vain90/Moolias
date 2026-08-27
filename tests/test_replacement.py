@@ -112,11 +112,20 @@ def make_client(monkeypatch, fake: FakeMailcow):
         yield client
 
 
-def test_replace_alias_copies_name_description_and_sogo_then_disables_old_alias(monkeypatch):
+def _replace(client, data: dict[str, str]):
+    return client.post(
+        "/aliases/42/replace",
+        data=data,
+        headers={"Accept": "application/json"},
+        follow_redirects=False,
+    )
+
+
+def test_replace_alias_copies_metadata_and_keeps_old_alias_active(monkeypatch):
     fake = FakeMailcow(alias_record(private_comment="Orders and invoices"))
 
     with make_client(monkeypatch, fake) as client:
-        response = client.post("/aliases/42/replace", data={"csrf_token": "test"})
+        response = _replace(client, {"csrf_token": "test"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -124,6 +133,9 @@ def test_replace_alias_copies_name_description_and_sogo_then_disables_old_alias(
     assert payload["address"].startswith("amazon-")
     suffix = payload["address"].split("@", 1)[0].rsplit("-", 1)[1]
     assert len(suffix) == 2
+    assert payload["workflow"]["kind"] == "replacement"
+    assert payload["workflow"]["old_address"] == "amazon-k7@example.org"
+    assert payload["workflow"]["new_address"] == payload["address"]
     assert fake.created == [
         {
             "address": payload["address"],
@@ -133,7 +145,7 @@ def test_replace_alias_copies_name_description_and_sogo_then_disables_old_alias(
             "sogo_visible": True,
         }
     ]
-    assert fake.active_updates == [(42, False)]
+    assert fake.active_updates == []
 
 
 def test_replace_alias_can_use_readable_random_format(monkeypatch):
@@ -146,9 +158,9 @@ def test_replace_alias_can_use_readable_random_format(monkeypatch):
     )
 
     with make_client(monkeypatch, fake) as client:
-        response = client.post(
-            "/aliases/42/replace",
-            data={"csrf_token": "test", "mode": "readable"},
+        response = _replace(
+            client,
+            {"csrf_token": "test", "mode": "readable"},
         )
 
     assert response.status_code == 200
@@ -162,16 +174,16 @@ def test_replace_alias_can_use_readable_random_format(monkeypatch):
             "sogo_visible": False,
         }
     ]
-    assert fake.active_updates == [(42, False)]
+    assert fake.active_updates == []
 
 
 def test_replace_alias_can_use_custom_local_part(monkeypatch):
     fake = FakeMailcow(alias_record())
 
     with make_client(monkeypatch, fake) as client:
-        response = client.post(
-            "/aliases/42/replace",
-            data={
+        response = _replace(
+            client,
+            {
                 "csrf_token": "test",
                 "mode": "custom",
                 "local_part": "amazon-neu",
@@ -189,7 +201,7 @@ def test_replace_alias_can_use_custom_local_part(monkeypatch):
             "sogo_visible": True,
         }
     ]
-    assert fake.active_updates == [(42, False)]
+    assert fake.active_updates == []
 
 
 def test_replace_alias_rejects_invalid_custom_local_part(monkeypatch):
@@ -224,17 +236,15 @@ def test_replace_alias_rejects_unknown_mode(monkeypatch):
     assert fake.active_updates == []
 
 
-def test_replace_alias_reports_partial_result_when_old_alias_cannot_be_disabled(monkeypatch):
+def test_replace_alias_does_not_attempt_immediate_deactivation(monkeypatch):
     fake = FakeMailcow(alias_record(), fail_disable=True)
 
     with make_client(monkeypatch, fake) as client:
-        response = client.post("/aliases/42/replace", data={"csrf_token": "test"})
+        response = _replace(client, {"csrf_token": "test"})
 
-    assert response.status_code == 502
-    detail = response.json()["detail"]
-    assert detail["code"] == "partial_replacement"
-    assert detail["address"].startswith("amazon-")
-    assert fake.active_updates == [(42, False)]
+    assert response.status_code == 200
+    assert response.json()["workflow"]["state"] == "waiting"
+    assert fake.active_updates == []
 
 
 def test_primary_mailbox_alias_cannot_be_replaced(monkeypatch):

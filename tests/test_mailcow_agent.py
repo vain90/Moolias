@@ -190,10 +190,12 @@ async def test_agent_requires_valid_signature_and_rejects_replay(tmp_path):
     now = [2000.0]
     state_dir = tmp_path / "state"
     policy_path = tmp_path / "policy" / "blocked_sender_login.pcre"
+    bypass_map_path = tmp_path / "rspamd" / "moolias_firstmail_recipients.map"
     app = create_agent_app(
         secret=SECRET,
         state_dir=state_dir,
         policy_path=policy_path,
+        bypass_map_path=bypass_map_path,
         cooldown_seconds=10,
         clock=lambda: now[0],
     )
@@ -227,10 +229,12 @@ async def test_agent_rejects_client_supplied_regex_and_rate_limits_changes(tmp_p
     now = [3000.0]
     state_dir = tmp_path / "state"
     policy_path = tmp_path / "policy" / "blocked_sender_login.pcre"
+    bypass_map_path = tmp_path / "rspamd" / "moolias_firstmail_recipients.map"
     app = create_agent_app(
         secret=SECRET,
         state_dir=state_dir,
         policy_path=policy_path,
+        bypass_map_path=bypass_map_path,
         cooldown_seconds=10,
         clock=lambda: now[0],
     )
