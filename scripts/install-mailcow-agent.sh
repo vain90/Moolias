@@ -31,19 +31,29 @@ NGINX_CUSTOM="${NGINX_DIR}/site.moolias-agent.custom"
 OVERRIDE_FILE="${MAILCOW_DIR}/docker-compose.override.yml"
 AGENT_ENV="${AGENT_DIR}/agent.env"
 
+PREVIOUS_AGENT_DIR="${MAILCOW_DIR}/data/conf/moolias-sender-agent"
+PREVIOUS_STATE_DIR="${PREVIOUS_AGENT_DIR}/state"
+PREVIOUS_POLICY_DIR="${POSTFIX_DIR}/moolias-sender-agent"
+PREVIOUS_NGINX_CUSTOM="${NGINX_DIR}/site.moolias-sender-agent.custom"
+PREVIOUS_AGENT_ENV="${PREVIOUS_AGENT_DIR}/agent.env"
+
 PCRE_MAP="pcre:/opt/postfix/conf/moolias-agent/blocked_sender_login.pcre"
+PREVIOUS_PCRE_MAP="pcre:/opt/postfix/conf/moolias-sender-agent/blocked_sender_login.pcre"
 LEGACY_MAP="pcre:/opt/postfix/conf/blocked_sender_login.pcre"
 SQL_SENDER_MAP="proxy:mysql:/opt/postfix/conf/sql/mysql_virtual_sender_acl.cf"
 BEGIN_MARKER="# BEGIN MOOLIAS SENDER PROTECTION"
 END_MARKER="# END MOOLIAS SENDER PROTECTION"
 COMPOSE_BEGIN="# BEGIN MOOLIAS MAILCOW AGENT"
 COMPOSE_END="# END MOOLIAS MAILCOW AGENT"
+PREVIOUS_COMPOSE_BEGIN="# BEGIN MOOLIAS SENDER AGENT"
+PREVIOUS_COMPOSE_END="# END MOOLIAS SENDER AGENT"
 RSPAMD_BEGIN="# BEGIN MOOLIAS FIRST MAIL DELIVERY"
 RSPAMD_END="# END MOOLIAS FIRST MAIL DELIVERY"
 HOOK_MARKER="# Managed by Moolias Sender Protection."
 RSPAMD_HOOK_MARKER="# Managed by Moolias First Mail Delivery."
 RSPAMD_PLUGIN_MARKER="Managed by Moolias Mailcow Agent installer."
 NGINX_MARKER="# Managed by Moolias Mailcow Agent."
+PREVIOUS_NGINX_MARKER="# Managed by Moolias Sender Protection."
 
 die() {
   echo "Moolias Mailcow Agent installer: $*" >&2
@@ -99,6 +109,35 @@ fi
 stamp="$(date +%Y%m%d-%H%M%S)"
 touch "$EXTRA_CF"
 
+previous_layout=false
+if [[ -e "$PREVIOUS_AGENT_DIR" || -e "$PREVIOUS_POLICY_DIR" || -e "$PREVIOUS_NGINX_CUSTOM" ]]; then
+  previous_layout=true
+fi
+if [[ -f "$OVERRIDE_FILE" ]]; then
+  previous_begin=false
+  previous_end=false
+  grep -Fq "$PREVIOUS_COMPOSE_BEGIN" "$OVERRIDE_FILE" && previous_begin=true
+  grep -Fq "$PREVIOUS_COMPOSE_END" "$OVERRIDE_FILE" && previous_end=true
+  if [[ "$previous_begin" != "$previous_end" ]]; then
+    die "docker-compose.override.yml contains an incomplete previous Moolias sender-agent block."
+  fi
+  if [[ "$previous_begin" == true ]]; then
+    previous_layout=true
+  fi
+fi
+if [[ -f "$PREVIOUS_NGINX_CUSTOM" ]] \
+  && ! grep -Fq -- "$PREVIOUS_NGINX_MARKER" "$PREVIOUS_NGINX_CUSTOM"; then
+  die "$PREVIOUS_NGINX_CUSTOM exists but is not managed by the previous Moolias sender agent."
+fi
+
+previous_agent_container=""
+if [[ "$previous_layout" == true ]]; then
+  previous_agent_container="$(
+    cd "$MAILCOW_DIR"
+    docker compose ps -q moolias-sender-agent 2>/dev/null || true
+  )"
+fi
+
 # Preserve whether the installer-owned sender map references the administrator's
 # separate PCRE. This keeps reruns safe without treating old Moolias layouts as API.
 managed_block_had_legacy=false
@@ -136,15 +175,17 @@ if [[ -n "$sender_assignment" ]]; then
   normalized_assignment="$(printf '%s' "$sender_assignment" | tr -d '[:space:]')"
   expected_legacy="smtpd_sender_login_maps=${LEGACY_MAP},${SQL_SENDER_MAP}"
   expected_current="smtpd_sender_login_maps=${PCRE_MAP},${SQL_SENDER_MAP}"
+  expected_previous="smtpd_sender_login_maps=${PREVIOUS_PCRE_MAP},${SQL_SENDER_MAP}"
   expected_both="smtpd_sender_login_maps=${LEGACY_MAP},${PCRE_MAP},${SQL_SENDER_MAP}"
+  expected_previous_both="smtpd_sender_login_maps=${LEGACY_MAP},${PREVIOUS_PCRE_MAP},${SQL_SENDER_MAP}"
 
   case "$normalized_assignment" in
     "$expected_legacy")
       legacy_was_active=true
       ;;
-    "$expected_current")
+    "$expected_current"|"$expected_previous")
       ;;
-    "$expected_both")
+    "$expected_both"|"$expected_previous_both")
       legacy_was_active=true
       ;;
     *)
@@ -167,6 +208,15 @@ awk '
   { print }
 ' "$extra_without_moolias" > "$extra_base"
 rm -f "$extra_without_moolias"
+
+if [[ "$previous_layout" == true && ! -e "${STATE_DIR}/state.json" ]]; then
+  [[ -f "${PREVIOUS_STATE_DIR}/state.json" ]] \
+    || die "previous Moolias sender-agent state is missing; refusing to replace it without preserving sender rules."
+  install -d -m 0700 -o 10001 -g 10001 "$STATE_DIR"
+  cp -a "${PREVIOUS_STATE_DIR}/state.json" "${STATE_DIR}/state.json"
+  chown 10001:10001 "${STATE_DIR}/state.json"
+  chmod 0600 "${STATE_DIR}/state.json"
+fi
 
 install -d -m 0755 "$AGENT_DIR"
 install -d -m 0755 "$POSTFIX_HOOK_DIR"
@@ -308,8 +358,13 @@ fi
 
 if [[ -f "$AGENT_ENV" ]]; then
   secret="$(sed -n 's/^MOOLIAS_AGENT_SECRET=//p' "$AGENT_ENV" | head -n1)"
+elif [[ -f "$PREVIOUS_AGENT_ENV" ]]; then
+  secret="$(sed -n 's/^MOOLIAS_AGENT_SECRET=//p' "$PREVIOUS_AGENT_ENV" | head -n1)"
 else
   secret=""
+fi
+if [[ -z "$secret" && "$previous_layout" == true ]]; then
+  die "previous Moolias sender-agent secret is missing; refusing to replace the agent with a different secret."
 fi
 if [[ -z "$secret" ]]; then
   secret="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
@@ -432,7 +487,14 @@ mv "$rspamd_conf_new" "$RSPAMD_CONF"
 # and Rspamd already see their respective Mailcow configuration directories.
 compose_base="$(mktemp "${MAILCOW_DIR}/.docker-compose.override.XXXXXX")"
 if [[ -f "$OVERRIDE_FILE" ]]; then
-  strip_managed_block "$OVERRIDE_FILE" "$COMPOSE_BEGIN" "$COMPOSE_END" > "$compose_base"
+  compose_without_current="$(mktemp "${MAILCOW_DIR}/.docker-compose.override.current.XXXXXX")"
+  strip_managed_block "$OVERRIDE_FILE" "$COMPOSE_BEGIN" "$COMPOSE_END" > "$compose_without_current"
+  strip_managed_block \
+    "$compose_without_current" \
+    "$PREVIOUS_COMPOSE_BEGIN" \
+    "$PREVIOUS_COMPOSE_END" \
+    > "$compose_base"
+  rm -f "$compose_without_current"
 else
   : > "$compose_base"
 fi
@@ -440,6 +502,10 @@ fi
 if grep -Eq '^[[:space:]]+moolias-agent:[[:space:]]*$' "$compose_base"; then
   rm -f "$compose_base" "$extra_base"
   die "docker-compose.override.yml already defines moolias-agent outside the managed block."
+fi
+if grep -Eq '^[[:space:]]+moolias-sender-agent:[[:space:]]*$' "$compose_base"; then
+  rm -f "$compose_base" "$extra_base"
+  die "docker-compose.override.yml defines moolias-sender-agent outside the previous Moolias managed block."
 fi
 
 # Match the indentation already used for service names in an existing override.
@@ -658,7 +724,20 @@ expected_agent_mounts="$(
 [[ -r "$RSPAMD_BYPASS_MAP" ]] \
   || die "agent did not render the first-delivery recipient map."
 
-docker compose exec -T nginx-mailcow nginx -t
+previous_nginx_removed=false
+if [[ -f "$PREVIOUS_NGINX_CUSTOM" ]]; then
+  backup_file "$PREVIOUS_NGINX_CUSTOM"
+  rm -f "$PREVIOUS_NGINX_CUSTOM"
+  previous_nginx_removed=true
+fi
+if ! docker compose exec -T nginx-mailcow nginx -t; then
+  if [[ "$previous_nginx_removed" == true ]]; then
+    cp -a \
+      "${PREVIOUS_NGINX_CUSTOM}.before-moolias-agent-${stamp}.bak" \
+      "$PREVIOUS_NGINX_CUSTOM"
+  fi
+  die "Mailcow nginx rejected the Moolias Agent configuration."
+fi
 docker compose exec -T nginx-mailcow nginx -s reload
 
 # extra.cf and the Postfix hook are consumed at container startup. No new
@@ -721,6 +800,16 @@ docker compose exec -T rspamd-mailcow \
   || die "Rspamd cannot read the Moolias first-delivery recipient map."
 docker compose exec -T moolias-agent test -w /rspamd-custom \
   || die "Mailcow Agent cannot update the first-delivery recipient map after Rspamd restart."
+
+if [[ -n "$previous_agent_container" && "$previous_agent_container" != "$agent_id" ]]; then
+  docker rm -f "$previous_agent_container" >/dev/null
+fi
+if [[ -d "$PREVIOUS_AGENT_DIR" ]]; then
+  mv "$PREVIOUS_AGENT_DIR" "${PREVIOUS_AGENT_DIR}.before-moolias-agent-${stamp}.bak"
+fi
+if [[ -d "$PREVIOUS_POLICY_DIR" ]]; then
+  mv "$PREVIOUS_POLICY_DIR" "${PREVIOUS_POLICY_DIR}.before-moolias-agent-${stamp}.bak"
+fi
 
 cat <<EOF
 
