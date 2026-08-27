@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-UPDATER_VERSION="0.1.4"
+UPDATER_VERSION="0.1.5"
 REPOSITORY="vain90/Moolias"
 IMAGE="ghcr.io/vain90/moolias"
 LATEST_RELEASE_URL="https://github.com/${REPOSITORY}/releases/latest"
@@ -330,6 +330,15 @@ if [[ "${UPDATE_AVAILABLE}" != true && "${FORCE}" != true ]]; then
     log "Moolias is already on the latest stable release."
   fi
   exit 0
+fi
+
+agent_secret="$(sed -n 's/^MOOLIAS_MAILCOW_AGENT_SECRET=//p' .env | tail -n1)"
+agent_secret="${agent_secret%$'\r'}"
+if (( ${#agent_secret} < 32 )); then
+  if [[ -f ".moolias-mailcow-install" ]]; then
+    die "This update requires the Moolias Mailcow Agent. Rerun the recommended Mailcow-host installer once to migrate the existing installation safely, then use update.sh normally again: curl -fsSL https://raw.githubusercontent.com/vain90/Moolias/main/install.sh | sudo bash"
+  fi
+  die "This update requires a configured Moolias Mailcow Agent and MOOLIAS_MAILCOW_AGENT_SECRET (at least 32 characters). Install or upgrade the Mailcow Agent first, store its shared secret in .env, then retry the update."
 fi
 
 if [[ "${ASSUME_YES}" != true ]]; then
