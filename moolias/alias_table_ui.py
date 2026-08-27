@@ -95,6 +95,14 @@ async def _workflow_coordinator(request: Request) -> AliasWorkflowCoordinator | 
     return getattr(request.app.state, "alias_workflow_coordinator", None)
 
 
+def _replacement_lock(request: Request) -> asyncio.Lock:
+    lock = getattr(request.app.state, "alias_replacement_lock", None)
+    if lock is None:
+        lock = asyncio.Lock()
+        request.app.state.alias_replacement_lock = lock
+    return lock
+
+
 def _workflow_payload(workflow: AliasWorkflow) -> dict[str, object]:
     return {
         "id": workflow.id,
@@ -733,78 +741,80 @@ async def replace_alias(
         raise HTTPException(status_code=400, detail="Unknown replacement mode")
 
     store = await _workflow_store(request)
-    pending = await store.pending_replacements(user)
-    alias_address = alias.address.lower()
-    existing = next(
-        (
-            item
-            for item in pending
-            if item.old_alias_id == alias_id
-            or (item.old_address or "").lower() == alias_address
-            or item.new_address.lower() == alias_address
-        ),
-        None,
-    )
-    if existing is not None:
-        if not _wants_json(request):
-            return RedirectResponse(f"/aliases?workflow={existing.id}", status_code=303)
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "replacement_pending",
-                "message": "A replacement is already in progress for this alias",
-                "workflow": _workflow_payload(existing),
-            },
+    async with _replacement_lock(request):
+        pending = await store.pending_replacements(user)
+        alias_address = alias.address.lower()
+        existing = next(
+            (
+                item
+                for item in pending
+                if item.old_alias_id == alias_id
+                or (item.old_address or "").lower() == alias_address
+                or item.new_address.lower() == alias_address
+            ),
+            None,
         )
+        if existing is not None:
+            if not _wants_json(request):
+                return RedirectResponse(f"/aliases?workflow={existing.id}", status_code=303)
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "replacement_pending",
+                    "message": "A replacement is already in progress for this alias",
+                    "workflow": _workflow_payload(existing),
+                },
+            )
 
-    replacement_name = alias.name or "alias"
-    try:
-        if mode == "named":
-            new_address = await _create_unique_alias(
-                request,
-                user,
-                lambda: named_local_part(replacement_name),
-                public_comment=alias.public_comment,
-                private_comment=alias.private_comment,
-                sogo_visible=alias.sogo_visible,
-            )
-        elif mode == "readable":
-            new_address = await _create_unique_alias(
-                request,
-                user,
-                lambda: readable_local_part(_language(request)),
-                public_comment=alias.public_comment,
-                private_comment=alias.private_comment,
-                sogo_visible=alias.sogo_visible,
-            )
-        else:
-            new_address = f"{validate_local_part(local_part)}@{mailbox_domain(user)}"
-            await request.app.state.mailcow.create_alias(
-                new_address,
-                user,
-                alias.public_comment,
-                private_comment=alias.private_comment,
-                sogo_visible=alias.sogo_visible,
-            )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except MailcowError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        replacement_name = alias.name or "alias"
+        try:
+            if mode == "named":
+                new_address = await _create_unique_alias(
+                    request,
+                    user,
+                    lambda: named_local_part(replacement_name),
+                    public_comment=alias.public_comment,
+                    private_comment=alias.private_comment,
+                    sogo_visible=alias.sogo_visible,
+                )
+            elif mode == "readable":
+                new_address = await _create_unique_alias(
+                    request,
+                    user,
+                    lambda: readable_local_part(_language(request)),
+                    public_comment=alias.public_comment,
+                    private_comment=alias.private_comment,
+                    sogo_visible=alias.sogo_visible,
+                )
+            else:
+                new_address = f"{validate_local_part(local_part)}@{mailbox_domain(user)}"
+                await request.app.state.mailcow.create_alias(
+                    new_address,
+                    user,
+                    alias.public_comment,
+                    private_comment=alias.private_comment,
+                    sogo_visible=alias.sogo_visible,
+                )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except MailcowError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    now = int(time.time())
-    try:
-        workflow = await store.create_replacement(
-            mailbox=user,
-            old_alias_id=alias.id,
-            old_address=alias.address,
-            new_address=new_address,
-            alias_name=alias.name,
-            alias_description=alias.private_description,
-            started_at=now,
-            bypass_expires_at=now + request.app.state.settings.alias_workflow_bypass_seconds,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        now = int(time.time())
+        try:
+            workflow = await store.create_replacement(
+                mailbox=user,
+                old_alias_id=alias.id,
+                old_address=alias.address,
+                new_address=new_address,
+                alias_name=alias.name,
+                alias_description=alias.private_description,
+                started_at=now,
+                bypass_expires_at=now + request.app.state.settings.alias_workflow_bypass_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
     await _provision_now(request, workflow)
 
     if _wants_json(request):
