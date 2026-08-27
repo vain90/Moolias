@@ -43,10 +43,10 @@ def test_replacement_pair_stays_together_under_search_sort_filter_and_pagination
 ) -> None:
     _login(page, base_url)
 
-    # Together with the existing Amazon and Archive rows, these seven aliases put
-    # the GitHub replacement group exactly across a 10-row page boundary if rows
-    # were paginated independently instead of as one replacement group.
-    for number in range(1, 8):
+    # With the existing active Amazon row, these eight aliases create nine
+    # single-row groups before GitHub in purpose order. The two-row replacement
+    # group must therefore move as a unit to page 2 with a 10-row page size.
+    for number in range(1, 9):
         _create_named_alias(
             page,
             base_url,
@@ -90,3 +90,10 @@ def test_replacement_pair_stays_together_under_search_sort_filter_and_pagination
         f"{base_url}/aliases?status=active&per_page=25&sort=usage&direction=desc"
     )
     _assert_pair(page, workflow_id)
+
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.reload()
+    _assert_pair(page, workflow_id)
+    rows = page.locator(f'[data-alias-workflow-row="{workflow_id}"]')
+    expect(rows.nth(0).locator(".alias-workflow-badge")).to_have_text("OLD")
+    expect(rows.nth(1).locator(".alias-workflow-badge")).to_have_text("NEW")
