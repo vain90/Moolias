@@ -179,12 +179,34 @@ def test_replacement_workflow_uses_shared_close_button_and_server_rendered_contr
 
     assert ".alias-workflow-dialog .dialog-close" not in css
     assert 'class="alias-workflow-wait-spinner"' in template
+    assert "Warte auf die erste E-Mail an diesen Alias." in template
+    assert "Der E-Mail-Status oben ist nur eine Rückmeldung" not in template
     assert 'class="alias-workflow-deactivation-form"' in template
     assert 'name="mode" value="later"' in template
     assert 'name="mode" value="now"' in template
+    assert 'name="mode" value="1d"' in template
     assert 'name="mode" value="7d"' in template
     assert 'name="mode" value="30d"' in template
     assert 'name="confirm_now"' not in template
+
+    option_rule = css.split(".alias-workflow-deactivation-option span {", 1)[1].split("}", 1)[0]
+    checked_rule = css.split(
+        ".alias-workflow-deactivation-option input:checked + span {", 1
+    )[1].split("}", 1)[0]
+    assert "border-radius: 999px;" in option_rule
+    assert "background: var(--accent);" not in checked_rule
+    assert ".alias-workflow-deactivation-option input:checked + span::before" in css
+
+
+def test_open_replacement_rows_keep_table_borders_and_use_link_rail():
+    root = Path(__file__).resolve().parents[1]
+    css = (root / "moolias/static/alias-workflow.css").read_text()
+
+    assert "border-bottom-color: transparent" not in css
+    assert ".alias-row.alias-migration-old::after" in css
+    assert "background-size: 5px calc(100% + 2px), 3px calc(100% + 2px);" in css
+    assert "linear-gradient(#667085, #667085)" in css
+    assert "border: 2px solid #667085;" in css
 
 
 def test_completed_replacement_history_keeps_sender_stats_first():
