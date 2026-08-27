@@ -2,7 +2,6 @@ import os
 
 import pytest
 
-
 os.environ.setdefault(
     "MOOLIAS_MAILCOW_AGENT_SECRET",
     "moolias-test-mailcow-agent-secret-0001",
