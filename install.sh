@@ -390,7 +390,7 @@ main() {
       fi
       access_tag_managed=true
       if [[ "${sender_install_mode,,}" == "ask" ]]; then
-        sender_install_mode="yes"
+        sender_install_mode="no"
       fi
       print_mailcow_api_allowlist_guidance
       return 0
@@ -512,15 +512,16 @@ main() {
 
     setup_page 6 "Primary sender protection"
     printf '%s\n' \
-      'Recommended: enable primary sender protection.' \
+      'The Moolias Mailcow Agent is installed automatically because guided alias' \
+      'creation and replacement use it for the exact-recipient first-mail bypass.' \
       '' \
-      'This optional Mailcow sidecar lets a mailbox user prevent authenticated' \
-      'sending with the mailbox primary address while receiving remains unchanged.' \
-      'Normal Mailcow aliases and sender permissions continue to work.' \
+      'Primary sender protection is an additional optional feature. When enabled,' \
+      'a mailbox user can prevent authenticated sending with the mailbox primary' \
+      'address while receiving and normal alias sending remain unchanged.' \
       '' >&3
     case "${sender_install_mode,,}" in
       ask)
-        if prompt_yes_no "Install primary sender protection?" "yes"; then
+        if prompt_yes_no "Enable primary sender protection?" "no"; then
           sender_install_mode="yes"
         else
           sender_install_mode="no"
@@ -549,7 +550,7 @@ main() {
       '============================================================' \
       '' \
       'Please keep this terminal open. Docker, Mailcow nginx, ACME and' \
-      'the optional sender-protection agent can take a little while.' \
+      'the required Mailcow Agent can take a little while.' \
       '' >&3
   }
 
@@ -570,12 +571,8 @@ main() {
 
     current="$(read_key_value "$env_file" MOOLIAS_SENDER_PROTECTION || true)"
     if is_true "${current:-false}"; then
-      # Sender protection is already configured. A normal installer rerun must
-      # preserve it instead of asking the child installer to install it again.
-      sender_install_mode="no"
+      sender_install_mode="yes"
     else
-      # An existing disabled installation is preserved as well. Operators can
-      # explicitly pass yes when they want to add sender protection on a rerun.
       sender_install_mode="no"
     fi
   }
@@ -662,24 +659,19 @@ main() {
 
   configure_post_install_env() {
     local env_file="${install_dir}/.env"
-    local sender_protection
 
     [[ -f "$env_file" ]] || return 0
 
     if [[ -n "$mailcow_internal_url" ]]; then
       set_key_value "$env_file" MAILCOW_INTERNAL_URL "$mailcow_internal_url"
+      set_key_value \
+        "$env_file" \
+        MOOLIAS_MAILCOW_AGENT_URL \
+        "${mailcow_internal_url}/moolias-agent"
     fi
 
     if [[ "$access_tag_managed" == true ]]; then
       set_key_value "$env_file" MOOLIAS_ACCESS_TAG "$access_tag"
-    fi
-
-    sender_protection="$(read_key_value "$env_file" MOOLIAS_SENDER_PROTECTION || true)"
-    if is_true "${sender_protection:-false}" && [[ -n "$mailcow_internal_url" ]]; then
-      set_key_value \
-        "$env_file" \
-        MOOLIAS_SENDER_AGENT_URL \
-        "${mailcow_internal_url}/moolias-agent"
     fi
 
     (
@@ -871,6 +863,7 @@ PY
     echo
     echo "Application:       healthy"
     echo "Mailcow API:       OK"
+    echo "Mailcow Agent:     configured"
     [[ -n "$mailcow_internal_url" ]] && echo "Internal routing:  ${mailcow_internal_url}"
     echo "Version:           ${version:-unknown}"
 
@@ -882,8 +875,6 @@ PY
 
     if is_true "${sender_protection:-false}"; then
       echo "Sender protection: enabled"
-      echo "Agent secret:      saved automatically in ${env_file}"
-      echo "                   No copy/paste is required."
     else
       echo "Sender protection: disabled"
     fi
