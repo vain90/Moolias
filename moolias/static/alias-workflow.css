@@ -10,6 +10,39 @@
   text-decoration: none;
 }
 
+.alias-create-loading-dialog {
+  width: min(400px, calc(100vw - 28px));
+}
+
+.alias-create-loading-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 72px;
+}
+
+.alias-create-loading-content h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.alias-create-loading-spinner {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: alias-create-loading-spin .8s linear infinite;
+}
+
+@keyframes alias-create-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .alias-workflow-address-card {
   display: flex;
   align-items: center;

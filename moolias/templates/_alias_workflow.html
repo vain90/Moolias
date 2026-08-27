@@ -147,6 +147,13 @@
 </dialog>
 {% endif %}
 
+<dialog class="assign-dialog alias-create-loading-dialog" data-alias-create-loading-dialog aria-labelledby="alias-create-loading-title">
+  <div class="alias-create-loading-content" role="status" aria-live="polite">
+    <span class="alias-create-loading-spinner" aria-hidden="true"></span>
+    <h2 id="alias-create-loading-title">{% if language == 'de' %}Alias wird erstellt …{% else %}Creating alias …{% endif %}</h2>
+  </div>
+</dialog>
+
 <dialog
   class="assign-dialog alias-workflow-dialog"
   data-alias-replacement-dialog
@@ -187,3 +194,6 @@
     </div>
   </form>
 </dialog>
+
+<link rel="stylesheet" href="/static/service-icon-picker.css?v=20260822-3" data-service-icon-picker-styles>
+<script src="/static/service-icon-picker.js?v=20260822-3" data-service-icon-picker-script defer></script>

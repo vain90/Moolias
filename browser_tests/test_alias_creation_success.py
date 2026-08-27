@@ -18,6 +18,53 @@ def _alias_row(page: Page, address: str):
     )
 
 
+def test_alias_creation_shows_loading_overlay_while_post_is_delayed(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+
+    page.locator("[data-open-create-alias]").click()
+    create_dialog = page.locator("dialog[data-create-alias-dialog]")
+    expect(create_dialog).to_be_visible()
+
+    create_dialog.locator('input[name="description"]').fill("Loading overlay")
+    create_dialog.locator('label.mode-option:has(input[value="custom"])').click()
+    create_dialog.locator('input[name="local_part"]').fill("loading-overlay")
+
+    page.evaluate(
+        """
+        () => {
+          const form = document.querySelector("[data-alias-create-form]");
+          form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            window.setTimeout(() => {
+              HTMLFormElement.prototype.submit.call(form);
+            }, 1000);
+          }, { once: true });
+        }
+        """
+    )
+
+    submit = create_dialog.locator('button[type="submit"]')
+    submit.click()
+
+    loading = page.locator("dialog[data-alias-create-loading-dialog]")
+    expect(loading).to_be_visible(timeout=500)
+    assert loading.evaluate("(dialog) => dialog.matches(':modal')")
+    expect(loading).to_contain_text("Creating alias …")
+    expect(loading.locator(".alias-create-loading-spinner")).to_be_visible()
+    expect(submit).to_be_disabled()
+
+    result = page.locator('dialog[data-alias-workflow-dialog][open]')
+    expect(result).to_be_visible(timeout=5000)
+    expect(result).to_contain_text("Alias created successfully")
+    expect(result.locator("[data-alias-workflow-address]")).to_have_text(
+        "loading-overlay@example.org"
+    )
+    expect(loading).not_to_be_visible()
+
+
 def test_alias_creation_shows_copyable_activation_workflow(page: Page, base_url: str) -> None:
     _login(page, base_url)
     page.context.grant_permissions(
