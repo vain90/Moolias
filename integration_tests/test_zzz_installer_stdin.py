@@ -69,4 +69,4 @@ def test_documented_curl_bootstrap_completes_outside_mailcow_dir() -> None:
     )
     assert "Moolias Mailcow Agent installed successfully" in result.stdout
     assert "NEXT STEP: Configure Moolias" in result.stdout
-    assert "MOOLIAS_SENDER_AGENT_SECRET=" in result.stdout
+    assert "MOOLIAS_MAILCOW_AGENT_SECRET=" in result.stdout
