@@ -2,12 +2,13 @@
   "use strict";
 
   function showDialog(dialog) {
-    if (!dialog) return;
-    if (dialog.hasAttribute("open")) return;
+    if (!dialog || dialog.matches(":modal")) return;
+    if (dialog.hasAttribute("open")) dialog.close();
     dialog.showModal();
   }
 
   const createDialog = document.querySelector("[data-create-alias-dialog]");
+  if (createDialog?.hasAttribute("open")) showDialog(createDialog);
   document.querySelector("[data-open-create-alias]")?.addEventListener("click", (event) => {
     if (!createDialog) return;
     event.preventDefault();
@@ -23,6 +24,7 @@
   });
 
   const replacementDialog = document.querySelector("[data-alias-replacement-dialog]");
+  if (replacementDialog?.hasAttribute("open")) showDialog(replacementDialog);
   const replacementForm = replacementDialog?.querySelector("[data-alias-replacement-form]");
   const replacementOldAddress = replacementDialog?.querySelector("[data-alias-replacement-old-address]");
   const replacementDomain = replacementDialog?.querySelector("[data-alias-replacement-domain]");
@@ -101,6 +103,7 @@
   });
 
   const workflowDialog = document.querySelector("[data-alias-workflow-dialog]");
+  if (workflowDialog?.hasAttribute("open")) showDialog(workflowDialog);
   const workflowId = workflowDialog?.dataset.aliasWorkflowId;
   const pollMs = Number.parseInt(workflowDialog?.dataset.aliasWorkflowPollMs || "0", 10);
   if (workflowDialog && workflowId && Number.isFinite(pollMs) && pollMs > 0) {
