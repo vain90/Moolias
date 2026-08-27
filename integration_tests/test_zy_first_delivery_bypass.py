@@ -20,7 +20,13 @@ RSPAMD_MAP_PATH = "/etc/rspamd/custom/moolias-sender-agent/moolias_firstmail_rec
 
 def _agent_secret(mailcow_dir: Path) -> str:
     env_path = mailcow_dir / "data/conf/moolias-sender-agent/agent.env"
-    for line in env_path.read_text(encoding="utf-8").splitlines():
+    result = subprocess.run(
+        ["sudo", "cat", str(env_path)],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    for line in result.stdout.splitlines():
         if line.startswith("MOOLIAS_AGENT_SECRET="):
             return line.split("=", 1)[1].strip()
     raise AssertionError("Mailcow Agent secret is missing")
