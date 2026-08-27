@@ -236,6 +236,38 @@ def test_replace_alias_rejects_unknown_mode(monkeypatch):
     assert fake.active_updates == []
 
 
+def test_replace_alias_rejects_new_side_of_pending_replacement_before_create(monkeypatch):
+    fake = FakeMailcow(alias_record(address="Replacement@example.org"))
+
+    class PendingWorkflow:
+        id = 7
+        old_alias_id = 41
+        old_address = "old@example.org"
+        new_address = "replacement@example.org"
+
+    class PendingStore:
+        async def pending_replacements(self, mailbox: str):
+            assert mailbox == "hidden@example.org"
+            return [PendingWorkflow()]
+
+    async def pending_store(_request):
+        return PendingStore()
+
+    monkeypatch.setattr(alias_table_module, "_workflow_store", pending_store)
+
+    with make_client(monkeypatch, fake) as client:
+        response = client.post(
+            "/aliases/42/replace",
+            data={"csrf_token": "test"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/aliases?workflow=7"
+    assert fake.created == []
+    assert fake.active_updates == []
+
+
 def test_replace_alias_does_not_attempt_immediate_deactivation(monkeypatch):
     fake = FakeMailcow(alias_record(), fail_disable=True)
 
