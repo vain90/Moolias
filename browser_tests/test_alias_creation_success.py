@@ -102,7 +102,7 @@ def test_alias_creation_shows_copyable_activation_workflow(page: Page, base_url:
 
     expect(result).to_have_attribute("data-alias-workflow-state", "waiting")
     expect(result).to_contain_text("Alias created successfully")
-    expect(result).to_contain_text("Waiting for the first email to this address.")
+    expect(result).to_contain_text("Waiting for the first email to this alias.")
     expect(result.locator("[data-alias-workflow-name]")).to_have_text("Issue 111")
     expect(result.locator("[data-alias-workflow-address]")).to_have_text(
         "issue-111@example.org"
