@@ -390,7 +390,7 @@ main() {
       fi
       access_tag_managed=true
       if [[ "${sender_install_mode,,}" == "ask" ]]; then
-        sender_install_mode="no"
+        sender_install_mode="yes"
       fi
       print_mailcow_api_allowlist_guidance
       return 0
@@ -521,7 +521,7 @@ main() {
       '' >&3
     case "${sender_install_mode,,}" in
       ask)
-        if prompt_yes_no "Enable primary sender protection?" "no"; then
+        if prompt_yes_no "Install primary sender protection?" "yes"; then
           sender_install_mode="yes"
         else
           sender_install_mode="no"
@@ -875,6 +875,8 @@ PY
 
     if is_true "${sender_protection:-false}"; then
       echo "Sender protection: enabled"
+      echo "Agent secret:      saved automatically in ${env_file}"
+      echo "                   No copy/paste is required."
     else
       echo "Sender protection: disabled"
     fi

@@ -9,9 +9,9 @@ def test_first_delivery_bypass_uses_exact_dynamic_recipient_map():
         "MOOLIAS_AGENT_BYPASS_MAP_PATH=/rspamd-custom/"
         "moolias_firstmail_recipients.map"
     ) in INSTALLER
-    assert "./data/conf/rspamd/custom/moolias-sender-agent:/rspamd-custom" in INSTALLER
+    assert "./data/conf/rspamd/custom/moolias-agent:/rspamd-custom" in INSTALLER
     assert (
-        "file:///etc/rspamd/custom/moolias-sender-agent/"
+        "file:///etc/rspamd/custom/moolias-agent/"
         "moolias_firstmail_recipients.map"
     ) in INSTALLER
     assert 'local recipients = task:get_recipients("smtp")' in INSTALLER
@@ -36,8 +36,8 @@ def test_first_delivery_bypass_disables_only_greylisting_symbols():
 def test_rspamd_restart_restores_agent_map_permissions_and_validates_config():
     assert "Managed by Moolias First Mail Delivery" in INSTALLER
     assert (
-        "chown 10001:10001 /etc/rspamd/custom/moolias-sender-agent/"
+        "chown 10001:10001 /etc/rspamd/custom/moolias-agent/"
         "moolias_firstmail_recipients.map"
     ) in INSTALLER
     assert "docker compose exec -T rspamd-mailcow rspamadm configtest" in INSTALLER
-    assert "docker compose exec -T moolias-sender-agent test -w /rspamd-custom" in INSTALLER
+    assert "docker compose exec -T moolias-agent test -w /rspamd-custom" in INSTALLER
