@@ -219,9 +219,14 @@
     svg.append(use);
     badge.append(svg);
   };
-  document.querySelectorAll(".service-badge").forEach((badge) => {
-    renderServiceBadge(badge, inferServiceLogoKey(badge), badge.textContent.trim());
-  });
+
+  const enhanceServiceBadges = (root = document) => {
+    root.querySelectorAll(".service-badge").forEach((badge) => {
+      renderServiceBadge(badge, inferServiceLogoKey(badge), badge.textContent.trim());
+    });
+  };
+
+  enhanceServiceBadges();
 
   const copiedLabel = document.body.dataset.copiedLabel || "Copied";
   const copyFeedbackObserver = new MutationObserver((mutations) => {
@@ -431,33 +436,69 @@
     renderServiceBadge(badge, icon.key, icon.glyph || "AL");
   };
 
-  document.querySelectorAll("[data-alias-icon-select]").forEach((select) => {
-    select.addEventListener("change", async () => {
-      const aliasId = select.dataset.aliasId;
-      const csrf = document.body.dataset.csrfToken || "";
-      if (!aliasId || !csrf) return;
+  const bindAliasIconSelects = (root = document) => {
+    root.querySelectorAll("[data-alias-icon-select]").forEach((select) => {
+      if (select.dataset.iconUpdateBound === "true") return;
+      select.dataset.iconUpdateBound = "true";
+      select.addEventListener("change", async () => {
+        const aliasId = select.dataset.aliasId;
+        const csrf = document.body.dataset.csrfToken || "";
+        if (!aliasId || !csrf) return;
 
-      const payload = new FormData();
-      payload.append("csrf_token", csrf);
-      payload.append("icon_key", select.value);
-      select.disabled = true;
-      try {
-        const response = await fetch(`/aliases/${encodeURIComponent(aliasId)}/icon`, {
-          method: "POST",
-          body: payload,
-          credentials: "same-origin",
-          headers: { Accept: "application/json" },
-        });
-        if (!response.ok) throw new Error(`Icon update failed with HTTP ${response.status}`);
-        const data = await response.json();
-        updateServiceBadge(aliasId, data.icon);
-      } catch (error) {
-        console.error("Could not update alias icon", error);
-      } finally {
-        select.disabled = false;
-      }
+        const payload = new FormData();
+        payload.append("csrf_token", csrf);
+        payload.append("icon_key", select.value);
+        select.disabled = true;
+        try {
+          const response = await fetch(`/aliases/${encodeURIComponent(aliasId)}/icon`, {
+            method: "POST",
+            body: payload,
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+          });
+          if (!response.ok) throw new Error(`Icon update failed with HTTP ${response.status}`);
+          const data = await response.json();
+          updateServiceBadge(aliasId, data.icon);
+        } catch (error) {
+          console.error("Could not update alias icon", error);
+        } finally {
+          select.disabled = false;
+        }
+      });
     });
-  });
+  };
+
+  bindAliasIconSelects();
+
+  const syncAliasQueryControls = () => {
+    const search = document.querySelector("[data-live-search]");
+    if (!search) return;
+    const query = search.value.trim();
+
+    document.querySelectorAll(".status-filters a, .alias-sort-link").forEach((link) => {
+      const url = new URL(link.href, window.location.href);
+      if (query) url.searchParams.set("q", query);
+      else url.searchParams.delete("q");
+      url.searchParams.delete("page");
+      link.href = `${url.pathname}${url.search}${url.hash}`;
+    });
+
+    document.querySelectorAll('.sort-controls input[name="q"]').forEach((input) => {
+      input.value = query;
+    });
+  };
+
+  const aliasResultsRegion = document.querySelector("[data-alias-results-region]");
+  if (aliasResultsRegion) {
+    new MutationObserver(() => {
+      enhanceServiceBadges(aliasResultsRegion);
+      bindAliasIconSelects(aliasResultsRegion);
+      syncAliasQueryControls();
+      document.dispatchEvent(new CustomEvent("moolias:alias-results-updated", {
+        detail: { root: aliasResultsRegion },
+      }));
+    }).observe(aliasResultsRegion, { childList: true });
+  }
 
   const installServiceIconPicker = () => {
     if (!document.querySelector("[data-alias-icon-select]")) return;

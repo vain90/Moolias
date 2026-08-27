@@ -43,6 +43,25 @@ def test_alias_table_headers_control_sorting(page: Page, base_url: str) -> None:
     assert _purposes(page) == ["Amazon", "GitHub", "Archive"]
 
 
+def test_cleared_live_search_does_not_return_when_filter_changes(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+    page.goto(f"{base_url}/aliases?q=GitHub")
+
+    active_filter = page.locator('.status-filters a[href*="status=active"]')
+    expect(active_filter).to_have_attribute("href", re.compile(r"[?&]q=GitHub(?:&|$)"))
+
+    page.locator("[data-search-clear]").click()
+    page.wait_for_function("() => !new URLSearchParams(window.location.search).has('q')")
+
+    expect(active_filter).not_to_have_attribute("href", re.compile(r"[?&]q="))
+    active_filter.click()
+    page.wait_for_load_state("domcontentloaded")
+    assert page.evaluate("() => new URLSearchParams(window.location.search).get('q')") is None
+
+
 def test_copy_feedback_uses_checkmark(page: Page, base_url: str) -> None:
     page.context.grant_permissions(["clipboard-read", "clipboard-write"], origin=base_url)
     _login(page, base_url)

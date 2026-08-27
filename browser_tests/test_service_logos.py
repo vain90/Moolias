@@ -86,6 +86,45 @@ def test_service_icon_picker_shows_logos_search_and_updates_alias(
     expect(trigger).not_to_contain_text("PayPal")
 
 
+def test_service_logo_and_picker_survive_live_search_refresh(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+
+    page.locator("[data-live-search]").fill("GitHub")
+    page.wait_for_function(
+        "() => new URLSearchParams(window.location.search).get('q') === 'GitHub'"
+    )
+
+    github_row = _alias_row(page, "github-m4@example.org")
+    expect(github_row).to_be_visible()
+    expect(github_row.locator("svg.service-logo use")).to_have_attribute(
+        "href",
+        "/static/service-icons.svg#service-github",
+    )
+
+    edit = github_row.locator("details.alias-edit-action")
+    edit.locator("summary").click()
+    select = github_row.locator("[data-alias-icon-select]")
+    expect(select).to_be_hidden(timeout=5000)
+    trigger = github_row.locator("[data-icon-picker-trigger]")
+    expect(trigger).to_be_visible(timeout=5000)
+    trigger.click()
+
+    dialog = page.locator("dialog[data-service-icon-picker-dialog]")
+    expect(dialog).to_be_visible()
+    dialog.locator("[data-icon-picker-search]").fill("PayPal")
+    dialog.locator('[data-icon-picker-option="paypal"]').click()
+
+    expect(dialog).not_to_be_visible(timeout=5000)
+    expect(select).to_have_value("paypal")
+    expect(github_row.locator("svg.service-logo use")).to_have_attribute(
+        "href",
+        "/static/service-icons.svg#service-paypal",
+    )
+
+
 def test_service_icon_picker_recovers_if_shell_enhancement_does_not_run(
     page: Page,
     base_url: str,

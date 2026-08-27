@@ -185,3 +185,13 @@ def test_replacement_workflow_uses_shared_close_button_and_server_rendered_contr
     assert 'name="mode" value="7d"' in template
     assert 'name="mode" value="30d"' in template
     assert 'name="confirm_now"' not in template
+
+
+def test_completed_replacement_history_keeps_sender_stats_first():
+    root = Path(__file__).resolve().parents[1]
+    css = (root / "moolias/static/alias-workflow.css").read_text()
+
+    assert ".alias-table-row .sender-stats {\n  order: 1;\n}" in css
+    assert ".alias-replacement-history {" in css
+    history_rule = css.split(".alias-replacement-history {", 1)[1].split("}", 1)[0]
+    assert "order: 2;" in history_rule
