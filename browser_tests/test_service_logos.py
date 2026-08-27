@@ -99,7 +99,8 @@ def test_service_logo_and_picker_survive_live_search_refresh(
 
     github_row = _alias_row(page, "github-m4@example.org")
     expect(github_row).to_be_visible()
-    expect(github_row.locator("svg.service-logo use")).to_have_attribute(
+    github_badge = _service_badge(page, "github-m4@example.org")
+    expect(github_badge.locator("svg.service-logo use")).to_have_attribute(
         "href",
         "/static/service-icons.svg#service-github",
     )
@@ -119,7 +120,7 @@ def test_service_logo_and_picker_survive_live_search_refresh(
 
     expect(dialog).not_to_be_visible(timeout=5000)
     expect(select).to_have_value("paypal")
-    expect(github_row.locator("svg.service-logo use")).to_have_attribute(
+    expect(github_badge.locator("svg.service-logo use")).to_have_attribute(
         "href",
         "/static/service-icons.svg#service-paypal",
     )
