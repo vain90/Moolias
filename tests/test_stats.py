@@ -1,4 +1,5 @@
 import os
+import sqlite3
 
 os.environ.setdefault("MOOLIAS_BASE_URL", "https://aliases.example.org")
 os.environ.setdefault("MOOLIAS_SESSION_SECRET", "x" * 64)
@@ -27,7 +28,7 @@ def settings(db_path: str, *, enabled: bool = False) -> Settings:
     )
 
 
-def test_disabled_stats_do_not_create_database(tmp_path):
+def test_disabled_stats_do_not_initialize_usage_schema(tmp_path):
     db_path = tmp_path / "usage.sqlite3"
     app = create_app(settings(str(db_path)))
 
@@ -35,7 +36,19 @@ def test_disabled_stats_do_not_create_database(tmp_path):
         response = client.get("/healthz")
 
     assert response.status_code == 200
-    assert not db_path.exists()
+    assert db_path.exists()
+    with sqlite3.connect(db_path) as connection:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+
+    assert "alias_workflows" in tables
+    assert "usage_meta" not in tables
+    assert "alias_usage" not in tables
+    assert "processed_events" not in tables
 
 
 async def test_stats_store_deduplicates_received_events(tmp_path):
