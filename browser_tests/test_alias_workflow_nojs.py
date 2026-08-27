@@ -27,7 +27,7 @@ def test_alias_creation_workflow_works_without_javascript(
         expect(workflow).to_be_visible()
         expect(workflow).to_have_attribute("data-alias-workflow-state", "waiting")
         expect(workflow).to_contain_text("Alias created successfully")
-        expect(workflow).to_contain_text("Waiting for the first email to this address.")
+        expect(workflow).to_contain_text("Waiting for the first email to this alias.")
         expect(workflow.locator("[data-alias-workflow-name]")).to_have_text("No JavaScript")
         address = workflow.locator("[data-alias-workflow-address]").inner_text().strip()
         assert address.endswith("@example.org")
