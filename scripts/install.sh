@@ -149,8 +149,8 @@ mailcow_compose() {
 }
 
 open_tty() {
-  if [[ -r /dev/tty && -w /dev/tty ]]; then
-    exec 3<>/dev/tty
+  if [[ -r /dev/tty && -w /dev/tty ]] \
+    && { exec 3<>/dev/tty; } 2>/dev/null; then
     return 0
   fi
   return 1
