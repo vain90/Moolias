@@ -310,7 +310,7 @@ cd /opt/moolias
 
 The updater uses the local `compose.yml`, pulls the latest stable image, waits for Moolias to become healthy and retains its existing rollback behavior.
 
-When an existing Mailcow-host installation still has the v1.2.1/old sender-agent layout and therefore lacks `MOOLIAS_MAILCOW_AGENT_SECRET`, the updater stops **before** pulling or recreating Moolias. Run the recommended installer once:
+When an existing Mailcow-host installation still has the v1.2.1/old sender-agent layout and therefore lacks `MOOLIAS_MAILCOW_AGENT_SECRET`, the updater stops **before recreating** Moolias. Run the recommended installer once:
 
 ```bash
 curl -fsSL \
