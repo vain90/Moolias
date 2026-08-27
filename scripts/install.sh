@@ -564,6 +564,21 @@ case "$TLS_MODE" in
     ;;
 esac
 
+sender_protection_enabled=false
+if is_true "${existing_sender_protection:-false}"; then
+  sender_protection_enabled=true
+elif [[ "$INSTALL_SENDER_PROTECTION" == "ask" ]]; then
+  if prompt_yes_no "Enable optional primary sender protection?" "no"; then
+    sender_protection_enabled=true
+  fi
+else
+  case "${INSTALL_SENDER_PROTECTION,,}" in
+    yes|y|true|1) sender_protection_enabled=true ;;
+    no|n|false|0) sender_protection_enabled=false ;;
+    *) die "MOOLIAS_INSTALL_SENDER_PROTECTION must be ask, yes or no." ;;
+  esac
+fi
+
 if [[ -d "$INSTALL_DIR" && ! -e "$INSTALL_MARKER" ]]; then
   if [[ -e "${INSTALL_DIR}/compose.yml" || -e "${INSTALL_DIR}/.env" ]]; then
     die "${INSTALL_DIR} already contains an unmanaged installation. Move it away or choose MOOLIAS_INSTALL_DIR."
@@ -576,8 +591,11 @@ trap 'rm -rf "$tmp_dir"' EXIT
 fetch_asset "compose.mailcow.yml" "${tmp_dir}/compose.yml"
 fetch_asset ".env.example" "${tmp_dir}/env.example"
 fetch_asset "update.sh" "${tmp_dir}/update.sh"
+fetch_asset "scripts/install-mailcow-agent.sh" "${tmp_dir}/install-mailcow-agent.sh"
 bash -n "${tmp_dir}/update.sh" \
   || die "downloaded update.sh failed syntax validation."
+bash -n "${tmp_dir}/install-mailcow-agent.sh" \
+  || die "downloaded Mailcow Agent installer failed syntax validation."
 
 install -d -m 0755 "$INSTALL_DIR"
 
@@ -615,6 +633,29 @@ set_key_value "$env_file" MAILCOW_OAUTH_CLIENT_SECRET "$oauth_secret"
 set_key_value "$env_file" MAILCOW_DOCKER_NETWORK "$mailcow_network"
 set_key_value "$env_file" MOOLIAS_IMAGE "$IMAGE_REPOSITORY"
 set_key_value "$env_file" MOOLIAS_TAG "$IMAGE_TAG"
+set_key_value "$env_file" MOOLIAS_MAILCOW_AGENT_URL "http://nginx-mailcow:${http_port}/moolias-agent"
+if [[ "$sender_protection_enabled" == "true" ]]; then
+  set_key_value "$env_file" MOOLIAS_SENDER_PROTECTION true
+else
+  set_key_value "$env_file" MOOLIAS_SENDER_PROTECTION false
+fi
+
+agent_installer="${tmp_dir}/install-mailcow-agent.sh"
+if [[ "$sender_protection_enabled" == "true" && "$tty_available" == "true" ]]; then
+  MAILCOW_DIR="$MAILCOW_DIR" \
+  MOOLIAS_AGENT_IMAGE="${IMAGE_REPOSITORY}:${IMAGE_TAG}" \
+  bash "$agent_installer" <&3
+else
+  MAILCOW_DIR="$MAILCOW_DIR" \
+  MOOLIAS_AGENT_IMAGE="${IMAGE_REPOSITORY}:${IMAGE_TAG}" \
+  MOOLIAS_IMPORT_EXISTING_SENDER_RULES=no \
+  bash "$agent_installer"
+fi
+
+agent_env="${MAILCOW_DIR}/data/conf/moolias-agent/agent.env"
+agent_secret="$(read_key_value "$agent_env" MOOLIAS_AGENT_SECRET || true)"
+[[ -n "$agent_secret" ]] || die "Mailcow Agent installed but its secret could not be read."
+set_key_value "$env_file" MOOLIAS_MAILCOW_AGENT_SECRET "$agent_secret"
 
 cat > "$INSTALL_MARKER" <<EOF
 managed_by=Moolias Mailcow installer
@@ -679,54 +720,6 @@ if [[ "$acme_changed" == "true" ]]; then
   mailcow_compose up -d --no-deps --force-recreate acme-mailcow
 fi
 
-sender_protection_enabled=false
-if is_true "${existing_sender_protection:-false}"; then
-  sender_protection_enabled=true
-elif [[ "$INSTALL_SENDER_PROTECTION" == "ask" ]]; then
-  if prompt_yes_no "Install optional primary sender protection now?" "no"; then
-    INSTALL_SENDER_PROTECTION="yes"
-  else
-    INSTALL_SENDER_PROTECTION="no"
-  fi
-fi
-
-case "${INSTALL_SENDER_PROTECTION,,}" in
-  yes|y|true|1)
-    agent_installer="${tmp_dir}/install-mailcow-agent.sh"
-    fetch_asset "scripts/install-mailcow-agent.sh" "$agent_installer"
-    bash -n "$agent_installer" \
-      || die "downloaded Mailcow Agent installer failed syntax validation."
-
-    if [[ "$tty_available" == "true" ]]; then
-      MAILCOW_DIR="$MAILCOW_DIR" \
-      MOOLIAS_AGENT_IMAGE="${IMAGE_REPOSITORY}:${IMAGE_TAG}" \
-      bash "$agent_installer" <&3
-    else
-      MAILCOW_DIR="$MAILCOW_DIR" \
-      MOOLIAS_AGENT_IMAGE="${IMAGE_REPOSITORY}:${IMAGE_TAG}" \
-      MOOLIAS_IMPORT_EXISTING_SENDER_RULES=no \
-      bash "$agent_installer"
-    fi
-
-    agent_env="${MAILCOW_DIR}/data/conf/moolias-sender-agent/agent.env"
-    agent_secret="$(read_key_value "$agent_env" MOOLIAS_AGENT_SECRET || true)"
-    [[ -n "$agent_secret" ]] || die "Mailcow Agent installed but its secret could not be read."
-
-    set_key_value "$env_file" MOOLIAS_SENDER_PROTECTION true
-    set_key_value "$env_file" MOOLIAS_SENDER_AGENT_SECRET "$agent_secret"
-
-    cd "$INSTALL_DIR"
-    docker compose up -d --force-recreate moolias
-    wait_for_moolias || die "Moolias did not become healthy after enabling sender protection."
-    sender_protection_enabled=true
-    ;;
-  no|n|false|0)
-    ;;
-  *)
-    die "MOOLIAS_INSTALL_SENDER_PROTECTION must be ask, yes or no."
-    ;;
-esac
-
 container_id="$(docker compose ps -q moolias)"
 installed_version="$(docker inspect \
   --format '{{index .Config.Labels "org.opencontainers.image.version"}}' \
@@ -758,6 +751,9 @@ Image:
 
 Version:
   ${installed_version:-unknown}
+
+Mailcow Agent:
+  installed
 
 Sender protection:
   $([[ "$sender_protection_enabled" == "true" ]] && printf enabled || printf disabled)
