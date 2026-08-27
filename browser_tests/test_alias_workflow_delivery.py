@@ -78,25 +78,37 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     workflow_id = int(workflow_id_text)
     expect(workflow).to_have_attribute("data-alias-workflow-state", "waiting")
     expect(workflow.locator(".alias-workflow-wait-spinner")).to_be_visible()
+    expect(workflow).to_contain_text("Waiting for the first email to this alias.")
+    expect(workflow).not_to_contain_text("only feedback and is not a requirement")
+
+    old_row = page.locator(
+        f'.alias-row:has([data-alias-select][data-address="{OLD_ADDRESS}"])'
+    )
+    new_row = page.locator(
+        f'.alias-row:has([data-alias-select][data-address="{NEW_ADDRESS}"])'
+    )
+    expect(old_row).to_have_class(re.compile(r"\balias-migration-old\b"))
+    expect(new_row).to_have_class(re.compile(r"\balias-migration-new\b"))
 
     deactivation = workflow.locator(".alias-workflow-deactivation")
     expect(deactivation).to_be_visible()
     expect(_deactivation_option(workflow, "later")).to_be_checked()
     expect(_deactivation_option(workflow, "now")).to_have_count(1)
+    expect(_deactivation_option(workflow, "1d")).to_have_count(1)
     expect(_deactivation_option(workflow, "7d")).to_have_count(1)
     expect(_deactivation_option(workflow, "30d")).to_have_count(1)
     expect(workflow.locator('input[name="confirm_now"]')).to_have_count(0)
 
     initial_url = page.url
-    deactivation.locator('label:has(input[name="mode"][value="7d"])').click()
-    expect(_deactivation_option(workflow, "7d")).to_be_checked()
+    deactivation.locator('label:has(input[name="mode"][value="1d"])').click()
+    expect(_deactivation_option(workflow, "1d")).to_be_checked()
     assert page.url == initial_url
-    expect(workflow).not_to_contain_text("The old address will be disabled in 7 days.")
+    expect(workflow).not_to_contain_text("The old address will be disabled in 1 day.")
 
     _deactivation_form(workflow).locator('button[type="submit"]').click()
     workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
-    expect(workflow).to_contain_text("The old address will be disabled in 7 days.")
-    expect(_deactivation_option(workflow, "7d")).to_be_checked()
+    expect(workflow).to_contain_text("The old address will be disabled in 1 day.")
+    expect(_deactivation_option(workflow, "1d")).to_be_checked()
     expect(workflow.locator(".alias-workflow-wait-spinner")).to_be_visible()
 
     deactivation = workflow.locator(".alias-workflow-deactivation")
@@ -104,7 +116,7 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     expect(_deactivation_option(workflow, "later")).to_be_checked()
     _deactivation_form(workflow).locator('button[type="submit"]').click()
     workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
-    expect(workflow).not_to_contain_text("The old address will be disabled in 7 days.")
+    expect(workflow).not_to_contain_text("The old address will be disabled in 1 day.")
 
     _record_delivery(e2e_db_path, workflow_id, old=True)
     workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
