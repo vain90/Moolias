@@ -734,7 +734,17 @@ async def replace_alias(
 
     store = await _workflow_store(request)
     pending = await store.pending_replacements(user)
-    existing = next((item for item in pending if item.old_alias_id == alias_id), None)
+    alias_address = alias.address.lower()
+    existing = next(
+        (
+            item
+            for item in pending
+            if item.old_alias_id == alias_id
+            or (item.old_address or "").lower() == alias_address
+            or item.new_address.lower() == alias_address
+        ),
+        None,
+    )
     if existing is not None:
         if not _wants_json(request):
             return RedirectResponse(f"/aliases?workflow={existing.id}", status_code=303)
