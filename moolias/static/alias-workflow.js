@@ -1,6 +1,32 @@
 (() => {
   "use strict";
 
+  function ensureServiceIconPicker() {
+    if (!document.querySelector("[data-alias-icon-select]")) return;
+    if (document.querySelector("[data-icon-picker-trigger]")) return;
+
+    if (!document.querySelector("link[data-service-icon-picker-styles]")) {
+      const stylesheet = document.createElement("link");
+      stylesheet.rel = "stylesheet";
+      stylesheet.href = "/static/service-icon-picker.css?v=20260822-3";
+      stylesheet.dataset.serviceIconPickerStyles = "";
+      document.head.append(stylesheet);
+    }
+
+    if (!document.querySelector("script[data-service-icon-picker-script]")) {
+      const script = document.createElement("script");
+      script.src = "/static/service-icon-picker.js?v=20260822-3";
+      script.dataset.serviceIconPickerScript = "";
+      document.body.append(script);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", ensureServiceIconPicker, { once: true });
+  } else {
+    ensureServiceIconPicker();
+  }
+
   function showDialog(dialog) {
     if (!dialog || dialog.matches(":modal")) return;
     if (dialog.hasAttribute("open")) dialog.close();

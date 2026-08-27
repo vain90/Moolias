@@ -2,6 +2,14 @@
   width: min(620px, calc(100vw - 28px));
 }
 
+.alias-workflow-dialog .dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  text-decoration: none;
+}
+
 .alias-workflow-address-card {
   display: flex;
   align-items: center;

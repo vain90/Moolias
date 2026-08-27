@@ -1,3 +1,10 @@
+FROM python:3.13-slim AS service-icon-assets
+
+WORKDIR /app
+RUN pip install --no-cache-dir simple-icons-pack==16.28.0
+COPY moolias ./moolias
+RUN python -m moolias.service_icon_assets
+
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -12,6 +19,7 @@ RUN apt-get update \
 
 COPY pyproject.toml README.md LICENSE ./
 COPY moolias ./moolias
+COPY --from=service-icon-assets /app/moolias/static/service-icons.generated.svg ./moolias/static/service-icons.generated.svg
 RUN pip install --no-cache-dir .
 
 USER moolias

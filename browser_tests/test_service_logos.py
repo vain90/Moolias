@@ -86,6 +86,28 @@ def test_service_icon_picker_shows_logos_search_and_updates_alias(
     expect(trigger).not_to_contain_text("PayPal")
 
 
+def test_service_icon_picker_recovers_if_shell_enhancement_does_not_run(
+    page: Page,
+    base_url: str,
+) -> None:
+    page.route("**/static/shell.js", lambda route: route.abort())
+    _login(page, base_url)
+
+    amazon_row = _alias_row(page, "amazon-k7@example.org")
+    edit = amazon_row.locator("details.alias-edit-action")
+    edit.locator("summary").click()
+
+    select = amazon_row.locator("[data-alias-icon-select]")
+    expect(select).to_be_hidden(timeout=5000)
+    trigger = amazon_row.locator("[data-icon-picker-trigger]")
+    expect(trigger).to_be_visible(timeout=5000)
+    trigger.click()
+
+    dialog = page.locator("dialog[data-service-icon-picker-dialog]")
+    expect(dialog).to_be_visible(timeout=5000)
+    expect(dialog.locator("[data-icon-picker-search]")).to_be_focused()
+
+
 def test_alias_edit_panel_uses_compact_logo_and_bottom_actions(
     page: Page,
     base_url: str,

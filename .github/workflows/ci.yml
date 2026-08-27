@@ -29,6 +29,7 @@ jobs:
       - run: node --check moolias/static/dialogs.js
       - run: node --check moolias/static/app.js
       - run: node --check moolias/static/alias-workflow.js
+      - run: node --check moolias/static/service-icon-picker.js
       - run: node --check moolias/static/stats.js
       - run: node --check moolias/static/sender-domain.js
       - run: node --check moolias/static/review.js
@@ -53,8 +54,12 @@ jobs:
           docker compose config >/dev/null
           MAILCOW_DOCKER_NETWORK=mailcow-ci \
             docker compose -f compose.mailcow.yml config >/dev/null
-      - name: Build Moolias image
-        run: docker build -t moolias:test .
+      - name: Build Moolias image with generated service logos
+        run: |
+          rm -f moolias/static/service-icons.generated.svg
+          docker build -t moolias:test .
+          docker run --rm --entrypoint sh moolias:test -c \
+            'test -s /app/moolias/static/service-icons.generated.svg && grep -q "service-lufthansa" /app/moolias/static/service-icons.generated.svg'
 
   browser-e2e:
     runs-on: ubuntu-latest

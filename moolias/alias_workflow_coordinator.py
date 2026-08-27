@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sqlite3
 import time
 from collections.abc import Callable, Mapping
+from email.utils import parseaddr
 from typing import Any
 
 from moolias.alias_delivery_agent import AliasDeliveryAgentClient, AliasDeliveryAgentError
 from moolias.alias_workflows import AliasWorkflow, AliasWorkflowStore
 from moolias.config import Settings
 from moolias.mailcow import MailcowClient, MailcowError
-from moolias.usage import ACCEPTED_ACTIONS
+from moolias.stats import StatsStore
+from moolias.stats_mode import StatsMode
+from moolias.usage import ACCEPTED_ACTIONS, mailbox_stats_state
 
 LOGGER = logging.getLogger(__name__)
 HISTORY_PROBE_SIZES = (10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000)
@@ -34,6 +38,21 @@ def _event_recipients(item: Mapping[str, Any]) -> set[str]:
     return {str(entry).strip().lower() for entry in entries if str(entry).strip()}
 
 
+def _sender_identity(item: Mapping[str, Any]) -> tuple[str, str] | None:
+    raw = item.get("sender_mime") or item.get("sender_smtp")
+    if isinstance(raw, list):
+        raw = raw[0] if raw else ""
+    _, address = parseaddr(str(raw or ""))
+    address = address.strip().lower()
+    if "@" not in address:
+        return None
+    local_part, domain = address.rsplit("@", 1)
+    domain = domain.strip().strip(".").lower()
+    if not local_part or not domain:
+        return None
+    return address, domain
+
+
 def accepted_delivery_metadata(
     history: list[Mapping[str, Any]],
     *,
@@ -53,6 +72,29 @@ def accepted_delivery_metadata(
     return sorted(deliveries, key=lambda item: item[1])
 
 
+def accepted_delivery_senders(
+    history: list[Mapping[str, Any]],
+    *,
+    recipients: set[str],
+    earliest_at: int,
+) -> list[tuple[str, int, str, str]]:
+    deliveries: set[tuple[str, int, str, str]] = set()
+    for item in history:
+        action = str(item.get("action") or "").strip().lower()
+        if action not in ACCEPTED_ACTIONS:
+            continue
+        event_at = _event_timestamp(item)
+        if event_at is None or event_at < earliest_at:
+            continue
+        sender = _sender_identity(item)
+        if sender is None:
+            continue
+        sender_address, sender_domain = sender
+        for recipient in _event_recipients(item) & recipients:
+            deliveries.add((recipient, event_at, sender_address, sender_domain))
+    return sorted(deliveries, key=lambda item: item[1])
+
+
 class AliasWorkflowCoordinator:
     def __init__(
         self,
@@ -68,6 +110,7 @@ class AliasWorkflowCoordinator:
         self.store = store
         self.agent = agent
         self.clock = clock
+        self.stats_store = StatsStore(settings.usage_db_path) if settings.usage_stats else None
 
     async def close(self) -> None:
         if self.agent is not None:
@@ -151,6 +194,71 @@ class AliasWorkflowCoordinator:
 
         await self.store.cleanup(before=now - 7 * 86400)
 
+    async def _learn_first_mail_senders(
+        self,
+        watchers: list[AliasWorkflow],
+        sender_deliveries: list[tuple[str, int, str, str]],
+    ) -> None:
+        if self.stats_store is None or not sender_deliveries:
+            return
+
+        mode_by_mailbox: dict[str, StatsMode | None] = {}
+        for workflow in watchers:
+            mailbox = workflow.mailbox.lower()
+            if mailbox not in mode_by_mailbox:
+                try:
+                    state = await mailbox_stats_state(self.settings, self.mailcow, mailbox)
+                except MailcowError:
+                    LOGGER.warning(
+                        "Could not resolve sender-detail mode for alias workflow %s",
+                        workflow.id,
+                    )
+                    mode_by_mailbox[mailbox] = None
+                else:
+                    mode_by_mailbox[mailbox] = (
+                        state.effective
+                        if not state.conflict
+                        and state.effective in {StatsMode.DOMAIN, StatsMode.FULL}
+                        else None
+                    )
+
+            mode = mode_by_mailbox[mailbox]
+            if mode is None:
+                continue
+
+            pending_recipients: list[str] = []
+            if workflow.old_address and workflow.old_mail_received_at is None:
+                pending_recipients.append(workflow.old_address.lower())
+            if workflow.new_mail_received_at is None:
+                pending_recipients.append(workflow.new_address.lower())
+
+            for recipient in pending_recipients:
+                delivery = next(
+                    (
+                        item
+                        for item in sender_deliveries
+                        if item[0] == recipient
+                        and workflow.started_at <= item[1] <= workflow.bypass_expires_at
+                    ),
+                    None,
+                )
+                if delivery is None:
+                    continue
+                _, _, sender_address, sender_domain = delivery
+                sender_key = sender_address if mode is StatsMode.FULL else sender_domain
+                try:
+                    await self.stats_store.set_sender_expectation(
+                        workflow.mailbox,
+                        recipient,
+                        sender_key,
+                        True,
+                    )
+                except (OSError, sqlite3.Error):
+                    LOGGER.warning(
+                        "Could not learn first-mail sender for alias workflow %s",
+                        workflow.id,
+                    )
+
     async def _scan_delivery_history(self, watchers: list[AliasWorkflow]) -> None:
         targets = {
             address
@@ -166,6 +274,12 @@ class AliasWorkflowCoordinator:
         )
         if not deliveries:
             return
+        sender_deliveries = accepted_delivery_senders(
+            history,
+            recipients=targets,
+            earliest_at=earliest_at,
+        )
+        await self._learn_first_mail_senders(watchers, sender_deliveries)
         changed = await self.store.record_deliveries(deliveries)
         if self.agent is not None:
             for workflow in changed:
@@ -185,6 +299,8 @@ class AliasWorkflowCoordinator:
                     "action": item.get("action"),
                     "unix_time": item.get("unix_time"),
                     "rcpt_smtp": item.get("rcpt_smtp"),
+                    "sender_mime": item.get("sender_mime"),
+                    "sender_smtp": item.get("sender_smtp"),
                 }
                 for item in raw_history
             ]

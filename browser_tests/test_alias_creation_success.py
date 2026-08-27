@@ -37,6 +37,22 @@ def test_alias_creation_shows_copyable_activation_workflow(page: Page, base_url:
     result = page.locator('dialog[data-alias-workflow-dialog][open]')
     expect(result).to_be_visible(timeout=5000)
     assert result.evaluate("(dialog) => dialog.matches(':modal')")
+
+    close = result.locator(".dialog-close")
+    close_box = close.bounding_box()
+    icon_box = close.locator("svg.ui-icon").bounding_box()
+    assert close_box and icon_box
+    close_center = (
+        close_box["x"] + close_box["width"] / 2,
+        close_box["y"] + close_box["height"] / 2,
+    )
+    icon_center = (
+        icon_box["x"] + icon_box["width"] / 2,
+        icon_box["y"] + icon_box["height"] / 2,
+    )
+    assert abs(close_center[0] - icon_center[0]) <= 1
+    assert abs(close_center[1] - icon_center[1]) <= 1
+
     expect(result).to_have_attribute("data-alias-workflow-state", "waiting")
     expect(result).to_contain_text("Alias created successfully")
     expect(result).to_contain_text("Waiting for the first email to this address.")
