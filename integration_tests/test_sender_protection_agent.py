@@ -332,11 +332,15 @@ def _assert_agent_runtime_hardening(mailcow_dir: str) -> None:
     assert not host_config.get("PortBindings")
 
     mounts = {mount["Destination"]: mount for mount in container.get("Mounts", [])}
-    assert set(mounts) == {"/state", "/postfix-policy"}, mounts
+    assert set(mounts) == {"/state", "/postfix-policy", "/rspamd-custom"}, mounts
     assert mounts["/state"]["RW"] is True
     assert mounts["/postfix-policy"]["RW"] is True
+    assert mounts["/rspamd-custom"]["RW"] is True
     assert mounts["/postfix-policy"]["Source"].endswith(
         "/data/conf/postfix/moolias-sender-agent"
+    )
+    assert mounts["/rspamd-custom"]["Source"].endswith(
+        "/data/conf/rspamd/custom/moolias-sender-agent"
     )
     assert "/var/run/docker.sock" not in mounts
 
