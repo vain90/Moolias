@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from moolias.alias_workflows import (
+    DEACTIVATION_1_DAY,
     DEACTIVATION_7_DAYS,
     DEACTIVATION_30_DAYS,
     DEACTIVATION_LATER,
@@ -152,6 +153,11 @@ async def test_replacement_deactivation_modes_are_persistent_and_changeable(tmp_
         started_at=1000,
         bypass_expires_at=1600,
     )
+
+    one = await store.set_deactivation(
+        "user@example.org", workflow.id, DEACTIVATION_1_DAY, now=1500
+    )
+    assert one.scheduled_deactivation_at == 1500 + 86400
 
     seven = await store.set_deactivation(
         "user@example.org", workflow.id, DEACTIVATION_7_DAYS, now=2000
