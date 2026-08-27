@@ -13,9 +13,10 @@ class Settings(BaseSettings):
     trusted_hosts: str = Field(default="*", alias="MOOLIAS_TRUSTED_HOSTS")
     access_tag: str = Field(default="", alias="MOOLIAS_ACCESS_TAG")
 
+    mailcow_agent_url: str = Field(default="", alias="MOOLIAS_MAILCOW_AGENT_URL")
+    mailcow_agent_secret: str = Field(alias="MOOLIAS_MAILCOW_AGENT_SECRET", min_length=32)
+
     sender_protection: bool = Field(default=False, alias="MOOLIAS_SENDER_PROTECTION")
-    sender_agent_url: str = Field(default="", alias="MOOLIAS_SENDER_AGENT_URL")
-    sender_agent_secret: str = Field(default="", alias="MOOLIAS_SENDER_AGENT_SECRET")
     sender_protection_cooldown_seconds: int = Field(
         default=10,
         ge=1,
@@ -111,7 +112,7 @@ class Settings(BaseSettings):
         "base_url",
         "mailcow_url",
         "mailcow_internal_url",
-        "sender_agent_url",
+        "mailcow_agent_url",
         "newsletter_agent_url",
     )
     @classmethod
@@ -122,7 +123,7 @@ class Settings(BaseSettings):
         "access_tag",
         "usage_tag",
         "usage_db_path",
-        "sender_agent_secret",
+        "mailcow_agent_secret",
         "newsletter_tag",
         "newsletter_db_path",
         "newsletter_agent_secret",
