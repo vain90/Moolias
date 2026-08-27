@@ -9,17 +9,17 @@ import pytest
 
 from moolias.alias_delivery_agent import AliasDeliveryAgentClient, AliasDeliveryAgentError
 
-DOMAIN = "moolias-sender-agent.test"
+DOMAIN = "moolias-agent.test"
 MAILBOX = f"owner@{DOMAIN}"
 ALIAS = f"service@{DOMAIN}"
 MAP_RELATIVE_PATH = Path(
-    "data/conf/rspamd/custom/moolias-sender-agent/moolias_firstmail_recipients.map"
+    "data/conf/rspamd/custom/moolias-agent/moolias_firstmail_recipients.map"
 )
-RSPAMD_MAP_PATH = "/etc/rspamd/custom/moolias-sender-agent/moolias_firstmail_recipients.map"
+RSPAMD_MAP_PATH = "/etc/rspamd/custom/moolias-agent/moolias_firstmail_recipients.map"
 
 
 def _agent_secret(mailcow_dir: Path) -> str:
-    env_path = mailcow_dir / "data/conf/moolias-sender-agent/agent.env"
+    env_path = mailcow_dir / "data/conf/moolias-agent/agent.env"
     result = subprocess.run(
         ["sudo", "cat", str(env_path)],
         check=True,
@@ -111,7 +111,7 @@ async def test_exact_first_delivery_bypass_updates_rspamd_map_and_survives_resta
         assert _map_recipients(mailcow_dir) == {ALIAS.casefold()}
 
         subprocess.run(
-            ["docker", "compose", "restart", "moolias-sender-agent"],
+            ["docker", "compose", "restart", "moolias-agent"],
             cwd=mailcow_dir,
             check=True,
             text=True,
