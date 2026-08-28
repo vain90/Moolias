@@ -90,6 +90,22 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     expect(old_row).to_have_class(re.compile(r"\balias-migration-old\b"))
     expect(new_row).to_have_class(re.compile(r"\balias-migration-new\b"))
 
+    new_alias_id = new_row.locator("[data-alias-select]").get_attribute("value")
+    assert new_alias_id
+    page.goto(f"{base_url}/aliases?deactivate={new_alias_id}")
+    replacement_deactivation = page.locator(
+        "dialog[data-replacement-deactivation-dialog]"
+    )
+    expect(replacement_deactivation).to_be_visible(timeout=5000)
+    assert replacement_deactivation.evaluate("element => element.matches(':modal')")
+    expect(page.locator("dialog:modal")).to_have_count(1)
+    replacement_deactivation.locator(".dialog-close").click()
+    expect(replacement_deactivation).not_to_be_visible()
+
+    page.goto(f"{base_url}/aliases?workflow={workflow_id}")
+    workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
+    expect(workflow).to_be_visible(timeout=5000)
+
     deactivation = workflow.locator(".alias-workflow-deactivation")
     expect(deactivation).to_be_visible()
     expect(_deactivation_option(workflow, "later")).to_be_checked()
