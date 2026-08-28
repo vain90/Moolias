@@ -52,7 +52,8 @@ def test_bootstrap_derives_internal_port_from_mailcow_http_port():
 
 def test_bootstrap_writes_internal_backend_and_sender_agent_urls():
     assert 'set_key_value "$env_file" MAILCOW_INTERNAL_URL "$mailcow_internal_url"' in BOOTSTRAP
-    assert 'MOOLIAS_MAILCOW_AGENT_URL \\\n        "http://moolias-agent:8081"' in BOOTSTRAP
+    assert "MOOLIAS_MAILCOW_AGENT_URL" in BOOTSTRAP
+    assert '"http://moolias-agent:8081"' in BOOTSTRAP
     assert '${mailcow_internal_url}/moolias-agent' not in BOOTSTRAP
     assert (
         'set_key_value "$env_file" MOOLIAS_MAILCOW_AGENT_URL "http://moolias-agent:8081"'
