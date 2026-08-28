@@ -293,15 +293,16 @@
 
 .alias-row.alias-migration-old {
   border-top: 2px solid var(--line-strong);
+  border-bottom: 1px dashed #98a2b3;
   background-image:
-    repeating-linear-gradient(to bottom, #667085 0 7px, transparent 7px 12px),
+    linear-gradient(#667085, #667085),
     linear-gradient(#fdb022, #fdb022);
 }
 
 .alias-row.alias-migration-new {
   border-bottom: 2px solid var(--line-strong);
   background-image:
-    repeating-linear-gradient(to bottom, #667085 0 7px, transparent 7px 12px),
+    linear-gradient(#667085, #667085),
     linear-gradient(var(--accent), var(--accent));
 }
 
@@ -346,6 +347,11 @@
 .alias-migration-old .alias-workflow-badge {
   background: #fffaeb;
   color: #b54708;
+}
+
+.alias-migration-new .alias-workflow-badge {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .alias-workflow-row-state {
