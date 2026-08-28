@@ -1,5 +1,5 @@
 from moolias.alias_table_ui import _replacement_needs_attention
-from moolias.alias_workflows import DEACTIVATION_LATER, AliasWorkflow, WORKFLOW_REPLACEMENT
+from moolias.alias_workflows import DEACTIVATION_LATER, WORKFLOW_REPLACEMENT, AliasWorkflow
 
 
 def _replacement(
