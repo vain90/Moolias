@@ -42,6 +42,18 @@ class Settings(BaseSettings):
         le=10000,
         alias="MOOLIAS_ALIAS_WORKFLOW_HISTORY_COUNT",
     )
+    alias_replacement_reminder_days: int = Field(
+        default=7,
+        ge=1,
+        le=365,
+        alias="MOOLIAS_ALIAS_REPLACEMENT_REMINDER_DAYS",
+    )
+    alias_replacement_monitoring_max_days: int = Field(
+        default=30,
+        ge=1,
+        le=3650,
+        alias="MOOLIAS_ALIAS_REPLACEMENT_MONITORING_MAX_DAYS",
+    )
 
     newsletter_management: bool = Field(
         default=False,
@@ -153,6 +165,11 @@ class Settings(BaseSettings):
             raise ValueError(
                 "MOOLIAS_NEWSLETTER_AGENT_SECRET must contain at least 32 characters "
                 "when newsletter management is enabled"
+            )
+        if self.alias_replacement_monitoring_max_days < self.alias_replacement_reminder_days:
+            raise ValueError(
+                "MOOLIAS_ALIAS_REPLACEMENT_MONITORING_MAX_DAYS must be greater than or "
+                "equal to MOOLIAS_ALIAS_REPLACEMENT_REMINDER_DAYS"
             )
         return self
 
