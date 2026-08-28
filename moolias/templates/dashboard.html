@@ -5,6 +5,7 @@
 <link rel="stylesheet" href="/static/alias-descriptions.css?v=20260825-1" data-alias-description-styles="1">
 <link rel="stylesheet" href="/static/alias-workflow.css?v={{ version }}" data-alias-workflow-styles="1">
 {% set workflow_rows = alias_workflow_rows if alias_workflow_rows is defined else {} %}
+{% set action_required_ui = action_required if action_required is defined else {'base_count': 0} %}
 <header class="page-heading page-heading-actions">
   <div>
     <h1>{% if language == 'de' %}Aliase{% else %}Aliases{% endif %}</h1>
@@ -60,8 +61,8 @@
   </div>
 
   <div class="unexpected-review-actions action-required-actions" data-unexpected-review-actions>
-    <a class="button compact unexpected-review-all-button action-required-button {% if action_required.base_count %}has-action-required{% endif %}" href="/aliases?action=required" data-unexpected-review-all data-action-required-open>
-      {% if action_required.base_count %}{% if language == 'de' %}Handlungsbedarf ({{ action_required.base_count }}){% else %}Action required ({{ action_required.base_count }}){% endif %}{% else %}{% if language == 'de' %}Handlungsbedarf{% else %}Action required{% endif %}{% endif %}
+    <a class="button compact unexpected-review-all-button action-required-button {% if action_required_ui.base_count %}has-action-required{% endif %}" href="/aliases?action=required" data-unexpected-review-all data-action-required-open>
+      {% if action_required_ui.base_count %}{% if language == 'de' %}Handlungsbedarf ({{ action_required_ui.base_count }}){% else %}Action required ({{ action_required_ui.base_count }}){% endif %}{% else %}{% if language == 'de' %}Handlungsbedarf{% else %}Action required{% endif %}{% endif %}
     </a>
   </div>
 
