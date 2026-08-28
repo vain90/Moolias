@@ -667,7 +667,7 @@ main() {
       set_key_value \
         "$env_file" \
         MOOLIAS_MAILCOW_AGENT_URL \
-        "${mailcow_internal_url}/moolias-agent"
+        "http://moolias-agent:8081"
     fi
 
     if [[ "$access_tag_managed" == true ]]; then
