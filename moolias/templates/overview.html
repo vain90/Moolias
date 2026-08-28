@@ -148,20 +148,12 @@
 
       {% for workflow in pending_alias_replacements|default([]) %}
       <a class="action-item overview-workflow-action" href="/aliases?workflow={{ workflow.id }}" data-pending-alias-workflow="{{ workflow.id }}">
-        <span class="action-icon blue" aria-hidden="true">{{ icon('repeat-2') }}</span>
+        <span class="action-icon blue" aria-hidden="true">{{ icon('link') }}</span>
         <span>
-          <strong>
-            {% if workflow.new_mail_received_at %}
-              {% if language == 'de' %}Aliaswechsel abschließen{% else %}Finish alias change{% endif %}
-            {% elif workflow.old_mail_received_at %}
-              {% if language == 'de' %}Alte Adresse wurde noch benutzt{% else %}Old address was still used{% endif %}
-            {% elif workflow.watcher_active %}
-              {% if language == 'de' %}Aliaswechsel bestätigen{% else %}Confirm alias change{% endif %}
-            {% else %}
-              {% if language == 'de' %}Aliaswechsel fortsetzen{% else %}Continue alias change{% endif %}
-            {% endif %}
-          </strong>
-          <small>{{ workflow.old_address }} → {{ workflow.new_address }}</small>
+          <strong>{% if language == 'de' %}Aliaswechsel prüfen{% else %}Review alias change{% endif %}</strong>
+          <small>
+            {% if workflow.alias_name %}{{ workflow.alias_name }} · {% endif %}{% if language == 'de' %}Bisherige Adresse ist noch aktiv{% else %}Previous address is still active{% endif %}
+          </small>
         </span>
         {{ icon('chevron-right') }}
       </a>
