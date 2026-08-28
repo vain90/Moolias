@@ -237,7 +237,7 @@ class AliasWorkflowStore:
         started_at: int,
         bypass_expires_at: int,
     ) -> AliasWorkflow:
-        if bypass_expires_at <= started_at:
+        if bypass_expires_at != 0 and bypass_expires_at <= started_at:
             raise ValueError("bypass expiry must be after workflow start")
         mailbox = mailbox.strip().lower()
         new_address = new_address.strip().lower()
@@ -333,17 +333,35 @@ class AliasWorkflowStore:
             ).fetchall()
         return [record for row in rows if (record := self._row(row)) is not None]
 
-    async def stop_waiting(self, mailbox: str, workflow_id: int) -> AliasWorkflow | None:
-        return await asyncio.to_thread(self._stop_waiting_sync, mailbox, workflow_id)
+    async def stop_waiting(
+        self,
+        mailbox: str,
+        workflow_id: int,
+        *,
+        now: int | None = None,
+    ) -> AliasWorkflow | None:
+        return await asyncio.to_thread(
+            self._stop_waiting_sync,
+            mailbox,
+            workflow_id,
+            int(time.time()) if now is None else int(now),
+        )
 
-    def _stop_waiting_sync(self, mailbox: str, workflow_id: int) -> AliasWorkflow | None:
+    def _stop_waiting_sync(
+        self,
+        mailbox: str,
+        workflow_id: int,
+        stopped_at: int,
+    ) -> AliasWorkflow | None:
         with self._connect() as connection:
             connection.execute(
                 """
-                UPDATE alias_workflows SET watcher_active = 0
+                UPDATE alias_workflows
+                SET watcher_active = 0,
+                    bypass_clear_requested_at = COALESCE(bypass_clear_requested_at, ?)
                 WHERE id = ? AND mailbox = ? COLLATE NOCASE
                 """,
-                (int(workflow_id), mailbox.strip().lower()),
+                (stopped_at, int(workflow_id), mailbox.strip().lower()),
             )
             row = connection.execute(
                 "SELECT * FROM alias_workflows WHERE id = ? AND mailbox = ? COLLATE NOCASE",
@@ -510,7 +528,7 @@ class AliasWorkflowStore:
                 SELECT * FROM alias_workflows
                 WHERE bypass_provisioned_at IS NULL
                   AND bypass_cleared_at IS NULL
-                  AND bypass_expires_at > ?
+                  AND (bypass_expires_at = 0 OR bypass_expires_at > ?)
                 ORDER BY started_at ASC
                 """,
                 (now,),
