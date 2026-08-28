@@ -62,13 +62,13 @@ class AliasDeliveryAgentClient:
         ):
             raise AliasDeliveryAgentError("Mailcow Agent does not support alias delivery bypass")
 
-    async def set_bypass(self, recipients: tuple[str, ...], expires_at: int | None) -> None:
+    async def set_bypass(self, recipients: tuple[str, ...], expires_at: int) -> None:
         await self._signed_post(
             "/v1/delivery-bypass",
             {
                 "recipients": list(recipients),
                 "enabled": True,
-                "expires_at": None if expires_at is None else int(expires_at),
+                "expires_at": int(expires_at),
             },
         )
 
