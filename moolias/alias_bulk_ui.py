@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
 from moolias.alias_workflows import AliasWorkflowStore
@@ -11,8 +11,6 @@ from moolias.mailcow import MailcowError
 from moolias.security import require_user, validate_csrf
 
 BULK_ACTIONS = {"enable", "disable", "sogo-on", "sogo-off"}
-
-router = APIRouter()
 
 
 def _replacement_lock(request: Request) -> asyncio.Lock:
@@ -95,13 +93,13 @@ async def _disable_aliases(request: Request, user: str, selected) -> None:
             await store.complete_replacement(user, workflow.id)
 
 
-@router.post("/aliases/bulk", response_class=PlainTextResponse)
 async def bulk_aliases(
     request: Request,
-    action: str = Form(...),
-    alias_ids: list[int] = Form(...),  # noqa: B008
-    csrf_token: str = Form(...),
-):
+    *,
+    action: str,
+    alias_ids: list[int],
+    csrf_token: str,
+) -> PlainTextResponse:
     validate_csrf(request, csrf_token)
     user = require_user(request)
     if action not in BULK_ACTIONS:
