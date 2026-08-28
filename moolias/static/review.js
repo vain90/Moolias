@@ -271,6 +271,7 @@
     const submit = form.querySelector('button[type="submit"]');
     if (submit) submit.disabled = true;
     const csrfToken = document.body.dataset.csrfToken || "";
+    let assignedCount = 0;
     try {
       for (const row of selected) {
         const aliasId = row.dataset.poolAliasId;
@@ -288,11 +289,17 @@
           return;
         }
         if (!response.ok) throw new Error(`Offline alias assignment failed with HTTP ${response.status}`);
+        assignedCount += 1;
       }
       markForReopen();
       window.location.reload();
     } catch (error) {
       console.error("Offline alias assignment failed", error);
+      if (assignedCount > 0) {
+        markForReopen();
+        window.location.reload();
+        return;
+      }
       if (submit) submit.disabled = false;
     }
   };

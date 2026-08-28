@@ -128,7 +128,7 @@
                 <span class="sender-review-state">
                   {% if sender.review_source == 'manual' %}{{ t.sender_state_confirmed }}
                   {% elif sender.review_source == 'automatic' %}{{ t.sender_state_automatic }}{% if sender.match_token %} · {{ sender.match_token }}{% endif %}
-                  {% elif sender.review_source == 'rspamd-spam' %}{% if language == 'de' %}Durch Rspamd zur Prüfung markiert{% else %}Flagged for review by Rspamd{% endif %}
+                  {% elif sender.review_source == 'rspamd-spam' %}{% if language == 'de' %}Automatisch zur Prüfung markiert{% else %}Flagged automatically for review{% endif %}
                   {% elif sender.review_source == 'manual-unexpected' %}{{ t.sender_state_manual_unexpected }}
                   {% else %}{{ t.sender_state_unexpected }}{% endif %}
                 </span>
@@ -197,17 +197,17 @@
     {% if action_state.collector %}
     <section class="action-required-section action-required-health">
       <div class="action-required-section-head">
-        <h3>{% if language == 'de' %}Statistik-Collector{% else %}Statistics collector{% endif %}</h3>
+        <h3>{% if language == 'de' %}Statistiken{% else %}Statistics{% endif %}</h3>
         <span class="count">1</span>
       </div>
       <div class="action-required-health-warning state-{{ action_state.collector_state }}">
         <strong>
-          {% if action_state.collector_state == 'low' %}{% if language == 'de' %}Historienpuffer niedrig{% else %}Low history headroom{% endif %}
-          {% elif action_state.collector_state == 'gap' %}{% if language == 'de' %}Mögliche Lücke in der Rspamd-Historie{% else %}Possible Rspamd history gap{% endif %}
-          {% elif action_state.collector_state == 'stale' %}{% if language == 'de' %}Collector-Status veraltet{% else %}Collector status is stale{% endif %}
-          {% else %}{% if language == 'de' %}Collector-Fehler{% else %}Collector failure{% endif %}{% endif %}
+          {% if action_state.collector_state == 'low' %}{% if language == 'de' %}Statistiken könnten unvollständig werden{% else %}Statistics may become incomplete{% endif %}
+          {% elif action_state.collector_state == 'gap' %}{% if language == 'de' %}Mögliche Lücke in den Statistiken{% else %}Possible gap in statistics{% endif %}
+          {% elif action_state.collector_state == 'stale' %}{% if language == 'de' %}Statistiken werden gerade nicht aktualisiert{% else %}Statistics are not being updated{% endif %}
+          {% else %}{% if language == 'de' %}Statistik-Aktualisierung fehlgeschlagen{% else %}Statistics update failed{% endif %}{% endif %}
         </strong>
-        <p class="hint">{% if language == 'de' %}Die vollständigen Collector-Details stehen bei den Statistik-Einstellungen.{% else %}Full collector details are available in the statistics settings.{% endif %}</p>
+        <p class="hint">{% if language == 'de' %}Mehr Informationen findest du in den Statistik-Einstellungen.{% else %}More information is available in the statistics settings.{% endif %}</p>
         <a class="button compact ghost" href="/statistics">{% if language == 'de' %}Details öffnen{% else %}Open details{% endif %}</a>
       </div>
     </section>
