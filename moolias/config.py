@@ -144,6 +144,15 @@ class Settings(BaseSettings):
     def strip_optional_value(cls, value: str) -> str:
         return value.strip()
 
+    @field_validator("alias_workflow_bypass_seconds")
+    @classmethod
+    def validate_alias_workflow_bypass_seconds(cls, value: int) -> int:
+        if value != 0 and value < 60:
+            raise ValueError(
+                "MOOLIAS_ALIAS_WORKFLOW_BYPASS_SECONDS must be 0 or at least 60 seconds"
+            )
+        return value
+
     @model_validator(mode="after")
     def validate_optional_features(self) -> "Settings":
         if not self.usage_db_path:
@@ -170,6 +179,10 @@ class Settings(BaseSettings):
             raise ValueError(
                 "MOOLIAS_ALIAS_REPLACEMENT_MONITORING_MAX_DAYS must be greater than or "
                 "equal to MOOLIAS_ALIAS_REPLACEMENT_REMINDER_DAYS"
+            )
+        if self.alias_workflow_bypass_seconds == 0:
+            self.alias_workflow_bypass_seconds = (
+                self.alias_replacement_monitoring_max_days * 86400
             )
         return self
 
