@@ -57,9 +57,11 @@ class FakeMailcow:
     def __init__(self, mode_tag: str = "moolias-stats-full") -> None:
         self.mode_tag = mode_tag
         self.history: list[dict[str, Any]] = []
+        self.history_requests: list[int] = []
         self.disabled: list[int] = []
 
     async def get_rspamd_history(self, count: int) -> list[dict[str, Any]]:
+        self.history_requests.append(count)
         return self.history[:count]
 
     async def get_mailbox(self, email: str) -> dict[str, Any]:
@@ -146,6 +148,42 @@ def test_delivery_parser_ignores_rejected_or_greylisted_mail():
         recipients={"new@example.org"},
         earliest_at=1000,
     ) == []
+
+
+async def test_repeated_scan_does_not_reopen_full_history_for_old_watcher(tmp_path):
+    store = AliasWorkflowStore(tmp_path / "state.sqlite3")
+    await store.initialize()
+    await store.create_creation(
+        mailbox="user@example.org",
+        new_address="new@example.org",
+        alias_name="Shop",
+        alias_description="",
+        started_at=1000,
+        bypass_expires_at=2000,
+    )
+    mailcow = FakeMailcow()
+    mailcow.history = [
+        {
+            "action": "clean",
+            "unix_time": timestamp,
+            "rcpt_smtp": ["unrelated@example.org"],
+        }
+        for timestamp in range(1099, 999, -1)
+    ]
+    coordinator = AliasWorkflowCoordinator(
+        settings(tmp_path),
+        mailcow,  # type: ignore[arg-type]
+        store,
+        FakeAgent(),  # type: ignore[arg-type]
+        clock=lambda: 1100,
+    )
+
+    await coordinator.reconcile_once()
+    assert mailcow.history_requests == [10, 25, 50, 100]
+
+    mailcow.history_requests.clear()
+    await coordinator.reconcile_once()
+    assert mailcow.history_requests == [10]
 
 
 @pytest.mark.parametrize(

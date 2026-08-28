@@ -71,6 +71,7 @@ def make_client(monkeypatch, fake: FakeMailcow):
     monkeypatch.setattr(alias_table_module, "validate_csrf", lambda _request, _token: None)
 
     with TestClient(main_module.create_app(settings())) as client:
+        assert getattr(client.app.state, "alias_workflow_coordinator", None) is not None
         login = client.get(
             "/oauth/callback?code=test&state=test",
             follow_redirects=False,

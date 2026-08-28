@@ -18,6 +18,7 @@ from moolias.usage import ACCEPTED_ACTIONS, mailbox_stats_state
 
 LOGGER = logging.getLogger(__name__)
 HISTORY_PROBE_SIZES = (10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000)
+HISTORY_SCAN_OVERLAP_SECONDS = 1
 
 
 def _event_timestamp(item: Mapping[str, Any]) -> int | None:
@@ -111,6 +112,7 @@ class AliasWorkflowCoordinator:
         self.agent = agent
         self.clock = clock
         self.stats_store = StatsStore(settings.usage_db_path) if settings.usage_stats else None
+        self._history_scanned_through: dict[int, int] = {}
 
     async def close(self) -> None:
         if self.agent is not None:
@@ -292,14 +294,36 @@ class AliasWorkflowCoordinator:
             for workflow in watchers
             for address in workflow.bypass_recipients
         }
-        earliest_at = min(workflow.started_at for workflow in watchers)
+        scan_starts = []
+        for workflow in watchers:
+            scanned_through = self._history_scanned_through.get(workflow.id)
+            if scanned_through is None:
+                scan_starts.append(workflow.started_at)
+            else:
+                scan_starts.append(
+                    max(
+                        workflow.started_at,
+                        scanned_through - HISTORY_SCAN_OVERLAP_SECONDS,
+                    )
+                )
+        earliest_at = min(scan_starts)
         history = await self._fetch_history_covering(earliest_at)
+        timestamps = [
+            timestamp
+            for item in history
+            if (timestamp := _event_timestamp(item)) is not None
+        ]
+        scanned_through = max(timestamps) if timestamps else None
         deliveries = accepted_delivery_metadata(
             history,
             recipients=targets,
             earliest_at=earliest_at,
         )
         if not deliveries:
+            if scanned_through is not None:
+                for workflow in watchers:
+                    previous = self._history_scanned_through.get(workflow.id, workflow.started_at)
+                    self._history_scanned_through[workflow.id] = max(previous, scanned_through)
             return
         sender_deliveries = accepted_delivery_senders(
             history,
@@ -312,6 +336,10 @@ class AliasWorkflowCoordinator:
             for workflow in changed:
                 if workflow.bypass_clear_requested_at is not None:
                     await self.clear_workflow_bypass(workflow)
+        if scanned_through is not None:
+            for workflow in watchers:
+                previous = self._history_scanned_through.get(workflow.id, workflow.started_at)
+                self._history_scanned_through[workflow.id] = max(previous, scanned_through)
 
     async def _fetch_history_covering(self, earliest_at: int) -> list[dict[str, Any]]:
         maximum = self.settings.alias_workflow_history_count
