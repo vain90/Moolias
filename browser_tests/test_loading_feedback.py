@@ -146,7 +146,12 @@ def test_action_required_expected_sender_updates_immediately_and_refreshes_table
     assert transition_duration != "0s"
 
     while action_alias.locator("[data-action-sender-row].unexpected").count():
-        sender = action_alias.locator("[data-action-sender-row].unexpected").first
+        unexpected_sender = action_alias.locator("[data-action-sender-row].unexpected").first
+        sender_key = unexpected_sender.get_attribute("data-sender-key")
+        assert sender_key
+        sender = action_alias.locator(
+            f'[data-action-sender-row][data-sender-key="{sender_key}"]'
+        )
         sender.locator("[data-action-sender-form] button[type='submit']").click()
         expect(sender).to_have_class(re.compile(r"\bexpected\b"), timeout=5000)
         expect(sender.locator('input[name="decision"]')).to_have_value("clear")

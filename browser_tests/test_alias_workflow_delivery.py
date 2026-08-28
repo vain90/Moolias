@@ -99,11 +99,10 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     status_link = new_row.locator(
         ".alias-workflow-row-state [data-open-alias-workflow]"
     )
+    expect(status_link).to_have_attribute("href", f"/aliases?workflow={workflow_id}")
     with page.expect_navigation(wait_until="load"):
         status_link.click()
-    expect(page).to_have_url(
-        re.compile(rf"{re.escape(base_url)}/aliases\?workflow={workflow_id}$")
-    )
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"))
     workflow = page.locator(
         f'dialog[data-alias-workflow-dialog][data-alias-workflow-id="{workflow_id}"]'
     )
@@ -137,6 +136,7 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     status_link = new_row.locator(
         ".alias-workflow-row-state [data-open-alias-workflow]"
     )
+    expect(status_link).to_have_attribute("href", f"/aliases?workflow={workflow_id}")
     with page.expect_navigation(wait_until="load"):
         status_link.click()
     workflow = page.locator(
@@ -207,13 +207,16 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
         f'[data-open-alias-workflow="{workflow_id}"]'
     )
     expect(action).to_contain_text("Complete alias change")
+    expect(action).to_have_attribute("href", f"/aliases?workflow={workflow_id}")
+    page.evaluate("window.__actionRequiredNoReload = 'alive'")
 
     with page.expect_navigation(wait_until="load"):
         action.click()
     expect(page).to_have_url(
-        re.compile(rf"{re.escape(base_url)}/aliases\?workflow={workflow_id}$"),
+        re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"),
         timeout=5000,
     )
+    assert page.evaluate("window.__actionRequiredNoReload") is None
     workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
     expect(workflow).to_be_visible(timeout=5000)
     expect(workflow).to_have_attribute("data-alias-workflow-state", "received")
