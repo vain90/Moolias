@@ -34,7 +34,8 @@
       </p>
       <p class="hint">{% if language == 'de' %}Angezeigt werden nur die Absenderinformationen, die dein aktueller Statistikmodus speichern darf.{% else %}Only sender information permitted by your current statistics mode is shown.{% endif %}</p>
 
-      <form class="stack used-pool-form action-required-pool-form" data-action-required-pool-form>
+      <form method="get" action="/offline-pool" class="stack used-pool-form action-required-pool-form" data-action-required-pool-form>
+        <input type="hidden" name="used" value="1">
         <div class="used-pool-list">
           {% for alias in used_reserved %}
           {% set pool_stats = usage_stats.get(alias.address|lower, {}) if usage_stats_visible else {} %}
@@ -116,7 +117,6 @@
               <span>{% if language == 'de' %}Prüfung für diesen Alias ignorieren{% else %}Ignore unexpected senders for this alias{% endif %}</span>
             </label>
             <p class="hint">{% if language == 'de' %}Wird nicht mehr als zu prüfen markiert. Absender und Statistiken bleiben sichtbar.{% else %}Sender details and statistics remain visible, but this alias is no longer reported as requiring attention.{% endif %}</p>
-            <noscript><button class="button compact ghost" type="submit">{{ t.save }}</button></noscript>
           </form>
 
           <div class="sender-stats-list">
@@ -212,8 +212,6 @@
     </section>
     {% endif %}
 
-    {% if not action_total %}
-    <p class="empty action-required-empty">{% if language == 'de' %}Nichts weiter zu tun.{% else %}Nothing to do.{% endif %}</p>
-    {% endif %}
+    <p class="empty action-required-empty" data-action-required-empty {% if action_total %}hidden{% endif %}>{% if language == 'de' %}Nichts weiter zu tun.{% else %}Nothing to do.{% endif %}</p>
   </div>
 </dialog>
