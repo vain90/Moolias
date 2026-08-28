@@ -145,7 +145,7 @@
                   {% elif workflow_row.role == 'old' %}{% if language == 'de' %}Bisherige Adresse bleibt aktiv{% else %}Previous address stays active{% endif %}
                   {% else %}{% if language == 'de' %}Neue Adresse wird geprüft{% else %}New address is being checked{% endif %}{% endif %}
                 </span>
-                <a class="button ghost compact" href="/aliases?workflow={{ workflow_row.id }}">{% if language == 'de' %}Status öffnen{% else %}Open status{% endif %}</a>
+                <a class="button ghost compact" href="/aliases?workflow={{ workflow_row.id }}" data-open-alias-workflow="{{ workflow_row.id }}">{% if language == 'de' %}Status öffnen{% else %}Open status{% endif %}</a>
               </div>
               {% endif %}
               {% if stats_state and stats_state.sender_detail_enabled %}
@@ -234,12 +234,12 @@
                   <button class="button primary compact" type="submit">{{ t.save }}</button>
                 </form>
                 {% if workflow_row %}
-                <a class="button compact alias-replace-action" href="/aliases?workflow={{ workflow_row.id }}">{% if language == 'de' %}Aliaswechsel anzeigen{% else %}Show alias change{% endif %}</a>
+                <a class="button compact alias-replace-action" href="/aliases?workflow={{ workflow_row.id }}" data-open-alias-workflow="{{ workflow_row.id }}">{% if language == 'de' %}Aliaswechsel anzeigen{% else %}Show alias change{% endif %}</a>
                 {% else %}
                 <a class="button compact alias-replace-action" href="/aliases?replace={{ alias.id }}" data-alias-workflow-replace="{{ alias.id }}" data-alias-workflow-address="{{ alias.address }}">{% if language == 'de' %}Alias ersetzen{% else %}Replace alias{% endif %}</a>
                 {% endif %}
                 {% if alias.active and workflow_row and workflow_row.role == 'new' %}
-                <a class="button compact danger alias-toggle-action top-gap" href="/aliases?deactivate={{ alias.id }}">{% if language == 'de' %}Alias deaktivieren{% else %}Disable alias{% endif %}</a>
+                <a class="button compact danger alias-toggle-action top-gap" href="/aliases?deactivate={{ alias.id }}" data-open-replacement-deactivation="{{ alias.id }}">{% if language == 'de' %}Alias deaktivieren{% else %}Disable alias{% endif %}</a>
                 {% else %}
                 <form class="alias-toggle-action top-gap" method="post" action="/aliases/{{ alias.id }}/toggle">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
