@@ -59,6 +59,12 @@
     </form>
   </div>
 
+  <div class="unexpected-review-actions action-required-actions" data-unexpected-review-actions>
+    <a class="button compact unexpected-review-all-button action-required-button {% if action_required.base_count %}has-action-required{% endif %}" href="/aliases?action=required" data-unexpected-review-all data-action-required-open>
+      {% if action_required.base_count %}{% if language == 'de' %}Handlungsbedarf ({{ action_required.base_count }}){% else %}Action required ({{ action_required.base_count }}){% endif %}{% else %}{% if language == 'de' %}Handlungsbedarf{% else %}Action required{% endif %}{% endif %}
+    </a>
+  </div>
+
   <div class="alias-filter-row">
     <nav class="status-filters" aria-label="{{ t.filter_aria }}">
       <a class="filter-pill {% if status_filter == 'all' %}current{% endif %}" href="/aliases?status=all&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.filter_all }} <span>{{ status_counts.all }}</span></a>
@@ -300,6 +306,7 @@
   </form>
 </dialog>
 
+{% include "_action_required.html" %}
 {% include "_alias_workflow.html" %}
 <script src="/static/alias-workflow.js?v={{ version }}" defer></script>
 {% endblock %}
