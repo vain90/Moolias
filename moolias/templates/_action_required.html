@@ -1,0 +1,219 @@
+{% from "_icons.html" import icon %}
+{% set action_return = '/overview' if active_nav == 'overview' else '/aliases' %}
+{% set action_total = action_required.base_count if action_required is defined else 0 %}
+{% set replacement_actions = pending_alias_replacements|default([]) %}
+
+<dialog
+  class="assign-dialog unexpected-review-dialog action-required-dialog"
+  data-action-required-dialog
+  data-unexpected-review-dialog
+  data-action-required-total="{{ action_total }}"
+  {% if request.query_params.get('action') == 'required' %}open{% endif %}
+>
+  <div class="dialog-head">
+    <div>
+      <h2>{% if language == 'de' %}Handlungsbedarf{% else %}Action required{% endif %}</h2>
+      <p class="muted action-required-intro">{% if language == 'de' %}Hier findest du alles, was aktuell deine Aufmerksamkeit braucht.{% else %}This is the single place for everything that currently needs your attention.{% endif %}</p>
+    </div>
+    <a class="dialog-close" href="{{ action_return }}" data-action-required-close aria-label="{{ t.close }}" title="{{ t.close }}">{{ icon('x') }}</a>
+  </div>
+
+  <div class="action-required-content">
+    {% if used_reserved %}
+    <section class="action-required-section" data-action-required-pool-section>
+      <div class="action-required-section-head">
+        <h3>{% if language == 'de' %}Benutzte Offline-Aliase{% else %}Used offline aliases{% endif %}</h3>
+        <span class="count">{{ used_reserved|length }}</span>
+      </div>
+      <p class="muted">
+        {% if language == 'de' %}
+          {% if used_reserved|length == 1 %}Ein noch nicht zugeordneter Offline-Alias wurde bereits benutzt. Ordne ihn einem Zweck zu oder erledige das später.{% else %}{{ used_reserved|length }} noch nicht zugeordnete Offline-Aliase wurden bereits benutzt. Ordne sie einem Zweck zu oder erledige das später.{% endif %}
+        {% else %}
+          {% if used_reserved|length == 1 %}One unassigned offline alias has already been used. Assign a purpose now or leave it for later.{% else %}{{ used_reserved|length }} unassigned offline aliases have already been used. Assign purposes now or leave them for later.{% endif %}
+        {% endif %}
+      </p>
+      <p class="hint">{% if language == 'de' %}Angezeigt werden nur die Absenderinformationen, die dein aktueller Statistikmodus speichern darf.{% else %}Only sender information permitted by your current statistics mode is shown.{% endif %}</p>
+
+      <form class="stack used-pool-form action-required-pool-form" data-action-required-pool-form>
+        <div class="used-pool-list">
+          {% for alias in used_reserved %}
+          {% set pool_stats = usage_stats.get(alias.address|lower, {}) if usage_stats_visible else {} %}
+          {% set pool_senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
+          <section class="used-pool-row" data-pool-alias-id="{{ alias.id }}">
+            <label class="used-pool-select check-row">
+              <input type="checkbox" checked data-pool-selected>
+              <span data-pool-selection-label>{% if language == 'de' %}Jetzt zuordnen{% else %}Assign now{% endif %}</span>
+            </label>
+            <div class="used-pool-identity">
+              <code>{{ alias.address }}</code>
+              {% if usage_stats_visible %}
+              <div class="pool-assignment-usage">
+                <div class="usage-summary">
+                  {% if pool_stats.received_count %}<span class="sender-stats-alert">{{ pool_stats.received_count }} {{ t.usage_received }}</span>{% endif %}
+                  {% if pool_stats.sent_count %}<span class="sender-stats-alert">{{ pool_stats.sent_count }} {{ t.usage_sent }}</span>{% endif %}
+                  {% if pool_stats.last_used_at %}<span>{{ t.usage_last_used }} <time data-local-timestamp="{{ pool_stats.last_used_at }}">{{ pool_stats.last_used_at }}</time></span>{% endif %}
+                </div>
+                {% if pool_senders %}
+                <div class="sender-stats-list pool-sender-list">
+                  {% for sender in pool_senders %}
+                  <div class="sender-stats-row">
+                    <div class="sender-stats-identity"><code>{{ sender.label }}</code></div>
+                    <span class="sender-message-count">{{ sender.received_count }}</span>
+                  </div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+              </div>
+              {% endif %}
+            </div>
+            <label class="used-pool-purpose">
+              <span>{% if language == 'de' %}Name / Zweck{% else %}Name / purpose{% endif %}</span>
+              <input type="text" maxlength="160" required autocomplete="off" placeholder="{% if language == 'de' %}z. B. Hotel, Shop, Newsletter …{% else %}e.g. hotel, shop, newsletter …{% endif %}" data-pool-purpose>
+            </label>
+          </section>
+          {% endfor %}
+        </div>
+        <div class="button-row used-pool-actions">
+          <button class="button primary" type="submit">{% if language == 'de' %}Ausgewählte zuordnen{% else %}Assign selected{% endif %}</button>
+        </div>
+      </form>
+    </section>
+    {% endif %}
+
+    {% if action_required.unexpected %}
+    <section class="action-required-section" data-action-required-unexpected-section>
+      <div class="action-required-section-head">
+        <h3>{% if language == 'de' %}Absender prüfen{% else %}Unexpected senders{% endif %}</h3>
+        <span class="count" data-action-unexpected-count>{{ action_required.unexpected }}</span>
+      </div>
+      <p class="muted">
+        {% if language == 'de' %}
+          {% if action_required.unexpected == 1 %}Ein aktiver Alias hat mindestens einen nicht automatisch erkannten Absender.{% else %}{{ action_required.unexpected }} aktive Aliase haben mindestens einen nicht automatisch erkannten Absender.{% endif %}
+        {% else %}
+          {% if action_required.unexpected == 1 %}One active alias contains at least one unexpected sender.{% else %}{{ action_required.unexpected }} active aliases contain at least one unexpected sender.{% endif %}
+        {% endif %}
+      </p>
+      <div class="unexpected-review-list">
+        {% for alias in assigned_all if alias.active and alias.address|lower in unexpected_aliases %}
+        {% set senders = sender_stats.get(alias.address|lower, []) %}
+        {% set unexpected_count = senders|selectattr('expected', 'equalto', false)|list|length %}
+        <section class="unexpected-review-alias" data-action-alias-id="{{ alias.id }}">
+          <div class="unexpected-review-alias-head">
+            <div class="unexpected-review-identity">
+              {% if alias.description %}<strong>{{ alias.description }}</strong>{% endif %}
+              <code>{{ alias.address }}</code>
+            </div>
+            <div class="action-required-alias-actions">
+              <span class="sender-stats-alert" data-action-alias-unexpected-count>{{ unexpected_count }} {% if language == 'de' %}nicht erkannt{% else %}unexpected{% endif %}</span>
+              <a class="button compact" href="/aliases?replace={{ alias.id }}" data-review-replace-alias="{{ alias.id }}">{% if language == 'de' %}Alias ersetzen{% else %}Replace alias{% endif %}</a>
+            </div>
+          </div>
+
+          <form method="post" action="/aliases/{{ alias.id }}/unexpected-monitoring" class="sender-review-settings" data-action-ignore-form>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label class="check-row">
+              <input type="checkbox" name="ignored" value="true" data-action-ignore>
+              <span>{% if language == 'de' %}Prüfung für diesen Alias ignorieren{% else %}Ignore unexpected senders for this alias{% endif %}</span>
+            </label>
+            <p class="hint">{% if language == 'de' %}Wird nicht mehr als zu prüfen markiert. Absender und Statistiken bleiben sichtbar.{% else %}Sender details and statistics remain visible, but this alias is no longer reported as requiring attention.{% endif %}</p>
+            <noscript><button class="button compact ghost" type="submit">{{ t.save }}</button></noscript>
+          </form>
+
+          <div class="sender-stats-list">
+            {% for sender in senders %}
+            <div class="sender-stats-row {{ 'expected' if sender.expected else 'unexpected' }}" data-action-sender-row data-alias-id="{{ alias.id }}" data-sender-key="{{ sender.sender_key }}">
+              <div class="sender-stats-identity">
+                <code>{{ sender.label }}</code>
+                <span class="sender-review-state">
+                  {% if sender.review_source == 'manual' %}{{ t.sender_state_confirmed }}
+                  {% elif sender.review_source == 'automatic' %}{{ t.sender_state_automatic }}{% if sender.match_token %} · {{ sender.match_token }}{% endif %}
+                  {% elif sender.review_source == 'rspamd-spam' %}{% if language == 'de' %}Durch Rspamd zur Prüfung markiert{% else %}Flagged for review by Rspamd{% endif %}
+                  {% elif sender.review_source == 'manual-unexpected' %}{{ t.sender_state_manual_unexpected }}
+                  {% else %}{{ t.sender_state_unexpected }}{% endif %}
+                </span>
+              </div>
+              <span class="sender-message-count">{{ sender.received_count }}</span>
+              <form method="post" action="/aliases/{{ alias.id }}/sender-expectation" class="sender-review-form" data-action-sender-form>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="return_to" value="{{ action_return }}?action=required">
+                <input type="hidden" name="sender_key" value="{{ sender.sender_key }}">
+                {% if sender.review_source == 'manual' or sender.review_source == 'manual-unexpected' %}
+                <input type="hidden" name="decision" value="clear"><button class="button compact ghost" type="submit">{{ t.sender_action_clear }}</button>
+                {% elif sender.expected %}
+                <input type="hidden" name="decision" value="unexpected"><button class="button compact ghost" type="submit">{{ t.sender_action_unexpected }}</button>
+                {% else %}
+                <input type="hidden" name="decision" value="expected"><button class="button compact" type="submit">{{ t.sender_action_expected }}</button>
+                {% endif %}
+              </form>
+            </div>
+            {% endfor %}
+          </div>
+          <p class="sender-stats-footnote">{{ t.sender_stats_all }}</p>
+        </section>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if replacement_actions %}
+    <section class="action-required-section" data-action-required-replacements-section>
+      <div class="action-required-section-head">
+        <h3>{% if language == 'de' %}Aliaswechsel{% else %}Alias changes{% endif %}</h3>
+        <span class="count">{{ replacement_actions|length }}</span>
+      </div>
+      <div class="unexpected-review-list">
+        {% for workflow in replacement_actions %}
+        <section class="unexpected-review-alias">
+          <div class="unexpected-review-alias-head">
+            <div class="unexpected-review-identity">
+              {% if workflow.alias_name %}<strong>{{ workflow.alias_name }}</strong>{% endif %}
+              <code>{{ workflow.old_address }} → {{ workflow.new_address }}</code>
+            </div>
+            <div class="action-required-alias-actions">
+              <a class="button compact" href="/aliases?workflow={{ workflow.id }}" data-open-alias-workflow="{{ workflow.id }}">
+                {% if workflow.new_mail_received_at %}{% if language == 'de' %}Aliaswechsel abschließen{% else %}Complete alias change{% endif %}{% else %}{% if language == 'de' %}Aliaswechsel prüfen{% else %}Review alias change{% endif %}{% endif %}
+              </a>
+            </div>
+          </div>
+          <p class="hint">{% if workflow.new_mail_received_at %}{% if language == 'de' %}Die neue Adresse empfängt E-Mails, die bisherige Adresse ist noch aktiv.{% else %}The new address receives mail and the previous address is still active.{% endif %}{% else %}{% if language == 'de' %}Die bisherige Adresse ist noch aktiv.{% else %}The previous address is still active.{% endif %}{% endif %}</p>
+        </section>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if action_required.unused_90 %}
+    <section class="action-required-section">
+      <div class="action-required-section-head">
+        <h3>{% if language == 'de' %}Lange unbenutzte Aliase{% else %}Long-unused aliases{% endif %}</h3>
+        <span class="count">{{ action_required.unused_90 }}</span>
+      </div>
+      <p class="muted">{% if language == 'de' %}Prüfe Aliase, für die seit mindestens 90 Tagen keine Nutzung mehr nachgewiesen wurde.{% else %}Review aliases with no proven usage for at least 90 days.{% endif %}</p>
+      <a class="button compact ghost" href="/aliases?sort=last_used&direction=asc">{% if language == 'de' %}Aliase anzeigen{% else %}Show aliases{% endif %}</a>
+    </section>
+    {% endif %}
+
+    {% if action_required.collector %}
+    <section class="action-required-section action-required-health">
+      <div class="action-required-section-head">
+        <h3>{% if language == 'de' %}Statistik-Collector{% else %}Statistics collector{% endif %}</h3>
+        <span class="count">1</span>
+      </div>
+      <div class="action-required-health-warning state-{{ action_required.collector_state }}">
+        <strong>
+          {% if action_required.collector_state == 'low' %}{% if language == 'de' %}Historienpuffer niedrig{% else %}Low history headroom{% endif %}
+          {% elif action_required.collector_state == 'gap' %}{% if language == 'de' %}Mögliche Lücke in der Rspamd-Historie{% else %}Possible Rspamd history gap{% endif %}
+          {% elif action_required.collector_state == 'stale' %}{% if language == 'de' %}Collector-Status veraltet{% else %}Collector status is stale{% endif %}
+          {% else %}{% if language == 'de' %}Collector-Fehler{% else %}Collector failure{% endif %}{% endif %}
+        </strong>
+        <p class="hint">{% if language == 'de' %}Die vollständigen Collector-Details stehen bei den Statistik-Einstellungen.{% else %}Full collector details are available in the statistics settings.{% endif %}</p>
+        <a class="button compact ghost" href="/statistics">{% if language == 'de' %}Details öffnen{% else %}Open details{% endif %}</a>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if not action_total %}
+    <p class="empty action-required-empty">{% if language == 'de' %}Nichts weiter zu tun.{% else %}Nothing to do.{% endif %}</p>
+    {% endif %}
+  </div>
+</dialog>
