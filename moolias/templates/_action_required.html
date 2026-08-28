@@ -1,6 +1,7 @@
 {% from "_icons.html" import icon %}
 {% set action_return = '/overview' if active_nav == 'overview' else '/aliases' %}
-{% set action_total = action_required.base_count if action_required is defined else 0 %}
+{% set action_state = action_required if action_required is defined else {'base_count': 0, 'unexpected': 0, 'unused_90': 0, 'collector': 0, 'collector_state': none} %}
+{% set action_total = action_state.base_count %}
 {% set replacement_actions = pending_alias_replacements|default([]) %}
 
 <dialog
@@ -8,7 +9,7 @@
   data-action-required-dialog
   data-unexpected-review-dialog
   data-action-required-total="{{ action_total }}"
-  {% if request.query_params.get('action') == 'required' %}open{% endif %}
+  {% if request is defined and request.query_params.get('action') == 'required' %}open{% endif %}
 >
   <div class="dialog-head">
     <div>
@@ -69,7 +70,7 @@
             </div>
             <label class="used-pool-purpose">
               <span>{% if language == 'de' %}Name / Zweck{% else %}Name / purpose{% endif %}</span>
-              <input type="text" maxlength="160" required autocomplete="off" placeholder="{% if language == 'de' %}z. B. Hotel, Shop, Newsletter …{% else %}e.g. hotel, shop, newsletter …{% endif %}" data-pool-purpose>
+              <input type="text" maxlength="160" autocomplete="off" placeholder="{% if language == 'de' %}z. B. Hotel, Shop, Newsletter …{% else %}e.g. hotel, shop, newsletter …{% endif %}" data-pool-purpose>
             </label>
           </section>
           {% endfor %}
@@ -81,17 +82,17 @@
     </section>
     {% endif %}
 
-    {% if action_required.unexpected %}
+    {% if action_state.unexpected %}
     <section class="action-required-section" data-action-required-unexpected-section>
       <div class="action-required-section-head">
         <h3>{% if language == 'de' %}Absender prüfen{% else %}Unexpected senders{% endif %}</h3>
-        <span class="count" data-action-unexpected-count>{{ action_required.unexpected }}</span>
+        <span class="count" data-action-unexpected-count>{{ action_state.unexpected }}</span>
       </div>
       <p class="muted">
         {% if language == 'de' %}
-          {% if action_required.unexpected == 1 %}Ein aktiver Alias hat mindestens einen nicht automatisch erkannten Absender.{% else %}{{ action_required.unexpected }} aktive Aliase haben mindestens einen nicht automatisch erkannten Absender.{% endif %}
+          {% if action_state.unexpected == 1 %}Ein aktiver Alias hat mindestens einen nicht automatisch erkannten Absender.{% else %}{{ action_state.unexpected }} aktive Aliase haben mindestens einen nicht automatisch erkannten Absender.{% endif %}
         {% else %}
-          {% if action_required.unexpected == 1 %}One active alias contains at least one unexpected sender.{% else %}{{ action_required.unexpected }} active aliases contain at least one unexpected sender.{% endif %}
+          {% if action_state.unexpected == 1 %}One active alias contains at least one unexpected sender.{% else %}{{ action_state.unexpected }} active aliases contain at least one unexpected sender.{% endif %}
         {% endif %}
       </p>
       <div class="unexpected-review-list">
@@ -182,28 +183,28 @@
     </section>
     {% endif %}
 
-    {% if action_required.unused_90 %}
+    {% if action_state.unused_90 %}
     <section class="action-required-section">
       <div class="action-required-section-head">
         <h3>{% if language == 'de' %}Lange unbenutzte Aliase{% else %}Long-unused aliases{% endif %}</h3>
-        <span class="count">{{ action_required.unused_90 }}</span>
+        <span class="count">{{ action_state.unused_90 }}</span>
       </div>
       <p class="muted">{% if language == 'de' %}Prüfe Aliase, für die seit mindestens 90 Tagen keine Nutzung mehr nachgewiesen wurde.{% else %}Review aliases with no proven usage for at least 90 days.{% endif %}</p>
       <a class="button compact ghost" href="/aliases?sort=last_used&direction=asc">{% if language == 'de' %}Aliase anzeigen{% else %}Show aliases{% endif %}</a>
     </section>
     {% endif %}
 
-    {% if action_required.collector %}
+    {% if action_state.collector %}
     <section class="action-required-section action-required-health">
       <div class="action-required-section-head">
         <h3>{% if language == 'de' %}Statistik-Collector{% else %}Statistics collector{% endif %}</h3>
         <span class="count">1</span>
       </div>
-      <div class="action-required-health-warning state-{{ action_required.collector_state }}">
+      <div class="action-required-health-warning state-{{ action_state.collector_state }}">
         <strong>
-          {% if action_required.collector_state == 'low' %}{% if language == 'de' %}Historienpuffer niedrig{% else %}Low history headroom{% endif %}
-          {% elif action_required.collector_state == 'gap' %}{% if language == 'de' %}Mögliche Lücke in der Rspamd-Historie{% else %}Possible Rspamd history gap{% endif %}
-          {% elif action_required.collector_state == 'stale' %}{% if language == 'de' %}Collector-Status veraltet{% else %}Collector status is stale{% endif %}
+          {% if action_state.collector_state == 'low' %}{% if language == 'de' %}Historienpuffer niedrig{% else %}Low history headroom{% endif %}
+          {% elif action_state.collector_state == 'gap' %}{% if language == 'de' %}Mögliche Lücke in der Rspamd-Historie{% else %}Possible Rspamd history gap{% endif %}
+          {% elif action_state.collector_state == 'stale' %}{% if language == 'de' %}Collector-Status veraltet{% else %}Collector status is stale{% endif %}
           {% else %}{% if language == 'de' %}Collector-Fehler{% else %}Collector failure{% endif %}{% endif %}
         </strong>
         <p class="hint">{% if language == 'de' %}Die vollständigen Collector-Details stehen bei den Statistik-Einstellungen.{% else %}Full collector details are available in the statistics settings.{% endif %}</p>
