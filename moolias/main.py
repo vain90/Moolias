@@ -14,6 +14,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from moolias import __version__
 from moolias.access import AccessRevalidationMiddleware
+from moolias.alias_bulk_ui import bulk_aliases as workflow_bulk_aliases
 from moolias.aliases import (
     RESERVED_COMMENT,
     is_mailbox_catch_all,
@@ -740,50 +741,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         alias_ids: list[int] = Form(...),
         csrf_token: str = Form(...),
     ):
-        validate_csrf(request, csrf_token)
-        user = require_user(request)
-        if action not in BULK_ACTIONS:
-            raise HTTPException(status_code=400, detail="Unknown bulk action")
-
-        selected_ids = list(dict.fromkeys(alias_ids))
-        if not selected_ids or len(selected_ids) > 100:
-            raise HTTPException(status_code=400, detail="Select between 1 and 100 aliases")
-
-        try:
-            aliases = await client(request).list_aliases()
-        except MailcowError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-        aliases_by_id = {alias.id: alias for alias in aliases}
-        selected = []
-        for alias_id in selected_ids:
-            alias = aliases_by_id.get(alias_id)
-            if (
-                alias is None
-                or not is_owned_alias(alias, user)
-                or is_primary_mailbox_alias(alias, user)
-                or alias.is_reserved
-            ):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Bulk selection contains an alias that cannot be managed",
-                )
-            selected.append(alias)
-
-        selected_ids = [alias.id for alias in selected]
-        try:
-            if action == "enable":
-                await client(request).set_active_many(selected_ids, True)
-            elif action == "disable":
-                await client(request).set_active_many(selected_ids, False)
-            elif action == "sogo-on":
-                await client(request).set_sogo_visible_many(selected_ids, True)
-            else:
-                await client(request).set_sogo_visible_many(selected_ids, False)
-        except MailcowError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-        return PlainTextResponse("ok\n")
+        return await workflow_bulk_aliases(
+            request,
+            action=action,
+            alias_ids=alias_ids,
+            csrf_token=csrf_token,
+        )
 
     @app.post("/aliases/{alias_id}/replace")
     async def replace_alias(
