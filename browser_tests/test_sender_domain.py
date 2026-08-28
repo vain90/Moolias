@@ -63,7 +63,8 @@ def test_full_mode_domain_approval_warns_and_can_be_overridden_per_address(
     sender.locator('[data-expect-domain]').click()
     confirmation = page.locator('dialog[data-moolias-dialog="confirm"]')
     expect(confirmation).to_be_visible()
-    confirmation.locator('[data-moolias-dialog-confirm]').click()
+    with page.expect_navigation(wait_until="load"):
+        confirmation.locator('[data-moolias-dialog-confirm]').click()
 
     _expect_alias_url(page, base_url)
     dialog = _open_amazon_senders(page)
@@ -71,7 +72,8 @@ def test_full_mode_domain_approval_warns_and_can_be_overridden_per_address(
     expect(sender).to_have_class(re.compile(r"\bexpected\b"))
     expect(sender.locator('[data-specific-unexpected]')).to_be_visible()
 
-    sender.locator('[data-specific-unexpected]').click()
+    with page.expect_navigation(wait_until="load"):
+        sender.locator('[data-specific-unexpected]').click()
     _expect_alias_url(page, base_url)
 
     dialog = _open_amazon_senders(page)
