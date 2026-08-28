@@ -33,6 +33,13 @@ def test_alias_workflow_javascript_does_not_reconstruct_server_ui():
         assert token not in WORKFLOW_JS
 
 
+def test_alias_workflow_dialog_navigation_is_progressively_enhanced():
+    assert "new DOMParser()" in WORKFLOW_JS
+    assert "window.location.reload" not in WORKFLOW_JS
+    assert "data-open-alias-workflow" in DASHBOARD_TEMPLATE
+    assert "data-open-replacement-deactivation" in DASHBOARD_TEMPLATE
+
+
 def test_alias_workflow_ui_does_not_expose_mail_system_internals():
     rendered_source = WORKFLOW_TEMPLATE.casefold()
     for term in ("greylist", "rspamd", "mailcow"):
