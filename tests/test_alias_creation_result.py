@@ -71,6 +71,7 @@ def make_client(monkeypatch, fake: FakeMailcow):
     monkeypatch.setattr(alias_table_module, "validate_csrf", lambda _request, _token: None)
 
     with TestClient(main_module.create_app(settings())) as client:
+        assert getattr(client.app.state, "alias_workflow_coordinator", None) is not None
         login = client.get(
             "/oauth/callback?code=test&state=test",
             follow_redirects=False,
@@ -102,7 +103,9 @@ def test_json_creation_result_exposes_stable_workflow_payload(monkeypatch):
         )
 
     assert response.status_code == 200
-    assert response.json() == {
+    payload = response.json()
+    workflow = payload.pop("workflow")
+    assert payload == {
         "kind": "alias_creation",
         "state": "created",
         "address": "issue-110@example.org",
@@ -110,6 +113,18 @@ def test_json_creation_result_exposes_stable_workflow_payload(monkeypatch):
         "description": "Verification alias",
         "sogo_visible": True,
     }
+    assert workflow["id"] > 0
+    assert workflow["kind"] == "creation"
+    assert workflow["state"] == "waiting"
+    assert workflow["old_address"] is None
+    assert workflow["new_address"] == "issue-110@example.org"
+    assert workflow["name"] == "Issue 110"
+    assert workflow["description"] == "Verification alias"
+    assert workflow["started_at"] > 0
+    assert workflow["old_mail_received_at"] is None
+    assert workflow["new_mail_received_at"] is None
+    assert workflow["scheduled_deactivation_at"] is None
+    assert workflow["completed"] is False
     assert fake.created == {
         "address": "issue-110@example.org",
         "target": "hidden@example.org",
@@ -119,7 +134,7 @@ def test_json_creation_result_exposes_stable_workflow_payload(monkeypatch):
     }
 
 
-def test_html_creation_keeps_redirect_fallback(monkeypatch):
+def test_html_creation_redirects_to_server_rendered_workflow(monkeypatch):
     fake = FakeMailcow()
 
     with make_client(monkeypatch, fake) as client:
@@ -130,5 +145,7 @@ def test_html_creation_keeps_redirect_fallback(monkeypatch):
         )
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/aliases"
+    location = response.headers["location"]
+    assert location.startswith("/aliases?workflow=")
+    assert int(location.rsplit("=", 1)[1]) > 0
     assert fake.created is not None

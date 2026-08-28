@@ -299,7 +299,9 @@
     }
   };
 
-  selects.forEach((select) => {
+  const enhanceSelect = (select) => {
+    if (select.dataset.serviceIconPickerBound === "true") return;
+    select.dataset.serviceIconPickerBound = "true";
     select.hidden = true;
     const label = select.closest("label");
     label?.classList.add("service-icon-picker-label");
@@ -330,6 +332,15 @@
         attributeFilter: ["class", "title"],
       });
     }
+  };
+
+  const enhanceSelects = (root = document) => {
+    root.querySelectorAll("[data-alias-icon-select]").forEach(enhanceSelect);
+  };
+
+  enhanceSelects();
+  document.addEventListener("moolias:alias-results-updated", (event) => {
+    enhanceSelects(event.detail?.root || document);
   });
 
   search.addEventListener("input", filterOptions);

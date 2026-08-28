@@ -262,14 +262,12 @@ if ! grep -qE '^MOOLIAS_NEWSLETTER_DB_PATH=' "$MOOLIAS_ENV"; then
   set_env_value "$MOOLIAS_ENV" "MOOLIAS_NEWSLETTER_DB_PATH" "/data/moolias-newsletters.sqlite3"
 fi
 
-mailcow_internal_url="$(sed -n 's/^MAILCOW_INTERNAL_URL=//p' "$MOOLIAS_ENV" | tail -n1)"
-mailcow_internal_url="${mailcow_internal_url%/}"
-if [[ -n "$mailcow_internal_url" ]]; then
-  set_env_value \
-    "$MOOLIAS_ENV" \
-    "MOOLIAS_NEWSLETTER_AGENT_URL" \
-    "${mailcow_internal_url}/moolias-newsletter-agent"
-fi
+# Moolias shares mailcow-network with the newsletter sidecar, so Docker DNS is
+# the stable internal route and does not depend on Mailcow nginx virtual-host selection.
+set_env_value \
+  "$MOOLIAS_ENV" \
+  "MOOLIAS_NEWSLETTER_AGENT_URL" \
+  "http://moolias-newsletter-agent:8082"
 
 cd "$MAILCOW_DIR"
 docker compose config >/dev/null

@@ -13,14 +13,46 @@ class Settings(BaseSettings):
     trusted_hosts: str = Field(default="*", alias="MOOLIAS_TRUSTED_HOSTS")
     access_tag: str = Field(default="", alias="MOOLIAS_ACCESS_TAG")
 
+    mailcow_agent_url: str = Field(default="", alias="MOOLIAS_MAILCOW_AGENT_URL")
+    mailcow_agent_secret: str = Field(alias="MOOLIAS_MAILCOW_AGENT_SECRET", min_length=32)
+
     sender_protection: bool = Field(default=False, alias="MOOLIAS_SENDER_PROTECTION")
-    sender_agent_url: str = Field(default="", alias="MOOLIAS_SENDER_AGENT_URL")
-    sender_agent_secret: str = Field(default="", alias="MOOLIAS_SENDER_AGENT_SECRET")
     sender_protection_cooldown_seconds: int = Field(
         default=10,
         ge=1,
         le=300,
         alias="MOOLIAS_SENDER_PROTECTION_COOLDOWN_SECONDS",
+    )
+
+    alias_workflow_bypass_seconds: int = Field(
+        default=900,
+        ge=0,
+        le=86400,
+        alias="MOOLIAS_ALIAS_WORKFLOW_BYPASS_SECONDS",
+    )
+    alias_workflow_poll_seconds: int = Field(
+        default=2,
+        ge=1,
+        le=30,
+        alias="MOOLIAS_ALIAS_WORKFLOW_POLL_SECONDS",
+    )
+    alias_workflow_history_count: int = Field(
+        default=1000,
+        ge=100,
+        le=10000,
+        alias="MOOLIAS_ALIAS_WORKFLOW_HISTORY_COUNT",
+    )
+    alias_replacement_reminder_days: int = Field(
+        default=7,
+        ge=1,
+        le=365,
+        alias="MOOLIAS_ALIAS_REPLACEMENT_REMINDER_DAYS",
+    )
+    alias_replacement_monitoring_max_days: int = Field(
+        default=30,
+        ge=1,
+        le=3650,
+        alias="MOOLIAS_ALIAS_REPLACEMENT_MONITORING_MAX_DAYS",
     )
 
     newsletter_management: bool = Field(
@@ -92,7 +124,7 @@ class Settings(BaseSettings):
         "base_url",
         "mailcow_url",
         "mailcow_internal_url",
-        "sender_agent_url",
+        "mailcow_agent_url",
         "newsletter_agent_url",
     )
     @classmethod
@@ -103,7 +135,7 @@ class Settings(BaseSettings):
         "access_tag",
         "usage_tag",
         "usage_db_path",
-        "sender_agent_secret",
+        "mailcow_agent_secret",
         "newsletter_tag",
         "newsletter_db_path",
         "newsletter_agent_secret",
@@ -111,6 +143,15 @@ class Settings(BaseSettings):
     @classmethod
     def strip_optional_value(cls, value: str) -> str:
         return value.strip()
+
+    @field_validator("alias_workflow_bypass_seconds")
+    @classmethod
+    def validate_alias_workflow_bypass_seconds(cls, value: int) -> int:
+        if value != 0 and value < 60:
+            raise ValueError(
+                "MOOLIAS_ALIAS_WORKFLOW_BYPASS_SECONDS must be 0 or at least 60 seconds"
+            )
+        return value
 
     @model_validator(mode="after")
     def validate_optional_features(self) -> "Settings":
@@ -133,6 +174,15 @@ class Settings(BaseSettings):
             raise ValueError(
                 "MOOLIAS_NEWSLETTER_AGENT_SECRET must contain at least 32 characters "
                 "when newsletter management is enabled"
+            )
+        if self.alias_replacement_monitoring_max_days < self.alias_replacement_reminder_days:
+            raise ValueError(
+                "MOOLIAS_ALIAS_REPLACEMENT_MONITORING_MAX_DAYS must be greater than or "
+                "equal to MOOLIAS_ALIAS_REPLACEMENT_REMINDER_DAYS"
+            )
+        if self.alias_workflow_bypass_seconds == 0:
+            self.alias_workflow_bypass_seconds = (
+                self.alias_replacement_monitoring_max_days * 86400
             )
         return self
 

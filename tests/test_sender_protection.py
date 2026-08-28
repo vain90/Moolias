@@ -5,6 +5,7 @@ import re
 
 os.environ.setdefault("MOOLIAS_BASE_URL", "https://aliases.example.org")
 os.environ.setdefault("MOOLIAS_SESSION_SECRET", "x" * 64)
+os.environ.setdefault("MOOLIAS_MAILCOW_AGENT_SECRET", "a" * 64)
 os.environ.setdefault("MAILCOW_URL", "https://mail.example.org")
 os.environ.setdefault("MAILCOW_API_KEY", "secret")
 os.environ.setdefault("MAILCOW_OAUTH_CLIENT_ID", "client")
@@ -16,7 +17,7 @@ import moolias.main as main_module
 import moolias.sender_protection as sender_module
 from moolias.config import Settings
 from moolias.main import create_app
-from moolias.sender_protection import SenderAgentAuthenticationError
+from moolias.sender_protection import MailcowAgentAuthenticationError
 from moolias.sender_protocol import AgentProtectionState
 
 
@@ -42,7 +43,7 @@ class FakeMailcowClient:
         pass
 
 
-class FakeSenderAgentClient:
+class FakeMailcowAgentClient:
     calls: list[tuple[str, bool]] = []
 
     def __init__(self, *_args, **_kwargs) -> None:
@@ -76,20 +77,18 @@ class FakeSenderAgentClient:
         )
 
 
-class FakeUnauthenticatedSenderAgentClient(FakeSenderAgentClient):
+class FakeUnauthenticatedMailcowAgentClient(FakeMailcowAgentClient):
     async def status(self, mailbox: str) -> AgentProtectionState:
-        raise SenderAgentAuthenticationError("authentication failed")
+        raise MailcowAgentAuthenticationError("authentication failed")
 
 
-def settings(*, enabled: bool = True, secret: str | None = None) -> Settings:
-    if secret is None:
-        secret = "a" * 64 if enabled else ""
+def settings(*, enabled: bool = True) -> Settings:
     return Settings(
         MOOLIAS_BASE_URL="https://aliases.example.org",
         MOOLIAS_SESSION_SECRET="x" * 64,
         MOOLIAS_COOKIE_SECURE=False,
+        MOOLIAS_MAILCOW_AGENT_SECRET="a" * 64,
         MOOLIAS_SENDER_PROTECTION=enabled,
-        MOOLIAS_SENDER_AGENT_SECRET=secret,
         MAILCOW_URL="https://mail.example.org",
         MAILCOW_API_KEY="secret",
         MAILCOW_OAUTH_CLIENT_ID="client",
@@ -117,7 +116,7 @@ def login(client: TestClient, monkeypatch, email: str) -> str:
     return match.group(1)
 
 
-def test_sender_protection_is_completely_optional(monkeypatch):
+def test_sender_protection_is_optional_with_required_mailcow_agent(monkeypatch):
     app = create_app(settings(enabled=False))
     with TestClient(app) as client:
         app.state.mailcow = FakeMailcowClient()
@@ -129,17 +128,17 @@ def test_sender_protection_is_completely_optional(monkeypatch):
     assert response.json() == {"enabled": False}
 
 
-def test_enabled_sender_protection_with_missing_secret_does_not_break_app(monkeypatch):
+def test_agent_authentication_failure_does_not_break_app(monkeypatch):
     monkeypatch.setattr(
         sender_module,
-        "SenderAgentClient",
-        FakeUnauthenticatedSenderAgentClient,
+        "MailcowAgentClient",
+        FakeUnauthenticatedMailcowAgentClient,
     )
 
-    app = create_app(settings(enabled=True, secret=""))
+    app = create_app(settings(enabled=True))
     with TestClient(app) as client:
         app.state.mailcow = FakeMailcowClient()
-        login(client, monkeypatch, "missing-secret@example.org")
+        login(client, monkeypatch, "authentication@example.org")
 
         response = client.get("/aliases/sender-protection")
 
@@ -152,8 +151,8 @@ def test_enabled_sender_protection_with_missing_secret_does_not_break_app(monkey
 
 
 def test_browser_cannot_choose_another_mailbox(monkeypatch):
-    FakeSenderAgentClient.calls = []
-    monkeypatch.setattr(sender_module, "SenderAgentClient", FakeSenderAgentClient)
+    FakeMailcowAgentClient.calls = []
+    monkeypatch.setattr(sender_module, "MailcowAgentClient", FakeMailcowAgentClient)
 
     app = create_app(settings())
     with TestClient(app) as client:
@@ -169,7 +168,7 @@ def test_browser_cannot_choose_another_mailbox(monkeypatch):
             headers={"X-CSRF-Token": csrf},
         )
         assert malicious.status_code == 400
-        assert FakeSenderAgentClient.calls == []
+        assert FakeMailcowAgentClient.calls == []
 
         valid = client.post(
             "/aliases/sender-protection",
@@ -179,12 +178,12 @@ def test_browser_cannot_choose_another_mailbox(monkeypatch):
 
     assert valid.status_code == 200
     assert valid.json()["blocked"] is True
-    assert FakeSenderAgentClient.calls == [("owner@example.org", True)]
+    assert FakeMailcowAgentClient.calls == [("owner@example.org", True)]
 
 
 def test_sender_protection_requires_csrf(monkeypatch):
-    FakeSenderAgentClient.calls = []
-    monkeypatch.setattr(sender_module, "SenderAgentClient", FakeSenderAgentClient)
+    FakeMailcowAgentClient.calls = []
+    monkeypatch.setattr(sender_module, "MailcowAgentClient", FakeMailcowAgentClient)
 
     app = create_app(settings())
     with TestClient(app) as client:
@@ -197,4 +196,4 @@ def test_sender_protection_requires_csrf(monkeypatch):
         )
 
     assert response.status_code == 403
-    assert FakeSenderAgentClient.calls == []
+    assert FakeMailcowAgentClient.calls == []

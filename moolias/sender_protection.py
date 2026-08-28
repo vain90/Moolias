@@ -12,6 +12,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from moolias.alias_delivery_agent import mailcow_agent_url
 from moolias.mailcow import MailcowAccessDenied, MailcowError
 from moolias.security import require_user, validate_csrf
 from moolias.sender_protocol import (
@@ -30,23 +31,23 @@ class SenderProtectionError(RuntimeError):
     pass
 
 
-class SenderAgentUnavailable(SenderProtectionError):
+class MailcowAgentUnavailable(SenderProtectionError):
     pass
 
 
-class SenderAgentNotInstalled(SenderProtectionError):
+class MailcowAgentNotInstalled(SenderProtectionError):
     pass
 
 
-class SenderAgentAuthenticationError(SenderProtectionError):
+class MailcowAgentAuthenticationError(SenderProtectionError):
     pass
 
 
-class SenderAgentExternalPolicy(SenderProtectionError):
+class SenderProtectionExternalPolicy(SenderProtectionError):
     pass
 
 
-class SenderAgentCooldown(SenderProtectionError):
+class SenderProtectionCooldown(SenderProtectionError):
     def __init__(self, retry_after: int) -> None:
         super().__init__(f"Sender protection can be changed again in {retry_after} seconds")
         self.retry_after = max(1, retry_after)
@@ -78,7 +79,7 @@ class _LocalCooldown:
 _local_cooldown = _LocalCooldown()
 
 
-class SenderAgentClient:
+class MailcowAgentClient:
     def __init__(
         self,
         base_url: str,
@@ -100,7 +101,7 @@ class SenderAgentClient:
     async def close(self) -> None:
         await self.client.aclose()
 
-    async def __aenter__(self) -> SenderAgentClient:
+    async def __aenter__(self) -> MailcowAgentClient:
         return self
 
     async def __aexit__(self, *_args: object) -> None:
@@ -110,21 +111,21 @@ class SenderAgentClient:
         try:
             response = await self.client.get("healthz")
         except httpx.HTTPError as exc:
-            raise SenderAgentUnavailable(str(exc)) from exc
+            raise MailcowAgentUnavailable(str(exc)) from exc
         if response.status_code == 404:
-            raise SenderAgentNotInstalled("Moolias Mailcow Agent was not found")
+            raise MailcowAgentNotInstalled("Moolias Mailcow Agent was not found")
         if response.is_error:
-            raise SenderAgentUnavailable(
+            raise MailcowAgentUnavailable(
                 f"Moolias Mailcow Agent health check returned HTTP {response.status_code}"
             )
         try:
             payload = response.json()
         except ValueError as exc:
-            raise SenderAgentUnavailable(
+            raise MailcowAgentUnavailable(
                 "Moolias Mailcow Agent returned invalid health data"
             ) from exc
         if payload.get("status") != "ok" or payload.get("protocol") != PROTOCOL_VERSION:
-            raise SenderAgentUnavailable("Moolias Mailcow Agent protocol is incompatible")
+            raise MailcowAgentUnavailable("Moolias Mailcow Agent protocol is incompatible")
 
     async def status(self, mailbox: str) -> AgentProtectionState:
         payload = await self._signed_post("/v1/status", {"mailbox": mailbox})
@@ -178,14 +179,14 @@ class SenderAgentClient:
                 },
             )
         except httpx.HTTPError as exc:
-            raise SenderAgentUnavailable(str(exc)) from exc
+            raise MailcowAgentUnavailable(str(exc)) from exc
 
         if response.status_code == 401:
-            raise SenderAgentAuthenticationError("Moolias Mailcow Agent authentication failed")
+            raise MailcowAgentAuthenticationError("Moolias Mailcow Agent authentication failed")
         if response.status_code == 404:
-            raise SenderAgentNotInstalled("Moolias Mailcow Agent endpoint was not found")
+            raise MailcowAgentNotInstalled("Moolias Mailcow Agent endpoint was not found")
         if response.status_code == 409:
-            raise SenderAgentExternalPolicy(
+            raise SenderProtectionExternalPolicy(
                 "Sender protection is managed by an existing Postfix rule"
             )
         if response.status_code == 429:
@@ -194,32 +195,25 @@ class SenderAgentClient:
                 seconds = int(retry_after)
             except ValueError:
                 seconds = 1
-            raise SenderAgentCooldown(seconds)
+            raise SenderProtectionCooldown(seconds)
         if response.is_error:
-            raise SenderAgentUnavailable(
+            raise MailcowAgentUnavailable(
                 f"Moolias Mailcow Agent returned HTTP {response.status_code}"
             )
 
         try:
             parsed = response.json()
         except ValueError as exc:
-            raise SenderAgentUnavailable("Moolias Mailcow Agent returned invalid JSON") from exc
+            raise MailcowAgentUnavailable("Moolias Mailcow Agent returned invalid JSON") from exc
         if not isinstance(parsed, dict):
-            raise SenderAgentUnavailable("Moolias Mailcow Agent returned invalid data")
+            raise MailcowAgentUnavailable("Moolias Mailcow Agent returned invalid data")
         return parsed
 
 
-def _agent_url(settings: Any) -> str:
-    configured = settings.sender_agent_url.strip()
-    if configured:
-        return configured.rstrip("/")
-    return f"{settings.mailcow_url.rstrip('/')}/moolias-agent"
-
-
 def _error_reason(exc: SenderProtectionError) -> str:
-    if isinstance(exc, SenderAgentNotInstalled):
+    if isinstance(exc, MailcowAgentNotInstalled):
         return "not-installed"
-    if isinstance(exc, SenderAgentAuthenticationError):
+    if isinstance(exc, MailcowAgentAuthenticationError):
         return "authentication"
     return "unreachable"
 
@@ -231,9 +225,9 @@ async def get_sender_protection(request: Request):
     if not settings.sender_protection:
         return {"enabled": False}
 
-    async with SenderAgentClient(
-        _agent_url(settings),
-        settings.sender_agent_secret,
+    async with MailcowAgentClient(
+        mailcow_agent_url(settings),
+        settings.mailcow_agent_secret,
         verify_tls=settings.mailcow_verify_tls,
     ) as agent:
         try:
@@ -290,37 +284,37 @@ async def update_sender_protection(request: Request):
             headers={"Retry-After": str(remaining)},
         )
 
-    async with SenderAgentClient(
-        _agent_url(settings),
-        settings.sender_agent_secret,
+    async with MailcowAgentClient(
+        mailcow_agent_url(settings),
+        settings.mailcow_agent_secret,
         verify_tls=settings.mailcow_verify_tls,
     ) as agent:
         try:
             await agent.probe()
             state, changed = await agent.set_blocked(user, payload.blocked)
-        except SenderAgentCooldown as exc:
+        except SenderProtectionCooldown as exc:
             raise HTTPException(
                 status_code=429,
                 detail="Sender protection cooldown is active",
                 headers={"Retry-After": str(exc.retry_after)},
             ) from exc
-        except SenderAgentExternalPolicy as exc:
+        except SenderProtectionExternalPolicy as exc:
             raise HTTPException(
                 status_code=409,
                 detail="Sender protection is managed by an existing Mailcow rule",
             ) from exc
-        except SenderAgentAuthenticationError as exc:
+        except MailcowAgentAuthenticationError as exc:
             raise HTTPException(
                 status_code=502,
-                detail="Sender agent authentication failed",
+                detail="Mailcow Agent authentication failed",
             ) from exc
-        except SenderAgentNotInstalled as exc:
-            raise HTTPException(status_code=503, detail="Sender agent is not installed") from exc
-        except SenderAgentUnavailable as exc:
-            raise HTTPException(status_code=503, detail="Sender agent is unavailable") from exc
+        except MailcowAgentNotInstalled as exc:
+            raise HTTPException(status_code=503, detail="Mailcow Agent is not installed") from exc
+        except MailcowAgentUnavailable as exc:
+            raise HTTPException(status_code=503, detail="Mailcow Agent is unavailable") from exc
 
     if state.mailbox.casefold() != user:
-        raise HTTPException(status_code=502, detail="Sender agent returned the wrong mailbox")
+        raise HTTPException(status_code=502, detail="Mailcow Agent returned the wrong mailbox")
     if changed:
         await _local_cooldown.mark(user)
 

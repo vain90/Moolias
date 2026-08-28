@@ -43,5 +43,28 @@ def test_compose_validation_errors_are_not_silenced():
     assert 'Docker Compose validation failed for ${COMPOSE_DISPLAY}' in UPDATER
 
 
-def test_updater_version_is_0_1_4():
-    assert 'UPDATER_VERSION="0.1.4"' in UPDATER
+def test_updater_requires_mailcow_agent_before_recreating_application():
+    assert "MOOLIAS_MAILCOW_AGENT_SECRET" in UPDATER
+    assert ".moolias-mailcow-install" in UPDATER
+    assert UPDATER.index('agent_secret="$(sed -n') < UPDATER.index(
+        'if [[ "${ASSUME_YES}" != true ]]'
+    )
+    assert UPDATER.index('agent_secret="$(sed -n') < UPDATER.index(
+        'compose up -d --force-recreate --remove-orphans moolias'
+    )
+
+
+def test_beta_agent_migration_guidance_keeps_main_and_edge_together():
+    assert (
+        "MOOLIAS_INSTALL_REF=main MOOLIAS_IMAGE_TAG=edge bash"
+        in UPDATER
+    )
+    assert (
+        'migration_command="curl -fsSL '
+        'https://raw.githubusercontent.com/vain90/Moolias/main/install.sh | sudo bash"'
+        in UPDATER
+    )
+
+
+def test_updater_version_is_0_1_5():
+    assert 'UPDATER_VERSION="0.1.5"' in UPDATER

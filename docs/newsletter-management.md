@@ -201,7 +201,8 @@ The Newsletter installer creates a dedicated sidecar that:
 - has no published host ports
 - runs with `no-new-privileges`
 - drops all Linux capabilities
-- exposes only the signed `/v1/headers` API through Mailcow nginx
+- exposes the signed `/v1/headers` API through Mailcow nginx for remote/standalone application access
+- is reached directly by the recommended same-host Moolias application at `http://moolias-newsletter-agent:8082` on the Mailcow Docker network
 - accepts only a mailbox and exact Message-ID
 - normally returns only the fixed newsletter-related header set
 - may inspect the UTF-8 message text only when Moolias explicitly marks the request as a Rspamd `MOOLIAS_BODY_UNSUB` candidate
@@ -233,7 +234,8 @@ MOOLIAS_NEWSLETTER_TAG=moolias-newsletter
 MOOLIAS_NEWSLETTER_DB_PATH=/data/moolias-newsletters.sqlite3
 
 MOOLIAS_NEWSLETTER_AGENT_SECRET=<generated-secret>
-MOOLIAS_NEWSLETTER_AGENT_URL=
+# Recommended same-host value; standalone deployments may leave this empty.
+MOOLIAS_NEWSLETTER_AGENT_URL=http://moolias-newsletter-agent:8082
 MOOLIAS_NEWSLETTER_POLL_SECONDS=60
 MOOLIAS_NEWSLETTER_HISTORY_COUNT=1000
 ```
@@ -254,7 +256,7 @@ The bootstrap follows the latest stable Moolias release and downloads all requir
 - `scripts/install-newsletter-rspamd.sh`
 - `scripts/rspamd/moolias_newsletter.lua`
 
-The installer creates the agent secret, configures Dovecot remote `doveadm` authentication when necessary, installs the Rspamd detector, adds the sidecar to Mailcow's Compose override, updates `/opt/moolias/.env` and enables the server-side feature. With the standard Mailcow-host deployment it recreates the Moolias application afterwards so the new settings become active immediately.
+The installer creates the agent secret, configures Dovecot remote `doveadm` authentication when necessary, installs the Rspamd detector, adds the sidecar to Mailcow's Compose override, writes `MOOLIAS_NEWSLETTER_AGENT_URL=http://moolias-newsletter-agent:8082` to `/opt/moolias/.env` for direct same-host access and enables the server-side feature. It keeps the authenticated Mailcow-nginx endpoint available for remote/standalone use. With the standard Mailcow-host deployment it recreates the Moolias application afterwards so the new settings become active immediately.
 
 The Newsletter Agent uses the configured `MOOLIAS_IMAGE` and `MOOLIAS_TAG` from the Moolias installation by default, which keeps the application and sidecar on the same stable channel. `MOOLIAS_AGENT_IMAGE` can be set explicitly for development or integration testing.
 

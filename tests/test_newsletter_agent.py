@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from unittest.mock import AsyncMock
@@ -7,6 +8,7 @@ from unittest.mock import AsyncMock
 import httpx
 
 from moolias.newsletter_agent import (
+    DoveadmNewsletterReader,
     _extract_body_unsubscribe_url,
     _normalise_mailbox,
     _normalise_message_id,
@@ -21,6 +23,22 @@ from moolias.sender_protocol import (
 
 SECRET = "n" * 64
 DOVEADM_PASSWORD = "d" * 64
+
+
+class _FakeProcess:
+    def __init__(self, stdout: bytes, stderr: bytes = b"", returncode: int = 0) -> None:
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
+
+    async def communicate(self) -> tuple[bytes, bytes]:
+        return self.stdout, self.stderr
+
+    def kill(self) -> None:
+        self.returncode = -9
+
+    async def wait(self) -> int:
+        return self.returncode
 
 
 def _signed_headers(path: str, body: bytes, nonce: str) -> dict[str, str]:
@@ -89,6 +107,63 @@ def test_body_unsubscribe_parser_does_not_return_unrelated_links():
         "Mehr erfahren: https://example.org/product\n"
     )
     assert _extract_body_unsubscribe_url(raw) is None
+
+
+async def test_newsletter_reader_fetches_body_outside_json_formatter(monkeypatch):
+    calls: list[tuple[str, ...]] = []
+
+    async def fake_create_subprocess_exec(*command: str, **_kwargs):
+        calls.append(command)
+        formatter = command[command.index("-f") + 1]
+        if formatter == "json":
+            payload = [
+                {
+                    "mailbox-guid": "guid-123",
+                    "uid": "42",
+                    "hdr.from": "Example <news@example.org>",
+                    "hdr.to": "alias@example.net",
+                    "hdr.delivered-to": "",
+                    "hdr.list-id": "",
+                    "hdr.list-unsubscribe": "",
+                    "hdr.list-unsubscribe-post": "",
+                    "hdr.dkim-signature": "",
+                    "hdr.authentication-results": "dkim=pass",
+                }
+            ]
+            return _FakeProcess(json.dumps(payload).encode())
+        if formatter == "flow":
+            raw = (
+                "From: Example <news@example.org>\n"
+                "Content-Type: text/plain; charset=utf-8\n"
+                "\n"
+                "Newsletter abbestellen: "
+                "https://example.org/unsubscribe/personal-token\n"
+            )
+            return _FakeProcess(f"text.utf8={raw}".encode())
+        raise AssertionError(f"Unexpected formatter: {formatter}")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+
+    reader = DoveadmNewsletterReader(DOVEADM_PASSWORD)
+    result = await reader.fetch_headers(
+        "user@example.org",
+        "message@example.org",
+        include_body_unsubscribe=True,
+    )
+
+    assert result is not None
+    assert result["body_unsubscribe_url"] == (
+        "https://example.org/unsubscribe/personal-token"
+    )
+    assert len(calls) == 2
+
+    header_call, body_call = calls
+    assert header_call[header_call.index("-f") + 1] == "json"
+    assert "text.utf8" not in header_call[header_call.index("-u") + 2]
+
+    assert body_call[body_call.index("-f") + 1] == "flow"
+    assert "text.utf8" in body_call
+    assert body_call[-4:] == ("mailbox-guid", "guid-123", "uid", "42")
 
 
 async def test_newsletter_agent_requires_signature_and_returns_only_selected_headers():

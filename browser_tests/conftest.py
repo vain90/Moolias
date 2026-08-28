@@ -37,24 +37,30 @@ def _wait_for_server(url: str, process: subprocess.Popen[str]) -> None:
 
 
 @pytest.fixture(scope="session")
-def base_url(tmp_path_factory) -> str:
+def e2e_db_path(tmp_path_factory) -> Path:
+    return tmp_path_factory.mktemp("moolias-e2e") / "stats.sqlite3"
+
+
+@pytest.fixture(scope="session")
+def base_url(e2e_db_path: Path) -> str:
     port = _free_port()
     url = f"http://127.0.0.1:{port}"
-    database = tmp_path_factory.mktemp("moolias-e2e") / "stats.sqlite3"
     env = os.environ.copy()
     env.update(
         {
             "MOOLIAS_E2E_BASE_URL": url,
-            "MOOLIAS_E2E_DB": str(database),
+            "MOOLIAS_E2E_DB": str(e2e_db_path),
             "MOOLIAS_BASE_URL": url,
             "MOOLIAS_SESSION_SECRET": "e2e-session-secret-" * 4,
             "MOOLIAS_COOKIE_SECURE": "false",
             "MOOLIAS_TRUSTED_HOSTS": "127.0.0.1,localhost",
             "MOOLIAS_USAGE_STATS": "true",
             "MOOLIAS_USAGE_TAG": "moolias-stats",
-            "MOOLIAS_USAGE_DB_PATH": str(database),
+            "MOOLIAS_USAGE_DB_PATH": str(e2e_db_path),
             "MOOLIAS_USAGE_POLL_SECONDS": "60",
             "MOOLIAS_USAGE_HISTORY_COUNT": "1000",
+            "MOOLIAS_MAILCOW_AGENT_SECRET": "e2e-mailcow-agent-secret-0000000001",
+            "MOOLIAS_MAILCOW_AGENT_URL": "http://127.0.0.1:9",
             "MAILCOW_URL": "https://mail.example.org",
             "MAILCOW_API_KEY": "e2e-api-key",
             "MAILCOW_OAUTH_CLIENT_ID": "e2e-client",

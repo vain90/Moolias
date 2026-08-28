@@ -52,8 +52,14 @@ def test_bootstrap_derives_internal_port_from_mailcow_http_port():
 
 def test_bootstrap_writes_internal_backend_and_sender_agent_urls():
     assert 'set_key_value "$env_file" MAILCOW_INTERNAL_URL "$mailcow_internal_url"' in BOOTSTRAP
-    assert "MOOLIAS_SENDER_AGENT_URL" in BOOTSTRAP
-    assert '"${mailcow_internal_url}/moolias-agent"' in BOOTSTRAP
+    assert "MOOLIAS_MAILCOW_AGENT_URL" in BOOTSTRAP
+    assert '"http://moolias-agent:8081"' in BOOTSTRAP
+    assert '${mailcow_internal_url}/moolias-agent' not in BOOTSTRAP
+    assert (
+        'set_key_value "$env_file" MOOLIAS_MAILCOW_AGENT_URL "http://moolias-agent:8081"'
+        in INSTALLER
+    )
+    assert 'http://nginx-mailcow:${http_port}/moolias-agent' not in INSTALLER
 
 
 def test_bootstrap_validates_api_before_its_final_summary():
@@ -196,6 +202,13 @@ def test_installer_supports_curl_pipe_and_noninteractive_mode():
     assert "MOOLIAS_NONINTERACTIVE" in INSTALLER
     assert "MOOLIAS_SOURCE_DIR" in INSTALLER
     assert "MOOLIAS_SKIP_PULL" in INSTALLER
+
+
+def test_installer_preserves_explicit_sender_rule_import_choice_without_tty():
+    assert (
+        'MOOLIAS_IMPORT_EXISTING_SENDER_RULES="${MOOLIAS_IMPORT_EXISTING_SENDER_RULES:-no}"'
+        in INSTALLER
+    )
 
 
 def test_installer_refuses_known_nginx_hostname_conflicts():

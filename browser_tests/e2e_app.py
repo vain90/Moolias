@@ -292,6 +292,7 @@ app = main_module.create_app(SETTINGS)
 
 def _clear_statistics(path: Path) -> None:
     tables = (
+        "alias_workflows",
         "alias_icon_settings",
         "usage_backfill_state",
         "alias_usage_evidence",

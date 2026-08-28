@@ -85,22 +85,25 @@ def test_statistics_mode_downgrade_shows_confirmation_and_processing_dialog(
     expect(processing.locator("progress")).to_be_visible()
 
 
-def test_action_required_dialog_shows_loading_feedback(
+def test_action_required_dialog_uses_server_rendered_content_without_loading_fetch(
     page: Page,
     base_url: str,
 ) -> None:
     _login(page, base_url)
 
+    dialog = page.locator("dialog[data-action-required-dialog]")
+    expect(dialog.locator("[data-action-required-unexpected-section]")).to_have_count(1)
+    expect(dialog.locator("[data-action-sender-row]")).to_have_count(2)
+
     page.evaluate(
         """
         () => {
+          window.__actionRequiredUnexpectedFetches = 0;
           const originalFetch = window.fetch.bind(window);
           window.fetch = (input, init) => {
             const url = input instanceof Request ? input.url : String(input);
             if (url.includes('/aliases') && url.includes('status=unexpected')) {
-              return new Promise((resolve, reject) => {
-                window.setTimeout(() => originalFetch(input, init).then(resolve, reject), 1500);
-              });
+              window.__actionRequiredUnexpectedFetches += 1;
             }
             return originalFetch(input, init);
           };
@@ -109,14 +112,61 @@ def test_action_required_dialog_shows_loading_feedback(
     )
 
     page.locator("[data-action-required-open]").click()
-    dialog = page.locator("dialog[data-action-required-dialog]")
     expect(dialog).to_be_visible()
-    expect(dialog.locator(".action-required-loading")).to_have_text(
-        "Loading action-required items …"
-    )
-    expect(dialog.locator(".action-required-progress")).to_be_visible()
+    expect(dialog.locator("[data-action-required-unexpected-section]")).to_be_visible()
+    expect(dialog.locator(".action-required-loading")).to_have_count(0)
+    expect(dialog.locator(".action-required-progress")).to_have_count(0)
+    assert page.evaluate("window.__actionRequiredUnexpectedFetches") == 0
 
-    expect(dialog.locator(".action-required-loading")).to_have_count(0, timeout=5_000)
+
+def test_action_required_expected_sender_updates_immediately_and_refreshes_table_on_close(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+    page.goto(f"{base_url}/aliases")
+
+    dialog = page.locator("dialog[data-action-required-dialog]")
+    page.locator("[data-action-required-open]").click()
+    expect(dialog).to_be_visible()
+
+    first_unexpected = dialog.locator("[data-action-sender-row].unexpected").first
+    expect(first_unexpected).to_be_visible()
+    alias_id = first_unexpected.get_attribute("data-alias-id")
+    assert alias_id
+    action_alias = dialog.locator(f'[data-action-alias-id="{alias_id}"]')
+    alias_row = page.locator(
+        f'.alias-row:has([data-alias-select][value="{alias_id}"])'
+    )
+    expect(alias_row).to_have_class(re.compile(r"\balias-row-unexpected\b"))
+
+    transition_duration = first_unexpected.evaluate(
+        "element => getComputedStyle(element).transitionDuration"
+    )
+    assert transition_duration != "0s"
+
+    while action_alias.locator("[data-action-sender-row].unexpected").count():
+        unexpected_sender = action_alias.locator("[data-action-sender-row].unexpected").first
+        sender_key = unexpected_sender.get_attribute("data-sender-key")
+        assert sender_key
+        sender = action_alias.locator(
+            f'[data-action-sender-row][data-sender-key="{sender_key}"]'
+        )
+        sender.locator("[data-action-sender-form] button[type='submit']").click()
+        expect(sender).to_have_class(re.compile(r"\bexpected\b"), timeout=5000)
+        expect(sender.locator('input[name="decision"]')).to_have_value("clear")
+        expect(sender.locator("button[type='submit']")).to_have_class(re.compile(r"\bghost\b"))
+
+    expect(alias_row).to_have_class(re.compile(r"\balias-row-unexpected\b"))
+
+    with page.expect_navigation(wait_until="load"):
+        dialog.locator("[data-action-required-close]").click()
+
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases$"))
+    alias_row = page.locator(
+        f'.alias-row:has([data-alias-select][value="{alias_id}"])'
+    )
+    expect(alias_row).not_to_have_class(re.compile(r"\balias-row-unexpected\b"))
 
 
 def test_usage_evidence_link_has_spacing_from_usage_summary(

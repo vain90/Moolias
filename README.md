@@ -40,7 +40,7 @@ Moolias does not maintain a separate account or identity database; Mailcow remai
 - Choose between name-based aliases such as `amazon-k7`, readable random aliases such as `hafen-feder-27`, or a custom local part.
 - Add a purpose or description to each alias.
 - Enable and disable aliases without deleting them.
-- Replace an alias while keeping the old address disabled for traceability.
+- Replace an alias while keeping the old address active until the chosen deactivation policy completes the migration.
 - Optionally expose individual aliases as selectable SOGo sender addresses.
 - Prepare offline aliases in advance and assign them later after they have been used.
 - Detect catch-all delivery and warn when it weakens the one-alias-per-service model.
@@ -94,8 +94,9 @@ The guided installer:
 - creates `/opt/moolias` with a private `.env`, Compose file and updater;
 - starts the stable Moolias image without a published host port;
 - creates and validates a dedicated Mailcow nginx reverse-proxy site;
+- installs the hardened Mailcow Agent required by guided alias creation and replacement;
+- can optionally enable primary sender protection through that Agent;
 - can optionally add the Moolias hostname to Mailcow `ADDITIONAL_SAN` for Mailcow ACME;
-- can optionally install the hardened primary-sender-protection sidecar;
 - backs up installer-managed files before replacing them;
 - validates Docker Compose, Moolias health and Mailcow nginx before completing.
 
@@ -106,6 +107,18 @@ See **[Install Moolias on the Mailcow host](docs/install-on-mailcow.md)** for TL
 ### Alternative: standalone Docker host
 
 Moolias can also run on another Docker host or container platform. This is useful when application workloads are intentionally separated from the Mailcow server or an existing reverse proxy should own the Moolias hostname.
+
+The Mailcow Agent is still required because guided alias creation and replacement use its exact-recipient first-mail delivery bypass. Install the Agent on the Mailcow host first:
+
+```bash
+curl -fsSL \
+  https://raw.githubusercontent.com/vain90/Moolias/main/scripts/install-mailcow-agent.sh \
+  | sudo env MOOLIAS_AGENT_IMAGE=ghcr.io/vain90/moolias:latest bash
+```
+
+Keep the `MOOLIAS_MAILCOW_AGENT_SECRET` printed by the installer private; it is needed by the standalone Moolias application.
+
+On the application host:
 
 ```bash
 git clone https://github.com/vain90/Moolias.git
@@ -119,12 +132,15 @@ Configure at least:
 MOOLIAS_BASE_URL=https://moolias.example.org
 MOOLIAS_SESSION_SECRET=<random-secret>
 MOOLIAS_TRUSTED_HOSTS=moolias.example.org
+MOOLIAS_MAILCOW_AGENT_SECRET=<secret-printed-by-the-mailcow-agent-installer>
 
 MAILCOW_URL=https://mail.example.org
 MAILCOW_API_KEY=<read-write-api-key>
 MAILCOW_OAUTH_CLIENT_ID=<oauth-client-id>
 MAILCOW_OAUTH_CLIENT_SECRET=<oauth-secret>
 ```
+
+By default Moolias reaches the Agent at `<MAILCOW_URL>/moolias-agent`. Set `MOOLIAS_MAILCOW_AGENT_URL` only when the Agent is exposed at a different URL.
 
 Generate a session secret with:
 
@@ -224,9 +240,9 @@ Once a prepared address has been used, Moolias can surface it in **Action requir
 
 Primary sender protection is optional. It prevents a signed-in mailbox user from sending with the mailbox's primary address while normal aliases continue through Mailcow's standard sender policy.
 
-On a Mailcow-host installation, the guided installer can set this up as an optional final step. The sender-protection component remains a separate hardened sidecar with no Docker socket, Mailcow API key or database credentials and only narrowly scoped state/Postfix-policy mounts.
+The Mailcow Agent itself is required for guided alias creation and replacement and is installed automatically by the recommended Mailcow-host installer. Primary sender protection is an optional capability of that already installed hardened Agent; enabling it does not give the Moolias application Docker, Mailcow API or database access beyond its existing application credentials.
 
-See [Primary sender protection](docs/sender-protection.md) for the security model, migration of existing rules and manual installation details.
+See [Mailcow Agent and primary sender protection](docs/sender-protection.md) for the security model, migration of existing rules and manual installation details.
 
 ### Install as a web app
 
@@ -249,6 +265,16 @@ cd /opt/moolias
 ./update.sh
 ```
 
+Existing Mailcow-host installations from v1.2.1 or an older sender-agent layout need one installer rerun when first moving to a release that requires the unified Mailcow Agent. The updater detects the missing Agent secret before changing the running application and tells you to run:
+
+```bash
+curl -fsSL \
+  https://raw.githubusercontent.com/vain90/Moolias/main/install.sh \
+  | sudo bash
+```
+
+That migration preserves the existing sender-protection secret and state, replaces only Moolias-managed Agent files/Compose blocks and then allows normal `./update.sh` use again.
+
 Check whether an update is available without changing the running deployment:
 
 ```bash
@@ -265,7 +291,7 @@ Run `./update.sh --help` for all updater options.
 
 The default Docker image tag is `latest`. A fixed release can be pinned with `MOOLIAS_TAG`, while `edge` follows the current `main` branch. See [.env.example](.env.example) for details.
 
-Manual Docker Compose updates remain possible:
+Manual Docker Compose updates remain possible after the required Mailcow Agent is configured:
 
 ```bash
 docker compose pull
@@ -278,7 +304,7 @@ Existing pre-release installations from before the rename should follow [the Moo
 
 Moolias holds a privileged Mailcow read/write API key. Keep the API key and OAuth credentials on the server, use HTTPS, use secure cookies in production and restrict API access to the Moolias source network/address where practical.
 
-The recommended Mailcow-host deployment shares only Mailcow's Docker network with the main application. Moolias does not receive the Docker socket, Mailcow database credentials, Postfix configuration or other Mailcow filesystem mounts.
+The recommended Mailcow-host deployment shares only Mailcow's Docker network with the main application. Moolias does not receive the Docker socket, Mailcow database credentials, Postfix configuration or other Mailcow filesystem mounts. The separate Mailcow Agent receives only its private state plus the dedicated Postfix and Rspamd policy paths it manages.
 
 Alias ownership is validated server-side before Moolias modifies an existing alias.
 

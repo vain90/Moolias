@@ -3,12 +3,15 @@
 {% block title %}{% if language == 'de' %}Aliase{% else %}Aliases{% endif %} · Moolias{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/alias-descriptions.css?v=20260825-1" data-alias-description-styles="1">
+<link rel="stylesheet" href="/static/alias-workflow.css?v={{ version }}" data-alias-workflow-styles="1">
+{% set workflow_rows = alias_workflow_rows if alias_workflow_rows is defined else {} %}
+{% set action_required_ui = action_required if action_required is defined else {'base_count': 0} %}
 <header class="page-heading page-heading-actions">
   <div>
     <h1>{% if language == 'de' %}Aliase{% else %}Aliases{% endif %}</h1>
     <p class="muted">{% if language == 'de' %}Verwalte deine Aliase und behalte Nutzung und Status im Blick.{% else %}Manage your aliases and keep usage and status in view.{% endif %}</p>
   </div>
-  <button class="button primary" type="button" data-open-create-alias>{{ ui_icon('plus') }}{% if language == 'de' %}Neuer Alias{% else %}New alias{% endif %}</button>
+  <a class="button primary" href="/aliases?create=1" data-open-create-alias>{{ ui_icon('plus') }}{% if language == 'de' %}Neuer Alias{% else %}New alias{% endif %}</a>
 </header>
 
 {% if catch_all %}
@@ -57,6 +60,12 @@
     </form>
   </div>
 
+  <div class="unexpected-review-actions action-required-actions" data-unexpected-review-actions>
+    <a class="button compact unexpected-review-all-button action-required-button {% if action_required_ui.base_count %}has-action-required{% endif %}" href="/aliases?action=required" data-unexpected-review-all data-action-required-open>
+      {% if action_required_ui.base_count %}{% if language == 'de' %}Handlungsbedarf ({{ action_required_ui.base_count }}){% else %}Action required ({{ action_required_ui.base_count }}){% endif %}{% else %}{% if language == 'de' %}Handlungsbedarf{% else %}Action required{% endif %}{% endif %}
+    </a>
+  </div>
+
   <div class="alias-filter-row">
     <nav class="status-filters" aria-label="{{ t.filter_aria }}">
       <a class="filter-pill {% if status_filter == 'all' %}current{% endif %}" href="/aliases?status=all&q={{ search_query|urlencode }}&per_page={{ per_page }}&sort={{ sort_mode }}&direction={{ sort_direction }}">{{ t.filter_all }} <span>{{ status_counts.all }}</span></a>
@@ -102,7 +111,10 @@
         {% set icon = service_icons.get(alias.address|lower) %}
         {% set senders = sender_stats.get(alias.address|lower, []) if stats_state and stats_state.sender_detail_enabled else [] %}
         {% set unexpected_count = senders|selectattr('expected', 'equalto', false)|list|length %}
-        <article class="alias-row alias-table-row {% if not alias.active %}disabled-row{% endif %}">
+        {% set workflow_row = workflow_rows.get(alias.address|lower) %}
+        {% set replacement_links = alias_replacement_history.get(alias.address|lower, []) if alias_replacement_history is defined else [] %}
+        <article class="alias-row alias-table-row {% if not alias.active %}disabled-row{% endif %}{% if workflow_row %} alias-migration-{{ workflow_row.role }}{% endif %}"{% if workflow_row %} data-alias-workflow-row="{{ workflow_row.id }}" data-alias-workflow-role="{{ workflow_row.role }}"{% endif %}>
+          {% if workflow_row and workflow_row.role == 'new' %}<span class="alias-migration-link-icon" aria-hidden="true">{{ ui_icon('link') }}</span>{% endif %}
           <label class="alias-select-control">
             <input type="checkbox" value="{{ alias.id }}" aria-label="{{ t.select_alias.format(address=alias.address) }}" data-alias-select data-address="{{ alias.address }}" data-description="{{ alias.description }}" data-active="{{ '1' if alias.active else '0' }}" data-sogo="{{ '1' if alias.sogo_visible else '0' }}">
           </label>
@@ -111,6 +123,7 @@
             <span class="service-badge tone-{{ icon.tone if icon else 'neutral' }}" data-service-icon-for="{{ alias.id }}" title="{{ icon.label if icon else '' }}">{{ icon.glyph if icon else 'AL' }}</span>
             <div class="alias-info">
               <strong>{{ alias.description or t.no_purpose }}</strong>
+              {% if workflow_row %}<span class="alias-workflow-badge">{% if workflow_row.role == 'old' %}{% if language == 'de' %}ALT{% else %}OLD{% endif %}{% else %}{% if language == 'de' %}NEU{% else %}NEW{% endif %}{% endif %}</span>{% endif %}
               {% if alias.private_description %}
               <details class="alias-description-details" data-alias-private-description-preview="1">
                 <summary class="alias-description-summary" title="{% if language == 'de' %}Beschreibung vollständig anzeigen{% else %}Show full description{% endif %}" aria-label="{% if language == 'de' %}Beschreibung vollständig anzeigen{% else %}Show full description{% endif %}">
@@ -121,6 +134,27 @@
               </details>
               {% endif %}
               <code>{{ alias.address }}</code>
+              {% if replacement_links %}
+              <div class="alias-replacement-history">
+                {% for relation in replacement_links %}
+                <a class="alias-replacement-history-link" href="/aliases?q={{ relation.address|urlencode }}" title="{{ relation.address }}">
+                  <span>{% if relation.direction == 'previous' %}← {% if language == 'de' %}Ersetzte{% else %}Replaced{% endif %} · {{ relation.address }}{% else %}{% if language == 'de' %}Ersetzt durch{% else %}Replaced by{% endif %} · {{ relation.address }} →{% endif %}</span>
+                </a>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% if workflow_row %}
+              <div class="alias-workflow-row-state">
+                <span>
+                  {% if workflow_row.state == 'received' %}{% if language == 'de' %}Neue E-Mail empfangen{% else %}New email received{% endif %}
+                  {% elif workflow_row.state == 'old_received' %}{% if language == 'de' %}Alte Adresse wurde noch benutzt{% else %}Old address was still used{% endif %}
+                  {% elif workflow_row.state == 'stopped' %}{% if language == 'de' %}Prüfung pausiert{% else %}Check paused{% endif %}
+                  {% elif workflow_row.role == 'old' %}{% if language == 'de' %}Bisherige Adresse bleibt aktiv{% else %}Previous address stays active{% endif %}
+                  {% else %}{% if language == 'de' %}Neue Adresse wird geprüft{% else %}New address is being checked{% endif %}{% endif %}
+                </span>
+                <a class="button ghost compact" href="/aliases?workflow={{ workflow_row.id }}" data-open-alias-workflow="{{ workflow_row.id }}">{% if language == 'de' %}Status öffnen{% else %}Open status{% endif %}</a>
+              </div>
+              {% endif %}
               {% if stats_state and stats_state.sender_detail_enabled %}
               <details class="sender-stats">
                 <summary class="sender-stats-trigger">
@@ -206,12 +240,20 @@
                   <label class="check-row"><input type="checkbox" name="sogo_visible" value="1" {% if alias.sogo_visible %}checked{% endif %}><span>{{ t.show_in_sogo }}</span></label>
                   <button class="button primary compact" type="submit">{{ t.save }}</button>
                 </form>
-                <button class="button compact alias-replace-action" type="button" data-replace-alias="{{ alias.id }}">{% if language == 'de' %}Alias ersetzen{% else %}Replace alias{% endif %}</button>
+                {% if workflow_row %}
+                <a class="button compact alias-replace-action" href="/aliases?workflow={{ workflow_row.id }}" data-open-alias-workflow="{{ workflow_row.id }}">{% if language == 'de' %}Aliaswechsel anzeigen{% else %}Show alias change{% endif %}</a>
+                {% else %}
+                <a class="button compact alias-replace-action" href="/aliases?replace={{ alias.id }}" data-alias-workflow-replace="{{ alias.id }}" data-alias-workflow-address="{{ alias.address }}">{% if language == 'de' %}Alias ersetzen{% else %}Replace alias{% endif %}</a>
+                {% endif %}
+                {% if alias.active and workflow_row and workflow_row.role == 'new' %}
+                <a class="button compact danger alias-toggle-action top-gap" href="/aliases?deactivate={{ alias.id }}" data-open-replacement-deactivation="{{ alias.id }}">{% if language == 'de' %}Alias deaktivieren{% else %}Disable alias{% endif %}</a>
+                {% else %}
                 <form class="alias-toggle-action top-gap" method="post" action="/aliases/{{ alias.id }}/toggle">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="return_to" value="{{ return_to }}">
                   <button class="button compact {{ 'danger' if alias.active else '' }}" type="submit">{% if alias.active %}{% if language == 'de' %}Alias deaktivieren{% else %}Disable alias{% endif %}{% else %}{% if language == 'de' %}Alias aktivieren{% else %}Enable alias{% endif %}{% endif %}</button>
                 </form>
+                {% endif %}
               </div>
             </details>
           </div>
@@ -239,10 +281,10 @@
   </div>
 </section>
 
-<dialog class="assign-dialog create-alias-dialog" data-create-alias-dialog>
+<dialog class="assign-dialog create-alias-dialog" data-create-alias-dialog {% if open_create_alias is defined and open_create_alias %}open{% endif %}>
   <div class="dialog-head">
     <div><h2>{{ t.create_alias }}</h2><p class="muted">{% if language == 'de' %}Erstelle eine neue Adresse für einen bestimmten Zweck.{% else %}Create a new address for a specific purpose.{% endif %}</p></div>
-    <button class="dialog-close" type="button" data-close-create-alias aria-label="{{ t.close }}">{{ ui_icon('x') }}</button>
+    <a class="dialog-close" href="/aliases" data-close-create-alias aria-label="{{ t.close }}">{{ ui_icon('x') }}</a>
   </div>
   <form method="post" action="/aliases" class="stack" data-alias-create-form>
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -264,5 +306,8 @@
     <button class="button primary" type="submit">{{ ui_icon('plus') }}{{ t.create_alias_button }}</button>
   </form>
 </dialog>
-<script src="/static/alias-workflow.js"></script>
+
+{% include "_action_required.html" %}
+{% include "_alias_workflow.html" %}
+<script src="/static/alias-workflow.js?v={{ version }}" defer></script>
 {% endblock %}

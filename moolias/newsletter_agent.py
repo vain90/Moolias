@@ -160,6 +160,8 @@ def _extract_body_unsubscribe_url(raw_message: str) -> str | None:
 
 class DoveadmNewsletterReader:
     FIELDS = (
+        "mailbox-guid",
+        "uid",
         "hdr.from",
         "hdr.to",
         "hdr.delivered-to",
@@ -185,6 +187,52 @@ class DoveadmNewsletterReader:
         self.host = host
         self.timeout = timeout
 
+    async def _fetch_body(self, mailbox: str, mailbox_guid: str, uid: str) -> str:
+        command = (
+            "doveadm",
+            "-o",
+            f"doveadm_password={self.password}",
+            "-f",
+            "flow",
+            "fetch",
+            "-S",
+            self.host,
+            "-u",
+            mailbox,
+            "text.utf8",
+            "mailbox-guid",
+            mailbox_guid,
+            "uid",
+            uid,
+        )
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self.timeout)
+        except TimeoutError as exc:
+            if "process" in locals() and process.returncode is None:
+                process.kill()
+                await process.wait()
+            raise DoveadmError("Dovecot body lookup timed out") from exc
+        except OSError as exc:
+            raise DoveadmError("doveadm could not be executed") from exc
+
+        if len(stdout) > MAX_DOVEADM_OUTPUT:
+            raise DoveadmError("Dovecot returned too much data")
+        if process.returncode != 0:
+            detail = stderr.decode("utf-8", errors="replace").strip()
+            if len(detail) > 300:
+                detail = detail[:300] + "…"
+            raise DoveadmError(detail or "Dovecot body lookup failed")
+
+        prefix = b"text.utf8="
+        if not stdout.startswith(prefix):
+            raise DoveadmError("Dovecot returned an unexpected body response")
+        return stdout[len(prefix) :].decode("utf-8", errors="replace")
+
     async def fetch_headers(
         self,
         mailbox: str,
@@ -194,9 +242,6 @@ class DoveadmNewsletterReader:
     ) -> dict[str, Any] | None:
         mailbox = _normalise_mailbox(mailbox)
         message_id = _normalise_message_id(message_id)
-        fields = list(self.FIELDS)
-        if include_body_unsubscribe:
-            fields.append("text.utf8")
         command = (
             "doveadm",
             "-o",
@@ -208,7 +253,7 @@ class DoveadmNewsletterReader:
             self.host,
             "-u",
             mailbox,
-            " ".join(fields),
+            " ".join(self.FIELDS),
             "mailbox",
             "*",
             "HEADER",
@@ -257,7 +302,11 @@ class DoveadmNewsletterReader:
         )
         body_unsubscribe_url = ""
         if include_body_unsubscribe:
-            raw_message = str(selected.get("text.utf8") or "")
+            mailbox_guid = str(selected.get("mailbox-guid") or "").strip()
+            uid = str(selected.get("uid") or "").strip()
+            if not mailbox_guid or not uid:
+                raise DoveadmError("Dovecot did not identify the selected message")
+            raw_message = await self._fetch_body(mailbox, mailbox_guid, uid)
             body_unsubscribe_url = _extract_body_unsubscribe_url(raw_message) or ""
 
         return {

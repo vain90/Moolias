@@ -118,6 +118,9 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
             "Alias Name / Alias-Adresse"
         )
 
+        create_link = page.locator("[data-open-create-alias]")
+        expect(create_link).to_have_attribute("href", "/aliases?create=1")
+
         row = _amazon_row(page)
         expect(row.locator("[data-alias-edit-address] code")).to_have_text(
             "amazon-k7@example.org"
@@ -125,7 +128,9 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
         expect(
             row.locator('.edit-panel textarea[name="private_description"]')
         ).to_have_count(1)
-        expect(row.locator("[data-replace-alias]")).to_have_text("Alias ersetzen")
+        replacement_link = row.locator("[data-alias-workflow-replace]")
+        expect(replacement_link).to_have_text("Alias ersetzen")
+        expect(replacement_link).to_have_attribute("href", "/aliases?replace=1")
         expect(row.locator(".alias-toggle-action button")).to_have_text(
             "Alias deaktivieren"
         )
@@ -134,6 +139,17 @@ def test_alias_description_fields_are_server_rendered_without_javascript(
                 'dialog[data-create-alias-dialog] textarea[name="private_description"]'
             )
         ).to_have_count(1)
+
+        page.goto(f"{base_url}/aliases?replace=1")
+        replacement_dialog = page.locator("dialog[data-alias-replacement-dialog][open]")
+        expect(replacement_dialog).to_be_visible()
+        expect(replacement_dialog.locator("[data-alias-replacement-form]")).to_have_attribute(
+            "action", "/aliases/1/replace"
+        )
+        expect(replacement_dialog).to_contain_text("amazon-k7@example.org")
+
+        page.goto(f"{base_url}/aliases?create=1")
+        expect(page.locator("dialog[data-create-alias-dialog][open]")).to_be_visible()
     finally:
         context.close()
 

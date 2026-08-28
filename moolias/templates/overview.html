@@ -146,6 +146,30 @@
         {{ icon('chevron-right') }}
       </button>
 
+      {% for workflow in pending_alias_replacements|default([]) %}
+      <a class="action-item overview-workflow-action" href="/aliases?workflow={{ workflow.id }}" data-pending-alias-workflow="{{ workflow.id }}" data-pending-alias-workflow-state="{{ workflow.waiting_state }}">
+        <span class="action-icon blue" aria-hidden="true">{{ icon('link') }}</span>
+        <span>
+          <strong>
+            {% if workflow.new_mail_received_at %}
+              {% if language == 'de' %}Aliaswechsel abschließen{% else %}Complete alias change{% endif %}
+            {% else %}
+              {% if language == 'de' %}Aliaswechsel prüfen{% else %}Review alias change{% endif %}
+            {% endif %}
+          </strong>
+          <small>
+            {% if workflow.alias_name %}{{ workflow.alias_name }} · {% endif %}
+            {% if workflow.new_mail_received_at %}
+              {% if language == 'de' %}Neue Adresse empfängt E-Mails · bisherige Adresse ist noch aktiv{% else %}New address receives mail · previous address is still active{% endif %}
+            {% else %}
+              {% if language == 'de' %}Bisherige Adresse ist noch aktiv{% else %}Previous address is still active{% endif %}
+            {% endif %}
+          </small>
+        </span>
+        {{ icon('chevron-right') }}
+      </a>
+      {% endfor %}
+
       {% if action_required.used_pool %}
       <a class="action-item" href="/offline-pool?used=1"><span class="action-icon blue" aria-hidden="true">{{ icon('archive') }}</span><span><strong>{{ action_required.used_pool }} {% if language == 'de' %}benutzte Offline-Aliase{% else %}used offline aliases{% endif %}</strong><small>{% if language == 'de' %}Ordne bereits benutzte Adressen einem Zweck zu.{% else %}Assign already used addresses to a purpose.{% endif %}</small></span>{{ icon('chevron-right') }}</a>
       {% endif %}
@@ -168,8 +192,10 @@
       </div>
     </div>
 
-    <button class="button ghost action-details-button" type="button" data-action-required-open>{% if language == 'de' %}Alle Details anzeigen{% else %}Show all details{% endif %}</button>
+    <a class="button ghost action-details-button" href="/overview?action=required" data-action-required-open>{% if language == 'de' %}Alle Details anzeigen{% else %}Show all details{% endif %}</a>
   </aside>
 </div>
+{% include "_action_required.html" %}
 <script src="/static/welcome-name.js?v=20260822-1" defer></script>
+<script src="/static/alias-workflow.js?v={{ version }}" defer></script>
 {% endblock %}

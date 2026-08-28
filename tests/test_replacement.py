@@ -1,6 +1,9 @@
+import asyncio
 import os
 from contextlib import contextmanager
+from types import SimpleNamespace
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from moolias.aliases import AliasRecord
@@ -112,11 +115,20 @@ def make_client(monkeypatch, fake: FakeMailcow):
         yield client
 
 
-def test_replace_alias_copies_name_description_and_sogo_then_disables_old_alias(monkeypatch):
+def _replace(client, data: dict[str, str]):
+    return client.post(
+        "/aliases/42/replace",
+        data=data,
+        headers={"Accept": "application/json"},
+        follow_redirects=False,
+    )
+
+
+def test_replace_alias_copies_metadata_and_keeps_old_alias_active(monkeypatch):
     fake = FakeMailcow(alias_record(private_comment="Orders and invoices"))
 
     with make_client(monkeypatch, fake) as client:
-        response = client.post("/aliases/42/replace", data={"csrf_token": "test"})
+        response = _replace(client, {"csrf_token": "test"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -124,6 +136,9 @@ def test_replace_alias_copies_name_description_and_sogo_then_disables_old_alias(
     assert payload["address"].startswith("amazon-")
     suffix = payload["address"].split("@", 1)[0].rsplit("-", 1)[1]
     assert len(suffix) == 2
+    assert payload["workflow"]["kind"] == "replacement"
+    assert payload["workflow"]["old_address"] == "amazon-k7@example.org"
+    assert payload["workflow"]["new_address"] == payload["address"]
     assert fake.created == [
         {
             "address": payload["address"],
@@ -133,7 +148,7 @@ def test_replace_alias_copies_name_description_and_sogo_then_disables_old_alias(
             "sogo_visible": True,
         }
     ]
-    assert fake.active_updates == [(42, False)]
+    assert fake.active_updates == []
 
 
 def test_replace_alias_can_use_readable_random_format(monkeypatch):
@@ -146,9 +161,9 @@ def test_replace_alias_can_use_readable_random_format(monkeypatch):
     )
 
     with make_client(monkeypatch, fake) as client:
-        response = client.post(
-            "/aliases/42/replace",
-            data={"csrf_token": "test", "mode": "readable"},
+        response = _replace(
+            client,
+            {"csrf_token": "test", "mode": "readable"},
         )
 
     assert response.status_code == 200
@@ -162,16 +177,16 @@ def test_replace_alias_can_use_readable_random_format(monkeypatch):
             "sogo_visible": False,
         }
     ]
-    assert fake.active_updates == [(42, False)]
+    assert fake.active_updates == []
 
 
 def test_replace_alias_can_use_custom_local_part(monkeypatch):
     fake = FakeMailcow(alias_record())
 
     with make_client(monkeypatch, fake) as client:
-        response = client.post(
-            "/aliases/42/replace",
-            data={
+        response = _replace(
+            client,
+            {
                 "csrf_token": "test",
                 "mode": "custom",
                 "local_part": "amazon-neu",
@@ -189,7 +204,7 @@ def test_replace_alias_can_use_custom_local_part(monkeypatch):
             "sogo_visible": True,
         }
     ]
-    assert fake.active_updates == [(42, False)]
+    assert fake.active_updates == []
 
 
 def test_replace_alias_rejects_invalid_custom_local_part(monkeypatch):
@@ -224,17 +239,103 @@ def test_replace_alias_rejects_unknown_mode(monkeypatch):
     assert fake.active_updates == []
 
 
-def test_replace_alias_reports_partial_result_when_old_alias_cannot_be_disabled(monkeypatch):
+def test_replace_alias_rejects_new_side_of_pending_replacement_before_create(monkeypatch):
+    fake = FakeMailcow(alias_record(address="Replacement@example.org"))
+
+    class PendingWorkflow:
+        id = 7
+        old_alias_id = 41
+        old_address = "old@example.org"
+        new_address = "replacement@example.org"
+
+    class PendingStore:
+        async def pending_replacements(self, mailbox: str):
+            assert mailbox == "hidden@example.org"
+            return [PendingWorkflow()]
+
+    async def pending_store(_request):
+        return PendingStore()
+
+    monkeypatch.setattr(alias_table_module, "_workflow_store", pending_store)
+
+    with make_client(monkeypatch, fake) as client:
+        response = client.post(
+            "/aliases/42/replace",
+            data={"csrf_token": "test"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/aliases?workflow=7"
+    assert fake.created == []
+    assert fake.active_updates == []
+
+
+async def test_parallel_replacements_create_only_one_new_alias(monkeypatch, tmp_path):
+    fake = FakeMailcow(alias_record())
+    original_create = fake.create_alias
+
+    async def delayed_create(*args, **kwargs):
+        await asyncio.sleep(0.05)
+        await original_create(*args, **kwargs)
+
+    monkeypatch.setattr(fake, "create_alias", delayed_create)
+    monkeypatch.setattr(alias_table_module, "require_user", lambda _request: "hidden@example.org")
+    monkeypatch.setattr(alias_table_module, "validate_csrf", lambda _request, _token: None)
+
+    store = alias_table_module.AliasWorkflowStore(tmp_path / "state.sqlite3")
+    await store.initialize()
+    request = SimpleNamespace(
+        app=SimpleNamespace(
+            state=SimpleNamespace(
+                mailcow=fake,
+                settings=SimpleNamespace(alias_workflow_bypass_seconds=900),
+                alias_workflow_store=store,
+                alias_workflow_coordinator=None,
+            )
+        ),
+        headers={"accept": "application/json"},
+    )
+
+    results = await asyncio.gather(
+        alias_table_module.replace_alias(
+            request,
+            42,
+            mode="named",
+            local_part="",
+            csrf_token="test",
+        ),
+        alias_table_module.replace_alias(
+            request,
+            42,
+            mode="named",
+            local_part="",
+            csrf_token="test",
+        ),
+        return_exceptions=True,
+    )
+
+    successes = [item for item in results if isinstance(item, dict)]
+    conflicts = [item for item in results if isinstance(item, HTTPException)]
+    assert len(successes) == 1
+    assert len(conflicts) == 1
+    assert conflicts[0].status_code == 409
+    assert len(fake.created) == 1
+
+    pending = await store.pending_replacements("hidden@example.org")
+    assert len(pending) == 1
+    assert pending[0].new_address == successes[0]["address"]
+
+
+def test_replace_alias_does_not_attempt_immediate_deactivation(monkeypatch):
     fake = FakeMailcow(alias_record(), fail_disable=True)
 
     with make_client(monkeypatch, fake) as client:
-        response = client.post("/aliases/42/replace", data={"csrf_token": "test"})
+        response = _replace(client, {"csrf_token": "test"})
 
-    assert response.status_code == 502
-    detail = response.json()["detail"]
-    assert detail["code"] == "partial_replacement"
-    assert detail["address"].startswith("amazon-")
-    assert fake.active_updates == [(42, False)]
+    assert response.status_code == 200
+    assert response.json()["workflow"]["state"] == "waiting"
+    assert fake.active_updates == []
 
 
 def test_primary_mailbox_alias_cannot_be_replaced(monkeypatch):
