@@ -132,11 +132,11 @@ Its only writable mounts are:
 
 The SMTP sender-policy path has no runtime dependency on Agent availability. If the Agent stops, the last rendered Postfix policy remains on disk and existing sender protection continues to be enforced. Changes to sender protection and alias-workflow bypass state are unavailable until the Agent returns.
 
-The Agent is exposed through Mailcow nginx at `/moolias-agent/` rather than through a new host port. That location limits request bodies to 4 KiB; state-changing endpoints still require a valid HMAC signature.
+The Agent has no published host port. For a standalone Moolias application on another host, the installer also exposes the authenticated Agent API through Mailcow nginx at `/moolias-agent/`; that location limits request bodies to 4 KiB and state-changing endpoints still require a valid HMAC signature. The recommended same-host Moolias application bypasses nginx and connects directly to `http://moolias-agent:8081` on the Mailcow Docker network.
 
 ## Installation
 
-For the recommended same-host deployment, do **not** install the Agent separately. The normal Moolias installer installs or updates it automatically, stores the shared secret in `/opt/moolias/.env`, configures the private Mailcow-nginx URL and validates the Agent before completing:
+For the recommended same-host deployment, do **not** install the Agent separately. The normal Moolias installer installs or updates it automatically, stores the shared secret in `/opt/moolias/.env`, configures `MOOLIAS_MAILCOW_AGENT_URL=http://moolias-agent:8081` for direct Docker-network access and validates the Agent before completing:
 
 ```bash
 curl -fsSL \
@@ -206,7 +206,7 @@ The required shared secret is:
 MOOLIAS_MAILCOW_AGENT_SECRET=replace-with-the-secret-printed-by-the-installer
 ```
 
-By default Moolias uses:
+For a standalone Moolias application, an empty Agent URL uses:
 
 ```text
 <MAILCOW_URL>/moolias-agent
@@ -216,6 +216,12 @@ Only set a custom URL when the Agent is reachable elsewhere:
 
 ```dotenv
 MOOLIAS_MAILCOW_AGENT_URL=https://mail.example.org/moolias-agent
+```
+
+For the recommended same-host deployment, the normal installer instead writes the direct Docker-network URL automatically:
+
+```dotenv
+MOOLIAS_MAILCOW_AGENT_URL=http://moolias-agent:8081
 ```
 
 Primary sender protection is controlled separately:
