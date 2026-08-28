@@ -68,7 +68,7 @@
       {% if selected_workflow.is_replacement %}{% if language == 'de' %}Aliaswechsel{% else %}Alias change{% endif %}{% else %}{% if language == 'de' %}Aktivierung{% else %}Activation{% endif %}{% endif %}
     </span>
     <div class="alias-workflow-status-message">
-      {% if not selected_workflow.completed_at and selected_workflow.watcher_active and not selected_workflow.new_mail_received_at %}
+      {% if not selected_workflow.completed_at and selected_workflow.watcher_active and not selected_workflow.new_mail_received_at and not selected_workflow_monitoring_expired %}
       <span class="alias-workflow-wait-spinner" aria-hidden="true"></span>
       {% endif %}
       <strong>
@@ -78,6 +78,8 @@
           {% if language == 'de' %}Neue E-Mail empfangen. Bitte schau in deinem Postfach nach.{% else %}New email received. Please check your inbox.{% endif %}
         {% elif workflow_state == 'old_received' %}
           {% if language == 'de' %}An die alte Adresse ist noch eine E-Mail eingegangen. Auf der neuen Adresse wurde noch keine E-Mail erkannt.{% else %}An email still arrived at the old address. No email has been detected at the new address yet.{% endif %}
+        {% elif selected_workflow_monitoring_expired %}
+          {% if language == 'de' %}Es wurde noch keine E-Mail an den neuen Alias erkannt. Bitte entscheide, wie du mit dem Wechsel fortfahren möchtest.{% else %}No email has been detected for the new alias yet. Please decide how you want to continue with the change.{% endif %}
         {% elif workflow_state == 'stopped' %}
           {% if language == 'de' %}Die Prüfung ist pausiert. Du kannst sie jederzeit fortsetzen.{% else %}The check is paused. You can resume it at any time.{% endif %}
         {% else %}
@@ -85,7 +87,7 @@
         {% endif %}
       </strong>
     </div>
-    {% if not selected_workflow.completed_at and workflow_state != 'received' %}
+    {% if not selected_workflow.completed_at and workflow_state != 'received' and not selected_workflow_monitoring_expired %}
     <div class="alias-workflow-wait-actions">
       {% if selected_workflow.watcher_active %}
       <form method="post" action="/aliases/workflows/{{ selected_workflow.id }}/stop">
@@ -150,7 +152,60 @@
 
   <div class="button-row top-gap">
     <a class="button" href="/aliases" data-alias-workflow-done>{% if language == 'de' %}Fertig{% else %}Done{% endif %}</a>
+    {% if selected_workflow.is_pending_replacement and selected_workflow_new_alias_id %}
+    <a class="button danger ghost" href="/aliases?deactivate={{ selected_workflow_new_alias_id }}" data-alias-workflow-cancel>{% if language == 'de' %}Wechsel abbrechen{% else %}Cancel change{% endif %}</a>
+    {% endif %}
   </div>
+</dialog>
+{% endif %}
+
+{% if replacement_deactivation_alias and replacement_deactivation_workflow %}
+<dialog class="assign-dialog assign-dialog-single alias-workflow-dialog" data-replacement-deactivation-dialog open>
+  <div class="dialog-head">
+    <div>
+      <h2>{% if language == 'de' %}Neuen Alias deaktivieren?{% else %}Disable new alias?{% endif %}</h2>
+      <p class="muted">
+        {% if language == 'de' %}Dieser Alias gehört zu einem laufenden Aliaswechsel. Wenn du ihn deaktivierst, wird der Wechsel beendet.{% else %}This alias belongs to an active alias change. Disabling it will end the change.{% endif %}
+      </p>
+    </div>
+    <a class="dialog-close" href="/aliases" aria-label="{{ t.close }}" title="{{ t.close }}">{{ ui_icon('x') }}</a>
+  </div>
+
+  <section class="alias-workflow-address-card">
+    <div class="alias-workflow-address-copy">
+      <span class="alias-workflow-address-label">{% if language == 'de' %}Neuer Alias{% else %}New alias{% endif %}</span>
+      <code>{{ replacement_deactivation_alias.address }}</code>
+    </div>
+  </section>
+
+  <form method="post" action="/aliases/{{ replacement_deactivation_alias.id }}/toggle" class="alias-replacement-cancel-form top-gap">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="return_to" value="/aliases">
+    <input type="hidden" name="confirm_replacement" value="true">
+
+    <h3>{% if language == 'de' %}Was soll mit der bisherigen Adresse passieren?{% else %}What should happen to the previous address?{% endif %}</h3>
+    <div class="alias-replacement-previous">
+      {% if replacement_deactivation_workflow.alias_name %}<strong>{{ replacement_deactivation_workflow.alias_name }}</strong>{% endif %}
+      <code>{{ replacement_deactivation_workflow.old_address }}</code>
+    </div>
+
+    <fieldset class="alias-workflow-deactivation-options alias-replacement-cancel-options">
+      <legend>{% if language == 'de' %}Bisherige Adresse auswählen{% else %}Choose previous address action{% endif %}</legend>
+      <label class="alias-workflow-deactivation-option">
+        <input type="radio" name="old_alias_action" value="keep" checked>
+        <span>{% if language == 'de' %}Aktiv lassen{% else %}Keep active{% endif %}</span>
+      </label>
+      <label class="alias-workflow-deactivation-option">
+        <input type="radio" name="old_alias_action" value="disable">
+        <span>{% if language == 'de' %}Auch deaktivieren{% else %}Disable too{% endif %}</span>
+      </label>
+    </fieldset>
+
+    <div class="button-row">
+      <button class="button danger" type="submit">{% if language == 'de' %}Neuen Alias deaktivieren{% else %}Disable new alias{% endif %}</button>
+      <a class="button" href="/aliases">{% if language == 'de' %}Abbrechen{% else %}Cancel{% endif %}</a>
+    </div>
+  </form>
 </dialog>
 {% endif %}
 
