@@ -85,22 +85,25 @@ def test_statistics_mode_downgrade_shows_confirmation_and_processing_dialog(
     expect(processing.locator("progress")).to_be_visible()
 
 
-def test_action_required_dialog_shows_loading_feedback(
+def test_action_required_dialog_uses_server_rendered_content_without_loading_fetch(
     page: Page,
     base_url: str,
 ) -> None:
     _login(page, base_url)
 
+    dialog = page.locator("dialog[data-action-required-dialog]")
+    expect(dialog.locator("[data-action-required-unexpected-section]")).to_have_count(1)
+    expect(dialog.locator("[data-action-sender-row]")).to_have_count(2)
+
     page.evaluate(
         """
         () => {
+          window.__actionRequiredUnexpectedFetches = 0;
           const originalFetch = window.fetch.bind(window);
           window.fetch = (input, init) => {
             const url = input instanceof Request ? input.url : String(input);
             if (url.includes('/aliases') && url.includes('status=unexpected')) {
-              return new Promise((resolve, reject) => {
-                window.setTimeout(() => originalFetch(input, init).then(resolve, reject), 1500);
-              });
+              window.__actionRequiredUnexpectedFetches += 1;
             }
             return originalFetch(input, init);
           };
@@ -109,14 +112,11 @@ def test_action_required_dialog_shows_loading_feedback(
     )
 
     page.locator("[data-action-required-open]").click()
-    dialog = page.locator("dialog[data-action-required-dialog]")
     expect(dialog).to_be_visible()
-    expect(dialog.locator(".action-required-loading")).to_have_text(
-        "Loading action-required items …"
-    )
-    expect(dialog.locator(".action-required-progress")).to_be_visible()
-
-    expect(dialog.locator(".action-required-loading")).to_have_count(0, timeout=5_000)
+    expect(dialog.locator("[data-action-required-unexpected-section]")).to_be_visible()
+    expect(dialog.locator(".action-required-loading")).to_have_count(0)
+    expect(dialog.locator(".action-required-progress")).to_have_count(0)
+    assert page.evaluate("window.__actionRequiredUnexpectedFetches") == 0
 
 
 def test_usage_evidence_link_has_spacing_from_usage_summary(
