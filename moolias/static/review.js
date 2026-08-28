@@ -186,11 +186,12 @@
   };
 
   const saveIgnoredAlias = async (form, checkbox) => {
+    const payload = new FormData(form);
     checkbox.disabled = true;
     try {
       const response = await fetch(form.action, {
         method: "POST",
-        body: new FormData(form),
+        body: payload,
         credentials: "same-origin",
       });
       if (response.status === 401) {
