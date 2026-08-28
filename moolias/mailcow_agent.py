@@ -268,7 +268,7 @@ class AgentStateStore:
         if not normalized or len(normalized) > 2:
             raise InvalidMailbox("Delivery bypass requires one or two recipient addresses")
         now = int(self.clock())
-        if enabled and (expires_at is None or int(expires_at) <= now):
+        if enabled and expires_at is not None and int(expires_at) <= now:
             raise AgentStateError("Delivery bypass expiry must be in the future")
 
         self.state_dir.mkdir(parents=True, exist_ok=True)
@@ -279,8 +279,7 @@ class AgentStateStore:
             self._expire_bypass_entries(state)
             active = dict(state["delivery_bypass"])
             if enabled:
-                assert expires_at is not None
-                expiry = int(expires_at)
+                expiry = None if expires_at is None else int(expires_at)
                 for recipient in normalized:
                     active[recipient] = expiry
             else:
@@ -291,7 +290,7 @@ class AgentStateStore:
             return {
                 "recipients": normalized,
                 "enabled": enabled,
-                "expires_at": int(expires_at) if enabled and expires_at is not None else None,
+                "expires_at": None if expires_at is None else int(expires_at),
             }
 
     def expire_delivery_bypass(self) -> list[str]:
@@ -306,7 +305,7 @@ class AgentStateStore:
                 self._write_state_and_files(state)
             return sorted(before - set(state["delivery_bypass"]))
 
-    def delivery_bypass_status(self) -> dict[str, int]:
+    def delivery_bypass_status(self) -> dict[str, int | None]:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.bypass_map_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock_file:
@@ -359,7 +358,7 @@ class AgentStateStore:
                 for key, value in changed_raw.items()
             }
             delivery_bypass = {
-                normalize_mailbox(str(key)): int(value)
+                normalize_mailbox(str(key)): (None if value is None else int(value))
                 for key, value in bypass_raw.items()
             }
         except (InvalidMailbox, TypeError, ValueError) as exc:
@@ -375,9 +374,9 @@ class AgentStateStore:
     def _expire_bypass_entries(self, state: dict[str, Any]) -> bool:
         now = int(self.clock())
         active = {
-            address: int(expires_at)
+            address: expires_at
             for address, expires_at in state["delivery_bypass"].items()
-            if int(expires_at) > now
+            if expires_at is None or int(expires_at) > now
         }
         changed = active != state["delivery_bypass"]
         state["delivery_bypass"] = dict(sorted(active.items()))
