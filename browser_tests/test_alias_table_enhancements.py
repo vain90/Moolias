@@ -4,7 +4,6 @@ import re
 
 from playwright.sync_api import Page, expect
 
-
 AMAZON = "amazon-k7@example.org"
 GITHUB = "github-m4@example.org"
 ARCHIVE = "archive-r8@example.org"
