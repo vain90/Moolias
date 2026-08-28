@@ -633,7 +633,7 @@ set_key_value "$env_file" MAILCOW_OAUTH_CLIENT_SECRET "$oauth_secret"
 set_key_value "$env_file" MAILCOW_DOCKER_NETWORK "$mailcow_network"
 set_key_value "$env_file" MOOLIAS_IMAGE "$IMAGE_REPOSITORY"
 set_key_value "$env_file" MOOLIAS_TAG "$IMAGE_TAG"
-set_key_value "$env_file" MOOLIAS_MAILCOW_AGENT_URL "http://nginx-mailcow:${http_port}/moolias-agent"
+set_key_value "$env_file" MOOLIAS_MAILCOW_AGENT_URL "http://moolias-agent:8081"
 if [[ "$sender_protection_enabled" == "true" ]]; then
   set_key_value "$env_file" MOOLIAS_SENDER_PROTECTION true
 else
