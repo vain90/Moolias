@@ -102,6 +102,25 @@
     if (event.target === replacementDialog) replacementDialog.close();
   });
 
+  const replacementDeactivationDialog = document.querySelector(
+    "[data-replacement-deactivation-dialog]"
+  );
+  if (replacementDeactivationDialog?.hasAttribute("open")) {
+    showDialog(replacementDeactivationDialog);
+  }
+  replacementDeactivationDialog?.querySelector(".dialog-close")?.addEventListener(
+    "click",
+    (event) => {
+      event.preventDefault();
+      replacementDeactivationDialog.close();
+    }
+  );
+  replacementDeactivationDialog?.addEventListener("click", (event) => {
+    if (event.target === replacementDeactivationDialog) {
+      replacementDeactivationDialog.close();
+    }
+  });
+
   document.querySelectorAll("[data-alias-workflow-copy]").forEach((button) => {
     button.addEventListener("click", async () => {
       const address = button.dataset.aliasWorkflowCopy || "";
