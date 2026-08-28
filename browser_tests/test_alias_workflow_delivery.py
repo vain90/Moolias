@@ -198,9 +198,10 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
 
     action.click()
     expect(page).to_have_url(
-        re.compile(rf"{re.escape(base_url)}/aliases\?workflow={workflow_id}$"),
+        re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"),
         timeout=5000,
     )
+    assert "workflow=" not in page.url
     workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
     expect(workflow).to_be_visible(timeout=5000)
     expect(workflow).to_have_attribute("data-alias-workflow-state", "received")
