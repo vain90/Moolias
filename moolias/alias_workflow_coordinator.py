@@ -167,6 +167,12 @@ class AliasWorkflowCoordinator:
             for workflow in await self.store.bypass_provisioning_due(now=now):
                 await self.provision_workflow(workflow)
 
+        monitoring_cutoff = now - self.settings.alias_replacement_monitoring_max_days * 86400
+        await self.store.stop_replacement_monitoring_before(
+            before=monitoring_cutoff,
+            now=now,
+        )
+
         watchers = await self.store.active_watchers()
         if watchers:
             await self._scan_delivery_history(watchers)
