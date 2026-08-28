@@ -60,6 +60,15 @@
   background: #fee4e2;
 }
 
+.alias-migration-link-icon {
+  border: 1px solid var(--line-strong);
+}
+
+.service-badge .service-logo {
+  width: 21px;
+  height: 21px;
+}
+
 .settings-form button[type="submit"] {
   border-color: var(--accent);
   background: var(--accent);
