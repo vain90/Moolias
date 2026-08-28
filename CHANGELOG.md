@@ -2,6 +2,45 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.3.0 - 2026-08-28
+
+### Added
+
+- guided alias creation and replacement workflows with persistent server-side state that wait for the first accepted delivery before completing a migration
+- an exact-recipient first-mail delivery bypass through the unified Mailcow Agent, with restart-safe state, automatic expiry and early cleanup after the expected delivery is detected
+- independent old/new delivery tracking for replacement workflows plus explicit old-alias deactivation choices for now, later, 1 day, 7 days or 30 days
+- server-side scheduled deactivation that continues without an open browser, together with Action required integration for pending alias changes
+
+### Changed
+
+- the first accepted sender for a waiting workflow is learned as expected at the configured sender-detail level without overriding an explicit manual unexpected decision
+- replacement pairs remain linked and grouped while the migration is active, and the old alias stays active until the selected deactivation policy completes
+- workflow, replacement, deactivation and Action required UI is rendered server-side; normal links and forms remain usable without JavaScript while JavaScript is limited to progressive enhancement and interaction
+- long-running first-mail monitoring advances a per-workflow history cursor instead of repeatedly reopening the full historical Rspamd window
+- the former sender-only sidecar is replaced by the unified required `moolias-agent`; same-host Moolias installations connect directly to `http://moolias-agent:8081`
+- same-host Newsletter Management connects directly to `http://moolias-newsletter-agent:8082`, while authenticated Mailcow-nginx endpoints remain available for standalone deployments
+- Newsletter Agent message retrieval now selects the message through Doveadm JSON first and fetches `text.utf8` separately using the selected mailbox GUID and UID
+- service-logo assets are generated during the Docker image build and icon-picker enhancement is idempotent after server-rendered alias rows are refreshed
+
+### Fixed
+
+- opening an alias migration from Action required now uses the same server-rendered workflow view and styling as opening it from Alias Management
+- confirming unexpected senders in Action required updates the sender row immediately and refreshes the underlying alias table when the dialog closes after changes
+- partial multi-alias Offline Pool assignment failures reload the current server state instead of leaving already-applied changes represented by stale UI
+- non-interactive installer runs no longer fail when `/dev/tty` cannot be opened
+- direct same-host Mailcow Agent and Newsletter Agent routing avoids the internal nginx 502 path while keeping standalone fallback URLs intact
+- first-mail sender learning continues correctly when the temporary delivery-bypass window has expired but the workflow is still waiting for its first accepted message
+
+### Upgrade notes
+
+- existing same-host installations using the older `moolias-sender-agent` layout must run the guided installer once before normal updater use; the migration preserves the existing Agent secret and managed sender-protection state
+- existing administrator-managed sender-login rules remain separate unless explicitly imported; unattended migration keeps recognized manual rules external by default
+
+### Security
+
+- the first-mail bypass is restricted to exact recipients and suppresses only greylisting behavior; normal spam, antivirus and other Rspamd checks remain active
+- the unified Mailcow Agent remains hardened without a Docker socket, Mailcow API key or database credentials and writes only its dedicated state, Postfix policy and Rspamd map paths
+
 ## 1.2.1 - 2026-08-26
 
 ### Added
@@ -229,7 +268,7 @@ All notable changes to Moolias are documented here.
 ### Breaking changes
 
 - The project has been renamed to Moolias across the Python package, container image, Docker Compose service, runtime identifiers and application configuration. Existing 0.1.x installations must follow `docs/migration-to-moolias.md` before switching to the 0.2.0 stable image.
-- application settings now use `MOOLIAS_*`, the container image is `ghcr.io/vain90/moolias`, the Compose service is `moolias`, and the default access/statistics tags and statistics database path use the `moolias` name. Legacy reserved offline-alias markers remain recognized so existing aliases can be migrated safely.
+- application settings now use `MOOLIAS_*`, the container image is `ghcr.io/vain90/moolias`, the Compose service is `moolias`, and the default access/statistics tags and statistics database path use the moolias name. Legacy reserved offline-alias markers remain recognized so existing aliases can be migrated safely.
 
 ### Added
 
