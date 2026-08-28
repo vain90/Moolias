@@ -158,7 +158,7 @@ async def test_bulk_enable_does_not_end_pending_replacement(tmp_path):
     assert current.completed_at is None
 
 
-def test_workflow_aware_bulk_route_is_registered_before_legacy_route():
+def test_workflow_aware_bulk_route_is_the_registered_bulk_route():
     settings = Settings(
         MOOLIAS_BASE_URL="https://aliases.example.org",
         MOOLIAS_SESSION_SECRET="x" * 64,
@@ -177,5 +177,5 @@ def test_workflow_aware_bulk_route_is_registered_before_legacy_route():
         and "POST" in getattr(route, "methods", set())
     ]
 
-    assert len(bulk_routes) == 2
+    assert len(bulk_routes) == 1
     assert bulk_routes[0].endpoint is bulk_module.bulk_aliases
