@@ -197,6 +197,8 @@ def _replacement_needs_attention(
         return workflow.scheduled_deactivation_at <= now
     if workflow.deactivation_mode != DEACTIVATION_LATER:
         return False
+    if workflow.new_mail_received_at is not None:
+        return True
     return workflow.started_at <= now - reminder_days * 86400
 
 
