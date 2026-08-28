@@ -462,6 +462,7 @@ local function skip_first_delivery_greylisting(task)
   if recipient_map:get_key(string.lower(recipient)) then
     task:disable_symbol("GREYLIST_CHECK")
     task:disable_symbol("GREYLIST_SAVE")
+    task:disable_action("greylist")
   end
 end
 
