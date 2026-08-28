@@ -107,6 +107,7 @@
         {% set workflow_row = workflow_rows.get(alias.address|lower) %}
         {% set replacement_links = alias_replacement_history.get(alias.address|lower, []) if alias_replacement_history is defined else [] %}
         <article class="alias-row alias-table-row {% if not alias.active %}disabled-row{% endif %}{% if workflow_row %} alias-migration-{{ workflow_row.role }}{% endif %}"{% if workflow_row %} data-alias-workflow-row="{{ workflow_row.id }}" data-alias-workflow-role="{{ workflow_row.role }}"{% endif %}>
+          {% if workflow_row and workflow_row.role == 'new' %}<span class="alias-migration-link-icon" aria-hidden="true">{{ ui_icon('link') }}</span>{% endif %}
           <label class="alias-select-control">
             <input type="checkbox" value="{{ alias.id }}" aria-label="{{ t.select_alias.format(address=alias.address) }}" data-alias-select data-address="{{ alias.address }}" data-description="{{ alias.description }}" data-active="{{ '1' if alias.active else '0' }}" data-sogo="{{ '1' if alias.sogo_visible else '0' }}">
           </label>
@@ -237,11 +238,15 @@
                 {% else %}
                 <a class="button compact alias-replace-action" href="/aliases?replace={{ alias.id }}" data-alias-workflow-replace="{{ alias.id }}" data-alias-workflow-address="{{ alias.address }}">{% if language == 'de' %}Alias ersetzen{% else %}Replace alias{% endif %}</a>
                 {% endif %}
+                {% if alias.active and workflow_row and workflow_row.role == 'new' %}
+                <a class="button compact danger alias-toggle-action top-gap" href="/aliases?deactivate={{ alias.id }}">{% if language == 'de' %}Alias deaktivieren{% else %}Disable alias{% endif %}</a>
+                {% else %}
                 <form class="alias-toggle-action top-gap" method="post" action="/aliases/{{ alias.id }}/toggle">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="return_to" value="{{ return_to }}">
                   <button class="button compact {{ 'danger' if alias.active else '' }}" type="submit">{% if alias.active %}{% if language == 'de' %}Alias deaktivieren{% else %}Disable alias{% endif %}{% else %}{% if language == 'de' %}Alias aktivieren{% else %}Enable alias{% endif %}{% endif %}</button>
                 </form>
+                {% endif %}
               </div>
             </details>
           </div>
