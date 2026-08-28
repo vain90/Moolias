@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from types import SimpleNamespace
 
 import pytest
@@ -158,7 +159,7 @@ async def test_bulk_enable_does_not_end_pending_replacement(tmp_path):
     assert current.completed_at is None
 
 
-def test_workflow_aware_bulk_route_is_the_registered_bulk_route():
+def test_active_bulk_route_delegates_to_workflow_guard():
     settings = Settings(
         MOOLIAS_BASE_URL="https://aliases.example.org",
         MOOLIAS_SESSION_SECRET="x" * 64,
@@ -178,4 +179,6 @@ def test_workflow_aware_bulk_route_is_the_registered_bulk_route():
     ]
 
     assert len(bulk_routes) == 1
-    assert bulk_routes[0].endpoint is bulk_module.bulk_aliases
+    assert bulk_routes[0].endpoint.__module__ == main_module.__name__
+    assert main_module.workflow_bulk_aliases is bulk_module.bulk_aliases
+    assert "workflow_bulk_aliases(" in inspect.getsource(bulk_routes[0].endpoint)
