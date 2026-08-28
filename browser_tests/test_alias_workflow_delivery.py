@@ -96,7 +96,9 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     assert page.evaluate("window.__mooliasNoReload") == "alive"
     assert "workflow=" not in page.url
 
-    status_link = new_row.locator('[data-open-alias-workflow]')
+    status_link = new_row.locator(
+        ".alias-workflow-row-state [data-open-alias-workflow]"
+    )
     status_link.click()
     workflow = page.locator(
         f'dialog[data-alias-workflow-dialog][data-alias-workflow-id="{workflow_id}"]'
