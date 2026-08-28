@@ -3,7 +3,7 @@
 
   function showDialog(dialog) {
     if (!dialog || dialog.matches(":modal")) return;
-    if (dialog.hasAttribute("open")) dialog.close();
+    if (dialog.hasAttribute("open")) dialog.removeAttribute("open");
     dialog.showModal();
   }
 
