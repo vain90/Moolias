@@ -206,10 +206,23 @@ def test_open_replacement_rows_keep_table_borders_and_use_link_rail():
     assert "background-size: 5px 100%, 3px 100%;" in css
     assert "repeating-linear-gradient(to bottom" not in css
     assert "linear-gradient(#667085, #667085)" in css
-    assert ".alias-row.alias-migration-old {\n  border-top: 2px solid var(--line-strong);\n  border-bottom: 1px dashed #98a2b3;" in css
+
+    old_pair_rule = (
+        ".alias-row.alias-migration-old {\n"
+        "  border-top: 2px solid var(--line-strong);\n"
+        "  border-bottom: 1px dashed #98a2b3;"
+    )
+    assert old_pair_rule in css
     assert ".alias-row.alias-migration-new {\n  border-bottom: 2px solid var(--line-strong);" in css
     assert ".alias-migration-link-icon {" in css
-    assert ".alias-migration-new .alias-workflow-badge {\n  background: var(--accent-soft);\n  color: var(--accent-strong);\n}" in css
+
+    new_badge_rule = (
+        ".alias-migration-new .alias-workflow-badge {\n"
+        "  background: var(--accent-soft);\n"
+        "  color: var(--accent-strong);\n"
+        "}"
+    )
+    assert new_badge_rule in css
 
 
 def test_completed_replacement_history_keeps_sender_stats_first():
