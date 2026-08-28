@@ -203,10 +203,11 @@ def test_open_replacement_rows_keep_table_borders_and_use_link_rail():
     css = (root / "moolias/static/alias-workflow.css").read_text()
 
     assert "border-bottom-color: transparent" not in css
-    assert ".alias-row.alias-migration-old::after" in css
-    assert "background-size: 5px calc(100% + 2px), 3px calc(100% + 2px);" in css
-    assert "linear-gradient(#667085, #667085)" in css
-    assert "border: 2px solid #667085;" in css
+    assert "background-size: 5px 100%, 3px 100%;" in css
+    assert "repeating-linear-gradient(to bottom, #667085 0 7px, transparent 7px 12px)" in css
+    assert ".alias-row.alias-migration-old {\n  border-top: 2px solid var(--line-strong);" in css
+    assert ".alias-row.alias-migration-new {\n  border-bottom: 2px solid var(--line-strong);" in css
+    assert ".alias-migration-link-icon {" in css
 
 
 def test_completed_replacement_history_keeps_sender_stats_first():
