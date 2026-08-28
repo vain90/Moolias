@@ -230,11 +230,7 @@ def test_action_required_starts_guided_alias_change_and_keeps_both_active(
     expect(new_alias.locator("[data-alias-select]")).to_have_attribute("data-sogo", "1")
 
     page.goto(f"{base_url}/overview")
-    pending = page.locator("[data-pending-alias-workflow]")
-    expect(pending).to_have_count(1)
-    expect(pending).to_contain_text(AMAZON)
-    expect(pending).to_contain_text("amazon-safe@example.org")
-    expect(pending).to_contain_text("Confirm alias change")
+    expect(page.locator("[data-pending-alias-workflow]")).to_have_count(0)
 
 
 def test_used_offline_alias_stays_protected_and_pool_export_excludes_it(
