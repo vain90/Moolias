@@ -43,6 +43,7 @@ class AliasWorkflow:
     bypass_provisioned_at: int | None
     bypass_clear_requested_at: int | None
     bypass_cleared_at: int | None
+    cancelled_at: int | None
     completed_at: int | None
 
     @property
@@ -106,6 +107,7 @@ class AliasWorkflowStore:
                     bypass_provisioned_at INTEGER,
                     bypass_clear_requested_at INTEGER,
                     bypass_cleared_at INTEGER,
+                    cancelled_at INTEGER,
                     completed_at INTEGER
                 );
 
@@ -123,6 +125,12 @@ class AliasWorkflowStore:
                     );
                 """
             )
+            columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(alias_workflows)").fetchall()
+            }
+            if "cancelled_at" not in columns:
+                connection.execute("ALTER TABLE alias_workflows ADD COLUMN cancelled_at INTEGER")
 
     @staticmethod
     def _row(row: sqlite3.Row | None) -> AliasWorkflow | None:
@@ -165,6 +173,7 @@ class AliasWorkflowStore:
             bypass_cleared_at=(
                 None if row["bypass_cleared_at"] is None else int(row["bypass_cleared_at"])
             ),
+            cancelled_at=(None if row["cancelled_at"] is None else int(row["cancelled_at"])),
             completed_at=(None if row["completed_at"] is None else int(row["completed_at"])),
         )
 
@@ -341,6 +350,55 @@ class AliasWorkflowStore:
                 (int(workflow_id), mailbox.strip().lower()),
             ).fetchone()
         return self._row(row)
+
+    async def stop_replacement_monitoring_before(
+        self,
+        *,
+        before: int,
+        now: int | None = None,
+    ) -> list[AliasWorkflow]:
+        return await asyncio.to_thread(
+            self._stop_replacement_monitoring_before_sync,
+            int(before),
+            int(time.time()) if now is None else int(now),
+        )
+
+    def _stop_replacement_monitoring_before_sync(
+        self,
+        before: int,
+        stopped_at: int,
+    ) -> list[AliasWorkflow]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id FROM alias_workflows
+                WHERE kind = 'replacement'
+                  AND completed_at IS NULL
+                  AND watcher_active = 1
+                  AND new_mail_received_at IS NULL
+                  AND started_at <= ?
+                ORDER BY started_at ASC, id ASC
+                """,
+                (before,),
+            ).fetchall()
+            workflow_ids = [int(row["id"]) for row in rows]
+            if not workflow_ids:
+                return []
+            placeholders = ",".join("?" for _ in workflow_ids)
+            connection.execute(
+                f"""
+                UPDATE alias_workflows
+                SET watcher_active = 0,
+                    bypass_clear_requested_at = COALESCE(bypass_clear_requested_at, ?)
+                WHERE id IN ({placeholders})
+                """,
+                (stopped_at, *workflow_ids),
+            )
+            changed = connection.execute(
+                f"SELECT * FROM alias_workflows WHERE id IN ({placeholders}) ORDER BY id",
+                tuple(workflow_ids),
+            ).fetchall()
+        return [record for row in changed if (record := self._row(row)) is not None]
 
     async def record_deliveries(
         self,
@@ -573,13 +631,71 @@ class AliasWorkflowStore:
             connection.execute(
                 """
                 UPDATE alias_workflows
-                SET completed_at = ?, watcher_active = 0, scheduled_deactivation_at = NULL
+                SET completed_at = ?,
+                    cancelled_at = NULL,
+                    watcher_active = 0,
+                    scheduled_deactivation_at = NULL,
+                    bypass_clear_requested_at = COALESCE(bypass_clear_requested_at, ?)
                 WHERE id = ?
                   AND mailbox = ? COLLATE NOCASE
                   AND kind = 'replacement'
                   AND completed_at IS NULL
                 """,
-                (completed_at, int(workflow_id), mailbox.strip().lower()),
+                (
+                    completed_at,
+                    completed_at,
+                    int(workflow_id),
+                    mailbox.strip().lower(),
+                ),
+            )
+            row = connection.execute(
+                "SELECT * FROM alias_workflows WHERE id = ? AND mailbox = ? COLLATE NOCASE",
+                (int(workflow_id), mailbox.strip().lower()),
+            ).fetchone()
+        return self._row(row)
+
+    async def cancel_replacement(
+        self,
+        mailbox: str,
+        workflow_id: int,
+        *,
+        now: int | None = None,
+    ) -> AliasWorkflow | None:
+        return await asyncio.to_thread(
+            self._cancel_replacement_sync,
+            mailbox,
+            workflow_id,
+            int(time.time()) if now is None else int(now),
+        )
+
+    def _cancel_replacement_sync(
+        self,
+        mailbox: str,
+        workflow_id: int,
+        cancelled_at: int,
+    ) -> AliasWorkflow | None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE alias_workflows
+                SET completed_at = ?,
+                    cancelled_at = ?,
+                    watcher_active = 0,
+                    deactivation_mode = 'later',
+                    scheduled_deactivation_at = NULL,
+                    bypass_clear_requested_at = COALESCE(bypass_clear_requested_at, ?)
+                WHERE id = ?
+                  AND mailbox = ? COLLATE NOCASE
+                  AND kind = 'replacement'
+                  AND completed_at IS NULL
+                """,
+                (
+                    cancelled_at,
+                    cancelled_at,
+                    cancelled_at,
+                    int(workflow_id),
+                    mailbox.strip().lower(),
+                ),
             )
             row = connection.execute(
                 "SELECT * FROM alias_workflows WHERE id = ? AND mailbox = ? COLLATE NOCASE",
