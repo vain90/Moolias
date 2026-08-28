@@ -268,7 +268,7 @@ async def test_first_mail_workflow_does_not_override_manual_unexpected_sender(tm
     assert row == (0,)
 
 
-async def test_first_mail_sender_is_not_learned_after_bypass_window(tmp_path):
+async def test_first_mail_sender_is_learned_after_bypass_window_while_waiting(tmp_path):
     db_path = tmp_path / "state.sqlite3"
     store = AliasWorkflowStore(db_path)
     await store.initialize()
@@ -306,11 +306,15 @@ async def test_first_mail_sender_is_not_learned_after_bypass_window(tmp_path):
     assert current is not None
     assert current.waiting_state == "received"
     with sqlite3.connect(db_path) as connection:
-        count = connection.execute(
-            "SELECT COUNT(*) FROM sender_expectations WHERE mailbox = ? AND alias = ?",
+        row = connection.execute(
+            """
+            SELECT sender_key, expected
+            FROM sender_expectations
+            WHERE mailbox = ? AND alias = ?
+            """,
             ("user@example.org", "fresh-xy@example.org"),
-        ).fetchone()[0]
-    assert count == 0
+        ).fetchone()
+    assert row == ("late@unrelated.invalid", 1)
 
 
 async def test_replacement_old_mail_keeps_waiting_new_mail_clears_both_bypasses(tmp_path):

@@ -27,19 +27,37 @@ def test_alias_workflow_javascript_does_not_reconstruct_server_ui():
         ".outerHTML",
         "insertAdjacentHTML",
         "cloneNode",
+        "new DOMParser",
+        "replaceChildren",
+        ".replaceWith(",
+        "document.body.append",
         "document.head.append",
     )
     for token in forbidden:
         assert token not in WORKFLOW_JS
 
 
+def test_alias_workflow_javascript_does_not_take_over_alias_table_navigation():
+    for token in (
+        "data-live-search",
+        "data-page-size",
+        "status-filters",
+        "data-bulk-toolbar",
+        "data-alias-workflow-replace",
+        "data-open-replacement-deactivation",
+        "fetchRenderedPage",
+        "openRenderedDialog",
+    ):
+        assert token not in WORKFLOW_JS
+
+
 def test_alias_workflow_links_use_normal_server_navigation():
     assert "data-open-alias-workflow" in DASHBOARD_TEMPLATE
+    assert 'href="/aliases?replace={{ alias.id }}"' in DASHBOARD_TEMPLATE
+    assert 'href="/aliases?deactivate={{ alias.id }}"' in DASHBOARD_TEMPLATE
     assert "const workflowTrigger" not in WORKFLOW_JS
     assert "workflowPageUrl" not in WORKFLOW_JS
-    assert "openRenderedDialog(\n        workflowTrigger" not in WORKFLOW_JS
     assert "window.location.reload();" in WORKFLOW_JS
-    assert "data-open-replacement-deactivation" in DASHBOARD_TEMPLATE
 
 
 def test_alias_workflow_ui_does_not_expose_mail_system_internals():

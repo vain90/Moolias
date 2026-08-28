@@ -265,8 +265,7 @@ class AliasWorkflowCoordinator:
                     (
                         item
                         for item in sender_deliveries
-                        if item[0] == recipient
-                        and workflow.started_at <= item[1] <= workflow.bypass_expires_at
+                        if item[0] == recipient and workflow.started_at <= item[1]
                     ),
                     None,
                 )

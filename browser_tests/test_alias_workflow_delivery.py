@@ -121,18 +121,29 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     new_alias_id = new_row.locator("[data-alias-select]").get_attribute("value")
     assert new_alias_id
     new_row.locator("details.alias-edit-action > summary").click()
-    new_row.locator("[data-open-replacement-deactivation]").click()
+    deactivation_link = new_row.locator("[data-open-replacement-deactivation]")
+    expect(deactivation_link).to_have_attribute("href", f"/aliases?deactivate={new_alias_id}")
+    with page.expect_navigation(wait_until="load"):
+        deactivation_link.click()
+    assert page.evaluate("window.__mooliasNoReload") is None
+    expect(page).to_have_url(
+        re.compile(rf"{re.escape(base_url)}/aliases\?deactivate={new_alias_id}$")
+    )
     replacement_deactivation = page.locator(
         "dialog[data-replacement-deactivation-dialog]"
     )
     expect(replacement_deactivation).to_be_visible(timeout=5000)
     assert replacement_deactivation.evaluate("element => element.matches(':modal')")
     expect(page.locator("dialog:modal")).to_have_count(1)
-    assert page.evaluate("window.__mooliasNoReload") == "alive"
+    page.evaluate("window.__mooliasNoReload = 'alive'")
     replacement_deactivation.locator(".dialog-close").click()
     expect(replacement_deactivation).not_to_be_visible()
     assert page.evaluate("window.__mooliasNoReload") == "alive"
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases$"))
 
+    new_row = page.locator(
+        f'.alias-row:has([data-alias-select][data-address="{NEW_ADDRESS}"])'
+    )
     status_link = new_row.locator(
         ".alias-workflow-row-state [data-open-alias-workflow]"
     )
