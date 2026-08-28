@@ -192,9 +192,10 @@
       </div>
     </div>
 
-    <button class="button ghost action-details-button" type="button" data-action-required-open>{% if language == 'de' %}Alle Details anzeigen{% else %}Show all details{% endif %}</button>
+    <a class="button ghost action-details-button" href="/overview?action=required" data-action-required-open>{% if language == 'de' %}Alle Details anzeigen{% else %}Show all details{% endif %}</a>
   </aside>
 </div>
+{% include "_action_required.html" %}
 <script src="/static/welcome-name.js?v=20260822-1" defer></script>
 <script src="/static/alias-workflow.js?v={{ version }}" defer></script>
 {% endblock %}
