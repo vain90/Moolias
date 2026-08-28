@@ -147,12 +147,23 @@
       </button>
 
       {% for workflow in pending_alias_replacements|default([]) %}
-      <a class="action-item overview-workflow-action" href="/aliases?workflow={{ workflow.id }}" data-pending-alias-workflow="{{ workflow.id }}">
+      <a class="action-item overview-workflow-action" href="/aliases?workflow={{ workflow.id }}" data-pending-alias-workflow="{{ workflow.id }}" data-pending-alias-workflow-state="{{ workflow.waiting_state }}">
         <span class="action-icon blue" aria-hidden="true">{{ icon('link') }}</span>
         <span>
-          <strong>{% if language == 'de' %}Aliaswechsel prüfen{% else %}Review alias change{% endif %}</strong>
+          <strong>
+            {% if workflow.new_mail_received_at %}
+              {% if language == 'de' %}Aliaswechsel abschließen{% else %}Complete alias change{% endif %}
+            {% else %}
+              {% if language == 'de' %}Aliaswechsel prüfen{% else %}Review alias change{% endif %}
+            {% endif %}
+          </strong>
           <small>
-            {% if workflow.alias_name %}{{ workflow.alias_name }} · {% endif %}{% if language == 'de' %}Bisherige Adresse ist noch aktiv{% else %}Previous address is still active{% endif %}
+            {% if workflow.alias_name %}{{ workflow.alias_name }} · {% endif %}
+            {% if workflow.new_mail_received_at %}
+              {% if language == 'de' %}Neue Adresse empfängt E-Mails · bisherige Adresse ist noch aktiv{% else %}New address receives mail · previous address is still active{% endif %}
+            {% else %}
+              {% if language == 'de' %}Bisherige Adresse ist noch aktiv{% else %}Previous address is still active{% endif %}
+            {% endif %}
           </small>
         </span>
         {{ icon('chevron-right') }}
