@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     alias_workflow_bypass_seconds: int = Field(
         default=900,
-        ge=60,
+        ge=0,
         le=86400,
         alias="MOOLIAS_ALIAS_WORKFLOW_BYPASS_SECONDS",
     )
