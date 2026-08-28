@@ -88,6 +88,12 @@
     const freshDialog = serverDocument.querySelector("dialog[data-action-required-dialog]");
     if (currentDialog && freshDialog) {
       currentDialog.dataset.actionRequiredTotal = freshDialog.dataset.actionRequiredTotal || "0";
+
+      const currentDialogEmpty = currentDialog.querySelector("[data-action-required-empty]");
+      const freshDialogEmpty = freshDialog.querySelector("[data-action-required-empty]");
+      if (currentDialogEmpty && freshDialogEmpty) {
+        currentDialogEmpty.hidden = freshDialogEmpty.hidden;
+      }
     }
 
     const currentOverviewCount = document.querySelector("[data-action-count]");
@@ -99,6 +105,17 @@
     const currentEmpty = document.querySelector("[data-action-empty]");
     const freshEmpty = serverDocument.querySelector("[data-action-empty]");
     if (currentEmpty && freshEmpty) currentEmpty.hidden = freshEmpty.hidden;
+
+    const currentTrigger = document.querySelector(
+      ".action-required-button[data-action-required-open]",
+    );
+    const freshTrigger = serverDocument.querySelector(
+      ".action-required-button[data-action-required-open]",
+    );
+    if (currentTrigger && freshTrigger) {
+      currentTrigger.textContent = freshTrigger.textContent;
+      currentTrigger.className = freshTrigger.className;
+    }
   };
 
   const syncUnexpectedReview = (serverDocument, aliasId, senderKey) => {
