@@ -99,7 +99,7 @@ async def _disable_aliases(request: Request, user: str, selected) -> None:
 async def bulk_aliases(
     request: Request,
     action: str = Form(...),
-    alias_ids: list[int] = Form(...),
+    alias_ids: list[int] = Form(...),  # noqa: B008
     csrf_token: str = Form(...),
 ):
     validate_csrf(request, csrf_token)
