@@ -33,10 +33,12 @@ def test_alias_workflow_javascript_does_not_reconstruct_server_ui():
         assert token not in WORKFLOW_JS
 
 
-def test_alias_workflow_dialog_navigation_is_progressively_enhanced():
-    assert "new DOMParser()" in WORKFLOW_JS
-    assert "window.location.reload" not in WORKFLOW_JS
+def test_alias_workflow_links_use_normal_server_navigation():
     assert "data-open-alias-workflow" in DASHBOARD_TEMPLATE
+    assert "const workflowTrigger" not in WORKFLOW_JS
+    assert "workflowPageUrl" not in WORKFLOW_JS
+    assert "openRenderedDialog(\n        workflowTrigger" not in WORKFLOW_JS
+    assert "window.location.reload();" in WORKFLOW_JS
     assert "data-open-replacement-deactivation" in DASHBOARD_TEMPLATE
 
 

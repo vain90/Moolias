@@ -2,6 +2,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REVIEW_JS = (ROOT / "moolias" / "static" / "review.js").read_text(encoding="utf-8")
+REVIEW_CSS = (ROOT / "moolias" / "static" / "review.css").read_text(encoding="utf-8")
 REVIEW_BEHAVIOR_JS = (ROOT / "moolias" / "static" / "review-behavior.js").read_text(
     encoding="utf-8"
 )
@@ -46,6 +47,16 @@ def test_expected_sender_action_refreshes_from_server_rendered_state():
     assert 'decision === "expected"' in REVIEW_JS
     assert "new DOMParser()" in REVIEW_JS
     assert "syncSenderRow" in REVIEW_JS
+    assert "freshSenderRow" in REVIEW_JS
     assert "freshRow" in REVIEW_JS
     assert "classList.add(\"expected\")" not in REVIEW_JS
     assert "classList.remove(\"unexpected\")" not in REVIEW_JS
+
+
+def test_expected_sender_feedback_and_alias_table_refresh_are_behavior_only():
+    assert "actionDialogChanged = true" in REVIEW_JS
+    assert 'window.location.pathname === "/aliases"' in REVIEW_JS
+    assert "window.location.reload();" in REVIEW_JS
+    assert "hideAfterResolvedFeedback" in REVIEW_JS
+    assert "transition: border-color .45s ease" in REVIEW_CSS
+    assert "@media (prefers-reduced-motion: reduce)" in REVIEW_CSS

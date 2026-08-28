@@ -99,19 +99,26 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     status_link = new_row.locator(
         ".alias-workflow-row-state [data-open-alias-workflow]"
     )
-    status_link.click()
+    with page.expect_navigation(wait_until="load"):
+        status_link.click()
+    expect(page).to_have_url(
+        re.compile(rf"{re.escape(base_url)}/aliases\?workflow={workflow_id}$")
+    )
     workflow = page.locator(
         f'dialog[data-alias-workflow-dialog][data-alias-workflow-id="{workflow_id}"]'
     )
     expect(workflow).to_be_visible(timeout=5000)
     assert workflow.evaluate("element => element.matches(':modal')")
-    assert page.evaluate("window.__mooliasNoReload") == "alive"
-    assert "workflow=" not in page.url
+    assert page.evaluate("window.__mooliasNoReload") is None
 
     workflow.locator(".dialog-close").click()
     expect(workflow).not_to_be_visible()
-    assert page.evaluate("window.__mooliasNoReload") == "alive"
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases$"))
 
+    new_row = page.locator(
+        f'.alias-row:has([data-alias-select][data-address="{NEW_ADDRESS}"])'
+    )
+    page.evaluate("window.__mooliasNoReload = 'alive'")
     new_alias_id = new_row.locator("[data-alias-select]").get_attribute("value")
     assert new_alias_id
     new_row.locator("details.alias-edit-action > summary").click()
@@ -127,7 +134,11 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     expect(replacement_deactivation).not_to_be_visible()
     assert page.evaluate("window.__mooliasNoReload") == "alive"
 
-    status_link.click()
+    status_link = new_row.locator(
+        ".alias-workflow-row-state [data-open-alias-workflow]"
+    )
+    with page.expect_navigation(wait_until="load"):
+        status_link.click()
     workflow = page.locator(
         f'dialog[data-alias-workflow-dialog][data-alias-workflow-id="{workflow_id}"]'
     )
@@ -189,24 +200,30 @@ def test_replacement_delivery_updates_ui_and_all_deactivation_choices(
     expect(workflow).not_to_be_visible()
 
     _record_delivery(e2e_db_path, workflow_id, new=True)
-    page.goto(f"{base_url}/overview")
-    action = page.locator(f'[data-pending-alias-workflow="{workflow_id}"]')
-    expect(action).to_have_count(1)
-    expect(action).to_have_attribute("data-pending-alias-workflow-state", "received")
+    page.goto(f"{base_url}/overview?action=required")
+    action_dialog = page.locator("dialog[data-action-required-dialog]")
+    expect(action_dialog).to_be_visible()
+    action = action_dialog.locator(
+        f'[data-open-alias-workflow="{workflow_id}"]'
+    )
     expect(action).to_contain_text("Complete alias change")
-    expect(action).to_contain_text("New address receives mail")
 
-    action.click()
+    with page.expect_navigation(wait_until="load"):
+        action.click()
     expect(page).to_have_url(
-        re.compile(rf"{re.escape(base_url)}/aliases(?:[?#].*)?$"),
+        re.compile(rf"{re.escape(base_url)}/aliases\?workflow={workflow_id}$"),
         timeout=5000,
     )
-    assert "workflow=" not in page.url
     workflow = page.locator("dialog[data-alias-workflow-dialog][open]")
     expect(workflow).to_be_visible(timeout=5000)
     expect(workflow).to_have_attribute("data-alias-workflow-state", "received")
     expect(workflow).to_contain_text("New email received. Please check your inbox.")
     expect(workflow.locator(".alias-workflow-wait-spinner")).to_have_count(0)
+    expect(page.locator('link[data-alias-workflow-styles="1"]')).to_have_count(1)
+    status_background = workflow.locator(".alias-workflow-status.received").evaluate(
+        "element => getComputedStyle(element).backgroundColor"
+    )
+    assert status_background != "rgba(0, 0, 0, 0)"
 
     deactivation = workflow.locator(".alias-workflow-deactivation")
     deactivation.locator('label:has(input[name="mode"][value="now"])').click()

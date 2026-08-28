@@ -343,16 +343,6 @@
     }
   }
 
-  function workflowPageUrl(workflowId) {
-    const url = new URL(window.location.href);
-    url.pathname = "/aliases";
-    url.searchParams.delete("create");
-    url.searchParams.delete("replace");
-    url.searchParams.delete("deactivate");
-    url.searchParams.set("workflow", workflowId);
-    return `${url.pathname}${url.search}${url.hash}`;
-  }
-
   function bindWorkflowCopyButtons(dialog) {
     dialog.querySelectorAll("[data-alias-workflow-copy]").forEach((button) => {
       if (button.dataset.workflowCopyBound === "1") return;
@@ -412,13 +402,8 @@
         if (!response.ok) return;
         const workflow = await response.json();
         if (workflow.state === dialog.dataset.aliasWorkflowState) return;
-
-        const renderedPage = await fetchRenderedPage(workflowPageUrl(workflowId));
-        installRenderedDialog(
-          renderedPage,
-          `[data-alias-workflow-dialog][data-alias-workflow-id="${CSS.escape(workflowId)}"]`,
-          bindWorkflowDialog,
-        );
+        window.clearInterval(timer);
+        window.location.reload();
       } catch (error) {
         console.debug("Could not refresh alias workflow state", error);
       } finally {
@@ -573,21 +558,6 @@
         historyMode: "replace",
         keepSearchValue: true,
       });
-      return;
-    }
-
-    const workflowTrigger = event.target.closest?.("[data-open-alias-workflow]");
-    if (workflowTrigger) {
-      const workflowId = workflowTrigger.dataset.openAliasWorkflow;
-      if (!workflowId) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      workflowTrigger.closest("details.alias-edit-action")?.removeAttribute("open");
-      openRenderedDialog(
-        workflowTrigger,
-        `[data-alias-workflow-dialog][data-alias-workflow-id="${CSS.escape(workflowId)}"]`,
-        bindWorkflowDialog,
-      );
       return;
     }
 

@@ -171,6 +171,14 @@
   margin-left: 0;
 }
 
+[data-action-required-dialog] .sender-stats-row {
+  transition: border-color .45s ease, background-color .45s ease, box-shadow .45s ease;
+}
+
+[data-action-required-dialog] .sender-stats-row.expected {
+  box-shadow: inset 0 0 0 1px rgba(6, 118, 71, .08);
+}
+
 .sender-review-settings > code {
   overflow-wrap: anywhere;
   color: #344054;
@@ -186,6 +194,12 @@
 [data-review-pool-dialog] .sender-stats-row.unexpected {
   border-color: #fecdca;
   background: #fef3f2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-action-required-dialog] .sender-stats-row {
+    transition: none;
+  }
 }
 
 @media (max-width: 760px) {

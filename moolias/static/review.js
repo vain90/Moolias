@@ -2,6 +2,8 @@
   "use strict";
 
   const REOPEN_KEY = "moolias-unexpected-review-reopen";
+  const RESOLVED_FEEDBACK_MS = 450;
+  let actionDialogChanged = false;
 
   const actionDialog = () => document.querySelector("dialog[data-action-required-dialog]");
 
@@ -38,6 +40,10 @@
       url.searchParams.delete("action");
       window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     }
+    if (actionDialogChanged && window.location.pathname === "/aliases") {
+      actionDialogChanged = false;
+      window.location.reload();
+    }
   };
 
   const getSummary = () => {
@@ -70,7 +76,7 @@
     if (currentCount && freshCount) currentCount.textContent = freshCount.textContent;
 
     const currentForm = currentRow.querySelector("[data-action-sender-form]");
-    const freshForm = freshRow.querySelector("[data-action-sender-form]");
+    const freshForm = freshRow.querySelector("[data-action-sender-form], .sender-review-form");
     const currentDecision = currentForm?.querySelector('input[name="decision"]');
     const freshDecision = freshForm?.querySelector('input[name="decision"]');
     const currentButton = currentForm?.querySelector('button[type="submit"]');
@@ -81,6 +87,30 @@
       currentButton.className = freshButton.className;
       currentButton.disabled = false;
     }
+  };
+
+  const freshSenderRow = (serverDocument, aliasId, senderKey) => {
+    const senderSelector = `[data-action-sender-row][data-alias-id="${selectorValue(aliasId)}"][data-sender-key="${selectorValue(senderKey)}"]`;
+    const actionRow = serverDocument.querySelector(
+      `dialog[data-action-required-dialog] ${senderSelector}`,
+    );
+    if (actionRow) return actionRow;
+
+    const aliasSelect = serverDocument.querySelector(
+      `[data-alias-select][value="${selectorValue(aliasId)}"]`,
+    );
+    const aliasRow = aliasSelect?.closest(".alias-row");
+    if (!aliasRow) return null;
+    return [...aliasRow.querySelectorAll('.sender-review-form input[name="sender_key"]')]
+      .find((input) => input.value === senderKey)
+      ?.closest(".sender-stats-row") || null;
+  };
+
+  const hideAfterResolvedFeedback = (element) => {
+    if (!element) return;
+    window.setTimeout(() => {
+      if (element.isConnected) element.hidden = true;
+    }, RESOLVED_FEEDBACK_MS);
   };
 
   const syncActionSummary = (serverDocument) => {
@@ -129,14 +159,14 @@
     );
 
     if (!currentAlias) return;
-    if (!freshAlias) {
-      currentAlias.hidden = true;
-    } else {
-      const senderSelector = `[data-action-sender-row][data-alias-id="${selectorValue(aliasId)}"][data-sender-key="${selectorValue(senderKey)}"]`;
-      const currentRow = currentAlias.querySelector(senderSelector);
-      const freshRow = freshAlias.querySelector(senderSelector);
-      if (currentRow && freshRow) syncSenderRow(currentRow, freshRow);
+    const senderSelector = `[data-action-sender-row][data-alias-id="${selectorValue(aliasId)}"][data-sender-key="${selectorValue(senderKey)}"]`;
+    const currentRow = currentAlias.querySelector(senderSelector);
+    const freshRow = freshSenderRow(serverDocument, aliasId, senderKey);
+    if (currentRow && freshRow) syncSenderRow(currentRow, freshRow);
 
+    if (!freshAlias) {
+      hideAfterResolvedFeedback(currentAlias);
+    } else {
       const currentBadge = currentAlias.querySelector("[data-action-alias-unexpected-count]");
       const freshBadge = freshAlias.querySelector("[data-action-alias-unexpected-count]");
       if (currentBadge && freshBadge) currentBadge.textContent = freshBadge.textContent;
@@ -148,7 +178,7 @@
     );
     if (currentSection) {
       if (!freshSection) {
-        currentSection.hidden = true;
+        hideAfterResolvedFeedback(currentSection);
       } else {
         const currentCount = currentSection.querySelector("[data-action-unexpected-count]");
         const freshCount = freshSection.querySelector("[data-action-unexpected-count]");
@@ -176,6 +206,7 @@
       });
       const serverDocument = await parseServerDocument(response);
       if (!serverDocument) return true;
+      actionDialogChanged = true;
       syncUnexpectedReview(serverDocument, aliasId, senderKey);
       return true;
     } catch (error) {
@@ -322,6 +353,11 @@
   };
 
   const start = () => {
+    const dialog = actionDialog();
+    dialog?.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeActionDialog();
+    });
     document.querySelectorAll("[data-pool-alias-id]").forEach(syncPoolSelection);
     try {
       if (sessionStorage.getItem(REOPEN_KEY) === "1") {

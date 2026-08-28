@@ -119,6 +119,51 @@ def test_action_required_dialog_uses_server_rendered_content_without_loading_fet
     assert page.evaluate("window.__actionRequiredUnexpectedFetches") == 0
 
 
+def test_action_required_expected_sender_updates_immediately_and_refreshes_table_on_close(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+    page.goto(f"{base_url}/aliases")
+
+    dialog = page.locator("dialog[data-action-required-dialog]")
+    page.locator("[data-action-required-open]").click()
+    expect(dialog).to_be_visible()
+
+    first_unexpected = dialog.locator("[data-action-sender-row].unexpected").first
+    expect(first_unexpected).to_be_visible()
+    alias_id = first_unexpected.get_attribute("data-alias-id")
+    assert alias_id
+    action_alias = dialog.locator(f'[data-action-alias-id="{alias_id}"]')
+    alias_row = page.locator(
+        f'.alias-row:has([data-alias-select][value="{alias_id}"])'
+    )
+    expect(alias_row).to_have_class(re.compile(r"\balias-row-unexpected\b"))
+
+    transition_duration = first_unexpected.evaluate(
+        "element => getComputedStyle(element).transitionDuration"
+    )
+    assert transition_duration != "0s"
+
+    while action_alias.locator("[data-action-sender-row].unexpected").count():
+        sender = action_alias.locator("[data-action-sender-row].unexpected").first
+        sender.locator("[data-action-sender-form] button[type='submit']").click()
+        expect(sender).to_have_class(re.compile(r"\bexpected\b"), timeout=5000)
+        expect(sender.locator('input[name="decision"]')).to_have_value("clear")
+        expect(sender.locator("button[type='submit']")).to_have_class(re.compile(r"\bghost\b"))
+
+    expect(alias_row).to_have_class(re.compile(r"\balias-row-unexpected\b"))
+
+    with page.expect_navigation(wait_until="load"):
+        dialog.locator("[data-action-required-close]").click()
+
+    expect(page).to_have_url(re.compile(rf"{re.escape(base_url)}/aliases$"))
+    alias_row = page.locator(
+        f'.alias-row:has([data-alias-select][value="{alias_id}"])'
+    )
+    expect(alias_row).not_to_have_class(re.compile(r"\balias-row-unexpected\b"))
+
+
 def test_usage_evidence_link_has_spacing_from_usage_summary(
     page: Page,
     base_url: str,
