@@ -7,6 +7,166 @@
     dialog.showModal();
   }
 
+  function clearAliasDialogParam(name) {
+    if (window.location.pathname !== "/aliases") return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has(name)) return;
+    url.searchParams.delete(name);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  async function fetchRenderedPage(url) {
+    const response = await fetch(url, {
+      credentials: "same-origin",
+      headers: { Accept: "text/html" },
+    });
+    if (!response.ok) {
+      throw new Error(`Could not load dialog: HTTP ${response.status}`);
+    }
+    const html = await response.text();
+    return new DOMParser().parseFromString(html, "text/html");
+  }
+
+  function installRenderedDialog(renderedPage, selector, bindDialog) {
+    const nextDialog = renderedPage.querySelector(selector);
+    if (!nextDialog) {
+      throw new Error(`Rendered dialog not found: ${selector}`);
+    }
+
+    const currentDialog = document.querySelector(selector);
+    if (currentDialog) {
+      if (currentDialog.matches(":modal")) {
+        currentDialog.dataset.refreshing = "1";
+        currentDialog.close();
+      }
+      currentDialog.replaceWith(nextDialog);
+    } else {
+      document.body.append(nextDialog);
+    }
+
+    showDialog(nextDialog);
+    bindDialog(nextDialog);
+    return nextDialog;
+  }
+
+  async function openRenderedDialog(trigger, selector, bindDialog) {
+    const href = trigger.getAttribute("href");
+    if (!href) return;
+
+    trigger.setAttribute("aria-busy", "true");
+    try {
+      const renderedPage = await fetchRenderedPage(href);
+      installRenderedDialog(renderedPage, selector, bindDialog);
+    } catch (error) {
+      console.debug("Could not open server-rendered alias dialog", error);
+      window.location.assign(href);
+    } finally {
+      trigger.removeAttribute("aria-busy");
+    }
+  }
+
+  function workflowPageUrl(workflowId) {
+    const url = new URL(window.location.href);
+    url.pathname = "/aliases";
+    url.searchParams.delete("create");
+    url.searchParams.delete("replace");
+    url.searchParams.delete("deactivate");
+    url.searchParams.set("workflow", workflowId);
+    return `${url.pathname}${url.search}${url.hash}`;
+  }
+
+  function bindWorkflowCopyButtons(dialog) {
+    dialog.querySelectorAll("[data-alias-workflow-copy]").forEach((button) => {
+      if (button.dataset.workflowCopyBound === "1") return;
+      button.dataset.workflowCopyBound = "1";
+      button.addEventListener("click", async () => {
+        const address = button.dataset.aliasWorkflowCopy || "";
+        if (!address) return;
+        await navigator.clipboard.writeText(address);
+        const original = button.dataset.copyLabel || button.textContent;
+        button.textContent = button.dataset.copiedLabel || original;
+        window.setTimeout(() => {
+          button.textContent = original;
+        }, 1200);
+      });
+    });
+  }
+
+  function bindWorkflowDialog(dialog) {
+    if (!dialog || dialog.dataset.workflowDialogBound === "1") return;
+    dialog.dataset.workflowDialogBound = "1";
+    bindWorkflowCopyButtons(dialog);
+
+    dialog.querySelectorAll(".dialog-close, [data-alias-workflow-done]").forEach((control) => {
+      control.addEventListener("click", (event) => {
+        event.preventDefault();
+        dialog.close();
+      });
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("close", () => {
+      if (dialog.dataset.refreshing === "1") {
+        delete dialog.dataset.refreshing;
+        return;
+      }
+      clearAliasDialogParam("workflow");
+    });
+
+    const workflowId = dialog.dataset.aliasWorkflowId;
+    const pollMs = Number.parseInt(dialog.dataset.aliasWorkflowPollMs || "0", 10);
+    if (!workflowId || !Number.isFinite(pollMs) || pollMs <= 0) return;
+
+    let polling = false;
+    const timer = window.setInterval(async () => {
+      if (!dialog.isConnected) {
+        window.clearInterval(timer);
+        return;
+      }
+      if (polling || document.hidden || !dialog.matches(":modal")) return;
+      polling = true;
+      try {
+        const response = await fetch(`/aliases/workflows/${workflowId}`, {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) return;
+        const workflow = await response.json();
+        if (workflow.state === dialog.dataset.aliasWorkflowState) return;
+
+        const renderedPage = await fetchRenderedPage(workflowPageUrl(workflowId));
+        installRenderedDialog(
+          renderedPage,
+          `[data-alias-workflow-dialog][data-alias-workflow-id="${CSS.escape(workflowId)}"]`,
+          bindWorkflowDialog,
+        );
+      } catch (error) {
+        console.debug("Could not refresh alias workflow state", error);
+      } finally {
+        polling = false;
+      }
+    }, pollMs);
+  }
+
+  function bindReplacementDeactivationDialog(dialog) {
+    if (!dialog || dialog.dataset.replacementDeactivationBound === "1") return;
+    dialog.dataset.replacementDeactivationBound = "1";
+
+    dialog.querySelectorAll('.dialog-close, .alias-replacement-cancel-form a[href="/aliases"]').forEach(
+      (control) => {
+        control.addEventListener("click", (event) => {
+          event.preventDefault();
+          dialog.close();
+        });
+      },
+    );
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("close", () => clearAliasDialogParam("deactivate"));
+  }
+
   const createDialog = document.querySelector("[data-create-alias-dialog]");
   if (createDialog?.hasAttribute("open")) showDialog(createDialog);
   document.querySelector("[data-open-create-alias]")?.addEventListener("click", (event) => {
@@ -80,6 +240,38 @@
   };
 
   document.addEventListener("click", (event) => {
+    const workflowTrigger = event.target.closest?.("[data-open-alias-workflow]");
+    if (workflowTrigger) {
+      const workflowId = workflowTrigger.dataset.openAliasWorkflow;
+      if (!workflowId) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      workflowTrigger.closest("details.alias-edit-action")?.removeAttribute("open");
+      openRenderedDialog(
+        workflowTrigger,
+        `[data-alias-workflow-dialog][data-alias-workflow-id="${CSS.escape(workflowId)}"]`,
+        bindWorkflowDialog,
+      );
+      return;
+    }
+
+    const deactivationTrigger = event.target.closest?.(
+      "[data-open-replacement-deactivation], [data-alias-workflow-cancel]",
+    );
+    if (deactivationTrigger) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      deactivationTrigger.closest("details.alias-edit-action")?.removeAttribute("open");
+      const sourceWorkflow = deactivationTrigger.closest("dialog[data-alias-workflow-dialog]");
+      if (sourceWorkflow?.matches(":modal")) sourceWorkflow.close();
+      openRenderedDialog(
+        deactivationTrigger,
+        "[data-replacement-deactivation-dialog]",
+        bindReplacementDeactivationDialog,
+      );
+      return;
+    }
+
     const trigger = event.target.closest?.("[data-alias-workflow-replace]");
     if (!trigger) return;
 
@@ -103,61 +295,14 @@
   });
 
   const replacementDeactivationDialog = document.querySelector(
-    "[data-replacement-deactivation-dialog]"
+    "[data-replacement-deactivation-dialog]",
   );
   if (replacementDeactivationDialog?.hasAttribute("open")) {
     showDialog(replacementDeactivationDialog);
   }
-  replacementDeactivationDialog?.querySelector(".dialog-close")?.addEventListener(
-    "click",
-    (event) => {
-      event.preventDefault();
-      replacementDeactivationDialog.close();
-    }
-  );
-  replacementDeactivationDialog?.addEventListener("click", (event) => {
-    if (event.target === replacementDeactivationDialog) {
-      replacementDeactivationDialog.close();
-    }
-  });
-
-  document.querySelectorAll("[data-alias-workflow-copy]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const address = button.dataset.aliasWorkflowCopy || "";
-      if (!address) return;
-      await navigator.clipboard.writeText(address);
-      const original = button.dataset.copyLabel || button.textContent;
-      button.textContent = button.dataset.copiedLabel || original;
-      window.setTimeout(() => {
-        button.textContent = original;
-      }, 1200);
-    });
-  });
+  bindReplacementDeactivationDialog(replacementDeactivationDialog);
 
   const workflowDialog = document.querySelector("[data-alias-workflow-dialog]");
   if (workflowDialog?.hasAttribute("open")) showDialog(workflowDialog);
-  const workflowId = workflowDialog?.dataset.aliasWorkflowId;
-  const pollMs = Number.parseInt(workflowDialog?.dataset.aliasWorkflowPollMs || "0", 10);
-  if (workflowDialog && workflowId && Number.isFinite(pollMs) && pollMs > 0) {
-    let polling = false;
-    window.setInterval(async () => {
-      if (polling || document.hidden) return;
-      polling = true;
-      try {
-        const response = await fetch(`/aliases/workflows/${workflowId}`, {
-          credentials: "same-origin",
-          headers: { Accept: "application/json" },
-        });
-        if (!response.ok) return;
-        const workflow = await response.json();
-        if (workflow.state !== workflowDialog.dataset.aliasWorkflowState) {
-          window.location.reload();
-        }
-      } catch (error) {
-        console.debug("Could not refresh alias workflow state", error);
-      } finally {
-        polling = false;
-      }
-    }, pollMs);
-  }
+  bindWorkflowDialog(workflowDialog);
 })();
