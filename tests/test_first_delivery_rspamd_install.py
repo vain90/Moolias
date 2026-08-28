@@ -19,7 +19,7 @@ def test_first_delivery_bypass_uses_exact_dynamic_recipient_map():
     assert "recipient_map:get_key(string.lower(recipient))" in INSTALLER
 
 
-def test_first_delivery_bypass_disables_only_greylisting_symbols():
+def test_first_delivery_bypass_disables_only_greylisting():
     disabled_lines = [
         line.strip()
         for line in INSTALLER.splitlines()
@@ -29,6 +29,12 @@ def test_first_delivery_bypass_disables_only_greylisting_symbols():
         'task:disable_symbol("GREYLIST_CHECK")',
         'task:disable_symbol("GREYLIST_SAVE")',
     ]
+    action_lines = [
+        line.strip()
+        for line in INSTALLER.splitlines()
+        if "task:disable_action(" in line
+    ]
+    assert action_lines == ['task:disable_action("greylist")']
     assert "disable_all_symbols" not in INSTALLER
     assert "set_pre_result" not in INSTALLER
 
