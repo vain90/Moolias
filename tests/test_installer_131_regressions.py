@@ -37,6 +37,10 @@ set -euo pipefail
 POSTFIX_HOOK_DIR="${MAILCOW_DIR}/data/hooks/postfix"
 RSPAMD_HOOK_DIR="${MAILCOW_DIR}/data/hooks/rspamd"
 stamp=teststamp
+stale_postfix="$POSTFIX_HOOK_DIR/moolias-old.before-moolias-agent-old.bak"
+stale_rspamd="$RSPAMD_HOOK_DIR/moolias-old.before-moolias-agent-old.bak"
+[[ ! -x "$stale_postfix" ]]
+[[ ! -x "$stale_rspamd" ]]
 backup_file() {
   local path="$1"
   if [[ -e "$path" ]]; then
@@ -47,6 +51,7 @@ hook="$POSTFIX_HOOK_DIR/moolias-sender-protection.sh"
 printf '#!/usr/bin/env bash\\nexit 0\\n' > "$hook"
 chmod 0755 "$hook"
 backup_file "$hook"
+[[ ! -x "${hook}.before-moolias-agent-${stamp}.bak" ]]
 """,
     )
     return core
