@@ -83,10 +83,6 @@ main() {
     base_core="${source_dir}/scripts/install-bootstrap-core.sh"
     [[ -f "$base_core" ]] || fail "local bootstrap core is missing: $base_core"
     resolved_ref="local-source"
-  elif [[ -n "$script_dir" && -f "${script_dir}/scripts/install-bootstrap-core.sh" ]]; then
-    source_dir="$script_dir"
-    base_core="${script_dir}/scripts/install-bootstrap-core.sh"
-    resolved_ref="local-source"
   elif [[ -n "$requested_ref" ]]; then
     [[ "$requested_ref" =~ ^[A-Za-z0-9._/+:-]+$ ]] \
       || fail "MOOLIAS_INSTALL_REF contains unsupported characters."
@@ -100,6 +96,10 @@ main() {
     fi
     base_core="$base_core_tmp"
     resolved_ref="$requested_ref"
+  elif [[ -n "$script_dir" && -f "${script_dir}/scripts/install-bootstrap-core.sh" ]]; then
+    source_dir="$script_dir"
+    base_core="${script_dir}/scripts/install-bootstrap-core.sh"
+    resolved_ref="local-source"
   else
     local latest_ref=""
     latest_ref="$(resolve_latest_ref || true)"

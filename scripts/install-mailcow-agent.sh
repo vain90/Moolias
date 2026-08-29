@@ -89,8 +89,6 @@ main() {
   elif [[ -n "$source_dir" ]]; then
     core_path="${source_dir}/scripts/install-mailcow-agent-core.sh"
     [[ -f "$core_path" ]] || fail "local Agent installer core is missing: $core_path"
-  elif [[ -n "$script_dir" && -f "${script_dir}/install-mailcow-agent-core.sh" ]]; then
-    core_path="${script_dir}/install-mailcow-agent-core.sh"
   elif [[ -n "${MOOLIAS_AGENT_CORE_URL:-}" ]]; then
     core_tmp="$(mktemp)"
     MOOLIAS_AGENT_CORE_TMP_CLEANUP="$core_tmp"
@@ -109,6 +107,8 @@ main() {
         || fail "could not download the Mailcow Agent installer from ${requested_ref}."
     fi
     core_path="$core_tmp"
+  elif [[ -n "$script_dir" && -f "${script_dir}/install-mailcow-agent-core.sh" ]]; then
+    core_path="${script_dir}/install-mailcow-agent-core.sh"
   else
     local latest_ref=""
     latest_ref="$(resolve_latest_ref || true)"

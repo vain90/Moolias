@@ -8,6 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 INSTALL_WRAPPER = ROOT / "install.sh"
 AGENT_WRAPPER = ROOT / "scripts" / "install-mailcow-agent.sh"
+INSTALL_WRAPPER_TEXT = INSTALL_WRAPPER.read_text(encoding="utf-8")
+AGENT_WRAPPER_TEXT = AGENT_WRAPPER.read_text(encoding="utf-8")
 
 
 def _write_executable(path: Path, content: str) -> None:
@@ -112,6 +114,18 @@ def test_agent_wrapper_keeps_local_development_images_without_forced_pull(tmp_pa
     _, docker_log = _run_agent_wrapper(tmp_path, "moolias:local-test")
     content = docker_log.read_text(encoding="utf-8") if docker_log.exists() else ""
     assert "pull moolias:local-test" not in content
+
+
+def test_explicit_release_ref_precedes_implicit_sibling_core() -> None:
+    requested = 'elif [[ -n "$requested_ref" ]]; then'
+    bootstrap_sibling = (
+        'elif [[ -n "$script_dir" && -f "${script_dir}/scripts/install-bootstrap-core.sh" ]]; then'
+    )
+    agent_sibling = (
+        'elif [[ -n "$script_dir" && -f "${script_dir}/install-mailcow-agent-core.sh" ]]; then'
+    )
+    assert INSTALL_WRAPPER_TEXT.index(requested) < INSTALL_WRAPPER_TEXT.index(bootstrap_sibling)
+    assert AGENT_WRAPPER_TEXT.index(requested) < AGENT_WRAPPER_TEXT.index(agent_sibling)
 
 
 def test_main_wrapper_can_install_newsletter_management_in_same_run(tmp_path: Path) -> None:
