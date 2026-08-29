@@ -2,6 +2,19 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.3.2 - 2026-08-29
+
+### Added
+
+- explicit orphaned-alias housekeeping via `python -m moolias.housekeeping`, with dry-run as the default and database mutation requiring `--apply`
+- Mailcow-backed address inventory, active-workflow and live-bypass protection, fail-closed SQLite schema checks, newsletter cascade cleanup and per-table cleanup reporting
+- dedicated housekeeping documentation plus unit and disposable real-Mailcow coverage for dry-run, apply, idempotence, current-schema compatibility and safety preflight behavior
+
+### Security
+
+- housekeeping never deletes Mailcow aliases, mailboxes or mail data, and preflights both Moolias SQLite stores before either database is changed
+- completed replacement history and mailbox-wide policy/history state are retained intentionally while only reviewed per-alias orphaned state is eligible for cleanup
+
 ## 1.3.1 - 2026-08-29
 
 ### Changed
