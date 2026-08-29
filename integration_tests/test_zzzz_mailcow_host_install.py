@@ -214,6 +214,31 @@ def test_recommended_mailcow_host_installer() -> None:
         else:
             assert override_file.read_bytes() == override_before
 
+        # Exercise the new v1.3.1 hand-off against the disposable Mailcow as well,
+        # including a non-default Moolias installation directory.
+        newsletter_command = list(command)
+        newsletter_command.insert(-2, "MOOLIAS_INSTALL_NEWSLETTER=yes")
+        newsletter = _run(*newsletter_command, cwd=ROOT)
+        assert "Installing optional Newsletter Management..." in newsletter.stdout
+        assert "Moolias Newsletter Agent installed successfully." in newsletter.stdout
+
+        installed_env = (INSTALL_DIR / ".env").read_text(encoding="utf-8")
+        assert "MOOLIAS_NEWSLETTER_MANAGEMENT=true" in installed_env
+        assert (
+            "MOOLIAS_NEWSLETTER_AGENT_URL=http://moolias-newsletter-agent:8082"
+            in installed_env
+        )
+        newsletter_id = _mailcow_compose("ps", "-q", "moolias-newsletter-agent").stdout.strip()
+        assert newsletter_id
+        newsletter_health = _run(
+            "docker",
+            "inspect",
+            "--format",
+            "{{.State.Health.Status}}",
+            newsletter_id,
+        ).stdout.strip()
+        assert newsletter_health == "healthy"
+
         # Reproduce the real-host repair/rerun case: sender protection is already
         # enabled in the persisted environment, while the public installer is run
         # again without an explicit sender-protection choice. This must preserve

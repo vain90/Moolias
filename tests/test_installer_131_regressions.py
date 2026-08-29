@@ -132,7 +132,7 @@ def test_main_wrapper_can_install_newsletter_management_in_same_run(tmp_path: Pa
         newsletter,
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        'echo newsletter >> "$MOOLIAS_TEST_LOG"\n',
+        'echo "newsletter:${MOOLIAS_DIR}" >> "$MOOLIAS_TEST_LOG"\n',
     )
 
     env = os.environ.copy()
@@ -158,7 +158,10 @@ def test_main_wrapper_can_install_newsletter_management_in_same_run(tmp_path: Pa
     )
 
     assert result.returncode == 0, result.stderr
-    assert log.read_text(encoding="utf-8").splitlines() == ["base", "newsletter"]
+    assert log.read_text(encoding="utf-8").splitlines() == [
+        "base",
+        f"newsletter:{install_dir}",
+    ]
 
 
 def test_main_wrapper_keeps_newsletter_disabled_by_default_when_unattended(tmp_path: Path) -> None:

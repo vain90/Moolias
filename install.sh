@@ -174,13 +174,16 @@ main() {
     echo
     echo "Installing optional Newsletter Management..."
     if [[ "$resolved_ref" == "local-source" ]]; then
-      MOOLIAS_INSTALL_REF="${requested_ref:-local-source}" \
+      MOOLIAS_DIR="$install_dir" \
+        MOOLIAS_INSTALL_REF="${requested_ref:-local-source}" \
         MOOLIAS_SOURCE_DIR="$source_dir" \
         bash "$newsletter_bootstrap"
     elif [[ "$resolved_ref" == "local-core" ]]; then
-      bash "$newsletter_bootstrap"
+      MOOLIAS_DIR="$install_dir" \
+        bash "$newsletter_bootstrap"
     else
-      MOOLIAS_INSTALL_REF="$resolved_ref" \
+      MOOLIAS_DIR="$install_dir" \
+        MOOLIAS_INSTALL_REF="$resolved_ref" \
         bash "$newsletter_bootstrap"
     fi
   fi
