@@ -222,11 +222,25 @@ def test_recommended_mailcow_host_installer() -> None:
         assert "Installing optional Newsletter Management..." in newsletter.stdout
         assert "Moolias Newsletter Agent installed successfully." in newsletter.stdout
 
-        installed_env = (INSTALL_DIR / ".env").read_text(encoding="utf-8")
-        assert "MOOLIAS_NEWSLETTER_MANAGEMENT=true" in installed_env
+        env_path = str(INSTALL_DIR / ".env")
+        newsletter_enabled = _run(
+            "sudo",
+            "grep",
+            "-Fx",
+            "MOOLIAS_NEWSLETTER_MANAGEMENT=true",
+            env_path,
+        ).stdout.strip()
+        assert newsletter_enabled == "MOOLIAS_NEWSLETTER_MANAGEMENT=true"
+        newsletter_url = _run(
+            "sudo",
+            "grep",
+            "-Fx",
+            "MOOLIAS_NEWSLETTER_AGENT_URL=http://moolias-newsletter-agent:8082",
+            env_path,
+        ).stdout.strip()
         assert (
-            "MOOLIAS_NEWSLETTER_AGENT_URL=http://moolias-newsletter-agent:8082"
-            in installed_env
+            newsletter_url
+            == "MOOLIAS_NEWSLETTER_AGENT_URL=http://moolias-newsletter-agent:8082"
         )
         newsletter_id = _mailcow_compose("ps", "-q", "moolias-newsletter-agent").stdout.strip()
         assert newsletter_id
