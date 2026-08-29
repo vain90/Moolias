@@ -564,42 +564,73 @@ def run_housekeeping(
         for value in valid_addresses
         if (address := _normalise_address(value))
     )
-    stats_candidates, stats_protected, protected_addresses = _stats_operation(
-        Path(stats_db),
+    stats_path = Path(stats_db)
+    newsletter_path = Path(newsletter_db)
+
+    # Preflight every store before --apply is allowed to change either database.
+    # The mutating pass repeats all checks inside its own write transaction so a
+    # concurrent schema or data change still fails closed.
+    preflight_stats, preflight_stats_protected, preflight_workflow_addresses = (
+        _stats_operation(
+            stats_path,
+            valid_addresses=valid,
+            apply=False,
+            now=timestamp,
+        )
+    )
+    preflight_newsletters, preflight_newsletter_protected = _newsletter_operation(
+        newsletter_path,
         valid_addresses=valid,
-        apply=apply,
+        protected_addresses=preflight_workflow_addresses,
+        apply=False,
+    )
+    if not apply:
+        return HousekeepingReport(
+            applied=False,
+            candidates=_merge_entries(preflight_stats, preflight_newsletters),
+            protected=_merge_entries(
+                preflight_stats_protected,
+                preflight_newsletter_protected,
+            ),
+            alias_count=int(alias_count),
+            mailbox_count=int(mailbox_count),
+        )
+
+    stats_candidates, stats_protected, protected_addresses = _stats_operation(
+        stats_path,
+        valid_addresses=valid,
+        apply=True,
         now=timestamp,
     )
 
     # Re-read workflow protection after the stats transaction before touching the
     # separate newsletter store. New workflow state can only add protection here.
-    if apply:
-        connection = _connect(Path(stats_db))
-        try:
-            connection.execute("BEGIN")
-            schema = _audit_schema(
-                connection,
-                rules=_STATS_RULES,
-                allow_workflows=True,
-                store_name="statistics/application database",
-            )
-            protected_addresses = protected_addresses | _protected_workflow_addresses(
-                connection,
-                schema,
-                now=timestamp,
-            )
-            connection.rollback()
-        finally:
-            connection.close()
+    connection = _connect(stats_path)
+    try:
+        connection.execute("BEGIN")
+        schema = _audit_schema(
+            connection,
+            rules=_STATS_RULES,
+            allow_workflows=True,
+            store_name="statistics/application database",
+        )
+        protected_addresses = protected_addresses | _protected_workflow_addresses(
+            connection,
+            schema,
+            now=timestamp,
+        )
+        connection.rollback()
+    finally:
+        connection.close()
 
     newsletter_candidates, newsletter_protected = _newsletter_operation(
-        Path(newsletter_db),
+        newsletter_path,
         valid_addresses=valid,
         protected_addresses=protected_addresses,
-        apply=apply,
+        apply=True,
     )
     return HousekeepingReport(
-        applied=apply,
+        applied=True,
         candidates=_merge_entries(stats_candidates, newsletter_candidates),
         protected=_merge_entries(stats_protected, newsletter_protected),
         alias_count=int(alias_count),
