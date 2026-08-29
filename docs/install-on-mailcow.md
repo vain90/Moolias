@@ -109,9 +109,12 @@ The bootstrap installer follows the latest stable Moolias release by default. It
 3. OAuth client ID;
 4. OAuth client secret;
 5. whether Mailcow ACME should add the Moolias hostname to `ADDITIONAL_SAN`;
-6. whether optional primary sender protection should be enabled through the required Mailcow Agent.
+6. whether optional primary sender protection should be enabled through the required Mailcow Agent;
+7. on a fresh interactive installation, whether optional Newsletter Management should be installed after the base Moolias setup completes.
 
 Secrets are read from `/dev/tty` without echo. The Mailcow Agent is installed in every standard Mailcow-host installation because guided alias creation and replacement depend on it. Its generated HMAC secret is copied directly into `/opt/moolias/.env`; there is no manual copy/paste step and the final summary never prints the secret value. Choosing `no` for primary sender protection disables only that optional capability, not the Agent itself.
+
+Newsletter Management defaults to `no` at its final fresh-install prompt. Choosing `yes` runs the existing restricted Newsletter installer immediately after the base installation, so the same command can configure the Newsletter Agent, Dovecot/Rspamd integration and the Moolias application setting. Skipping it does not remove the feature; it can be enabled later with the separate Newsletter installer.
 
 Routine Docker Compose progress and successful nginx warning output are kept out of the normal completion flow. If an installation step actually fails, the captured error output is shown.
 
@@ -164,7 +167,7 @@ The required Mailcow Agent installer additionally manages only its own marked/na
 
 When Mailcow ACME is selected, the main installer also adds the Moolias hostname to `ADDITIONAL_SAN` in `mailcow.conf` and restarts `acme-mailcow` so the certificate can be refreshed.
 
-Before replacing an installer-managed file, the installer creates a timestamped backup. It refuses to overwrite unrelated nginx, Compose, Postfix or Rspamd configuration that cannot be merged safely.
+Before replacing an installer-managed file, the installer creates a timestamped backup. Backups created inside Mailcow hook directories are deliberately non-executable, and a rerun repairs executable Moolias hook backups left by older installer versions before Postfix or Rspamd restart paths are reached. The installer refuses to overwrite unrelated nginx, Compose, Postfix or Rspamd configuration that cannot be merged safely.
 
 It does **not**:
 
@@ -245,6 +248,8 @@ The Mailcow Agent is required for guided alias creation and replacement. It owns
 
 The Agent remains a separate hardened service because it needs narrowly scoped write access to its private state, dedicated Postfix sender policy and dedicated Rspamd recipient-bypass map. The main Moolias application never receives those mounts.
 
+For registry-qualified Agent images, the installer performs a fresh pull before starting the service. This prevents a mutable tag such as `latest` from silently reusing stale cached code. Local development images remain usable without an automatic registry pull.
+
 Primary sender protection remains optional. The setup question controls only `MOOLIAS_SENDER_PROTECTION`; answering `no` keeps the required Agent installed while leaving primary sender protection disabled.
 
 The installer reads the generated or preserved Agent secret directly from Mailcow's private Agent environment file, writes it to `/opt/moolias/.env` as `MOOLIAS_MAILCOW_AGENT_SECRET`, configures `MOOLIAS_MAILCOW_AGENT_URL=http://moolias-agent:8081` for direct private-network access and starts Moolias with that shared secret. The integrated completion summary reports only that the secret was stored safely; it does not print the secret or ask the administrator to copy it manually.
@@ -255,7 +260,9 @@ See [Mailcow Agent and primary sender protection](sender-protection.md) for its 
 
 Newsletter Management needs a separate restricted sidecar because the Moolias web application deliberately has no access to Dovecot mail storage or the Docker socket. For an exact mailbox + Message-ID, the sidecar normally returns only the fixed newsletter-related headers. Only when Rspamd has marked that exact message with Moolias's body-unsubscribe signal may the sidecar inspect the message text locally; in that case it returns only an extracted HTTPS unsubscribe URL and never returns the message body.
 
-Install Newsletter Management on the Mailcow host **after the normal Moolias installation** with the stable-aware bootstrap:
+A fresh recommended interactive installation now offers Newsletter Management directly at the end of the normal Moolias installer. Choosing `yes` there invokes the same restricted Newsletter installer described below.
+
+If Newsletter Management was skipped during the initial installation, or should be enabled on an existing installation, run the stable-aware bootstrap on the Mailcow host:
 
 ```bash
 curl -fsSL \
@@ -297,6 +304,8 @@ See [Newsletter management](newsletter-management.md) for the complete policy, p
 The installer is intended to be safe to run again.
 
 Existing Moolias secrets and optional application settings are preserved unless replacement values are explicitly supplied through environment variables. Managed files are backed up before replacement.
+
+The interactive Newsletter question is limited to a fresh installation, so a normal repair/rerun does not unexpectedly add the optional sidecar. To enable Newsletter Management during an automated or deliberate rerun, set `MOOLIAS_INSTALL_NEWSLETTER=yes` or use the separate Newsletter installer.
 
 A re-run also rediscovers the current Mailcow Docker network and `HTTP_PORT`, which is useful after a Mailcow Compose/project-name or port migration. If it finds the published v1.2.1 `moolias-sender-agent` layout, it migrates its secret and version-1 state into the unified `moolias-agent` layout before retiring the old managed service/files.
 
@@ -357,10 +366,11 @@ sudo env \
   MAILCOW_OAUTH_CLIENT_SECRET='...' \
   MOOLIAS_TLS_MODE=mailcow-acme \
   MOOLIAS_INSTALL_SENDER_PROTECTION=no \
+  MOOLIAS_INSTALL_NEWSLETTER=no \
   bash install.sh
 ```
 
-`MOOLIAS_INSTALL_SENDER_PROTECTION=no` disables only optional primary sender protection. The required Mailcow Agent is still installed and its secret is written to the Moolias `.env` file.
+`MOOLIAS_INSTALL_SENDER_PROTECTION=no` disables only optional primary sender protection. The required Mailcow Agent is still installed and its secret is written to the Moolias `.env` file. `MOOLIAS_INSTALL_NEWSLETTER=no` keeps Newsletter Management disabled; set it to `yes` to install the restricted Newsletter sidecar in the same unattended run.
 
 Useful installer overrides:
 
@@ -371,6 +381,7 @@ MOOLIAS_INSTALL_REF=v1.2.3
 MOOLIAS_IMAGE_TAG=latest
 MOOLIAS_TLS_MODE=mailcow-acme|external|none
 MOOLIAS_INSTALL_SENDER_PROTECTION=yes|no
+MOOLIAS_INSTALL_NEWSLETTER=yes|no
 MOOLIAS_TLS_WAIT_SECONDS=90
 ```
 

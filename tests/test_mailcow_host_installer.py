@@ -1,7 +1,9 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BOOTSTRAP = (ROOT / "install.sh").read_text(encoding="utf-8")
+BOOTSTRAP_WRAPPER = (ROOT / "install.sh").read_text(encoding="utf-8")
+BOOTSTRAP_CORE = (ROOT / "scripts" / "install-bootstrap-core.sh").read_text(encoding="utf-8")
+BOOTSTRAP = BOOTSTRAP_WRAPPER + "\n" + BOOTSTRAP_CORE
 INSTALLER = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
 COMPOSE = (ROOT / "compose.mailcow.yml").read_text(encoding="utf-8")
 ENV_EXAMPLE = (ROOT / ".env.example").read_text(encoding="utf-8")

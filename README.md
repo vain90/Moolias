@@ -97,10 +97,11 @@ The guided installer:
 - installs the hardened Mailcow Agent required by guided alias creation and replacement;
 - can optionally enable primary sender protection through that Agent;
 - can optionally add the Moolias hostname to Mailcow `ADDITIONAL_SAN` for Mailcow ACME;
+- can optionally install the restricted Newsletter Agent and enable Newsletter Management in the same fresh interactive run;
 - backs up installer-managed files before replacing them;
 - validates Docker Compose, Moolias health and Mailcow nginx before completing.
 
-After installation, open the configured Moolias URL and sign in through Mailcow.
+After installation, open the configured Moolias URL and sign in through Mailcow. If Newsletter Management is not enabled during the initial guided run, it can still be installed later with the separate stable-aware Newsletter installer.
 
 See **[Install Moolias on the Mailcow host](docs/install-on-mailcow.md)** for TLS modes, non-interactive installation, backups and the exact files the installer manages.
 
@@ -218,7 +219,7 @@ Newsletter Management is globally disabled by default:
 MOOLIAS_NEWSLETTER_MANAGEMENT=false
 ```
 
-An administrator can install the restricted Mailcow Newsletter Agent and enable the server-side feature. Actual enablement for each mailbox then follows the same Mailcow tag inheritance model as statistics. With the default `MOOLIAS_NEWSLETTER_TAG=moolias-newsletter`, `moolias-newsletter` enables the feature and `moolias-newsletter-off` disables it. A mailbox tag overrides the domain tag; without a mailbox newsletter tag, the domain setting is inherited.
+For a fresh recommended same-host installation, the guided installer can install the restricted Mailcow Newsletter Agent and enable the server-side feature in the same run. If that option is skipped, Newsletter Management can still be enabled later with the separate stable-aware Newsletter installer. Actual enablement for each mailbox then follows the same Mailcow tag inheritance model as statistics. With the default `MOOLIAS_NEWSLETTER_TAG=moolias-newsletter`, `moolias-newsletter` enables the feature and `moolias-newsletter-off` disables it. A mailbox tag overrides the domain tag; without a mailbox newsletter tag, the domain setting is inherited.
 
 There is no additional prompt at login. Users can choose **Use domain setting**, **Off**, or **On** in Settings, and Moolias modifies only that newsletter tag family on their own mailbox.
 

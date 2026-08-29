@@ -44,7 +44,9 @@ jobs:
       - run: bash -n install.sh
       - run: bash -n install-newsletter.sh
       - run: bash -n scripts/install.sh
+      - run: bash -n scripts/install-bootstrap-core.sh
       - run: bash -n scripts/install-mailcow-agent.sh
+      - run: bash -n scripts/install-mailcow-agent-core.sh
       - run: bash -n scripts/install-newsletter-agent.sh
       - run: bash -n scripts/install-newsletter-rspamd.sh
       - run: bash -n update.sh

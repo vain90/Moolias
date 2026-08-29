@@ -40,11 +40,14 @@ def test_documented_curl_bootstrap_completes_outside_mailcow_dir() -> None:
     env["MOOLIAS_IMPORT_EXISTING_SENDER_RULES"] = "no"
 
     port = server.server_address[1]
+    env["MOOLIAS_AGENT_CORE_URL"] = (
+        f"http://127.0.0.1:{port}/install-mailcow-agent-core.sh"
+    )
     command = (
         f"curl -fsSL http://127.0.0.1:{port}/install-mailcow-agent.sh | "
         "sudo --preserve-env="
         "MAILCOW_DIR,MOOLIAS_AGENT_IMAGE,MOOLIAS_AGENT_COOLDOWN_SECONDS,"
-        "MOOLIAS_IMPORT_EXISTING_SENDER_RULES bash"
+        "MOOLIAS_IMPORT_EXISTING_SENDER_RULES,MOOLIAS_AGENT_CORE_URL bash"
     )
 
     try:

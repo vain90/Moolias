@@ -2,6 +2,18 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.3.1 - 2026-08-29
+
+### Changed
+
+- the recommended same-host installer can optionally enable Newsletter Management in the same fresh interactive run; the separate stable-aware Newsletter installer remains available for enabling it later
+- the Mailcow Agent installer refreshes registry-qualified images before starting the Agent, preventing a cached mutable tag such as `latest` from silently running stale code while local development images remain untouched
+
+### Fixed
+
+- installer-created Mailcow hook backups are made non-executable immediately, and installer reruns repair executable `*.before-moolias-agent-*.bak` leftovers before the Agent installer reaches Postfix or Rspamd restart paths
+- explicit pinned-release and local-source installer paths continue to use their matching installer components instead of accidentally resolving through a different stable source
+
 ## 1.3.0 - 2026-08-28
 
 ### Added
