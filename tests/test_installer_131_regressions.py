@@ -12,6 +12,16 @@ INSTALL_WRAPPER_TEXT = INSTALL_WRAPPER.read_text(encoding="utf-8")
 AGENT_WRAPPER_TEXT = AGENT_WRAPPER.read_text(encoding="utf-8")
 
 
+def test_installer_entrypoints_and_cores_remain_executable() -> None:
+    for path in (
+        INSTALL_WRAPPER,
+        AGENT_WRAPPER,
+        ROOT / "scripts" / "install-bootstrap-core.sh",
+        ROOT / "scripts" / "install-mailcow-agent-core.sh",
+    ):
+        assert path.stat().st_mode & stat.S_IXUSR, path
+
+
 def _write_executable(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
     path.chmod(0o755)
