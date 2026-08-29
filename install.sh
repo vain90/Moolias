@@ -92,8 +92,12 @@ main() {
       || fail "MOOLIAS_INSTALL_REF contains unsupported characters."
     base_core_tmp="$(mktemp)"
     MOOLIAS_BOOTSTRAP_CORE_TMP_CLEANUP="$base_core_tmp"
-    fetch_to "$requested_ref" "scripts/install-bootstrap-core.sh" "$base_core_tmp" \
-      || fail "could not download the Moolias installer core from ${requested_ref}."
+    if ! fetch_to "$requested_ref" "scripts/install-bootstrap-core.sh" "$base_core_tmp"; then
+      # Explicit pins to releases before v1.3.1 do not contain the split core.
+      # Run that release's original bootstrap unchanged.
+      fetch_to "$requested_ref" "install.sh" "$base_core_tmp" \
+        || fail "could not download the Moolias installer from ${requested_ref}."
+    fi
     base_core="$base_core_tmp"
     resolved_ref="$requested_ref"
   else
@@ -119,6 +123,7 @@ main() {
 
   if [[ "$resolved_ref" == "local-source" ]]; then
     MOOLIAS_INSTALL_REF="${requested_ref:-local-source}" \
+      MOOLIAS_SOURCE_DIR="$source_dir" \
       bash "$base_core" "$@"
   elif [[ "$resolved_ref" == "local-core" ]]; then
     bash "$base_core" "$@"

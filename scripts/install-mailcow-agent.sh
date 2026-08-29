@@ -102,8 +102,12 @@ main() {
       || fail "MOOLIAS_INSTALL_REF contains unsupported characters."
     core_tmp="$(mktemp)"
     MOOLIAS_AGENT_CORE_TMP_CLEANUP="$core_tmp"
-    fetch_core "$requested_ref" "$core_tmp" \
-      || fail "could not download the Mailcow Agent installer core from ${requested_ref}."
+    if ! fetch_core "$requested_ref" "$core_tmp"; then
+      curl --proto '=https' --tlsv1.2 -fsSL \
+        "${raw_base}/${requested_ref}/scripts/install-mailcow-agent.sh" \
+        -o "$core_tmp" \
+        || fail "could not download the Mailcow Agent installer from ${requested_ref}."
+    fi
     core_path="$core_tmp"
   else
     local latest_ref=""
