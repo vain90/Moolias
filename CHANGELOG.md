@@ -299,6 +299,6 @@ All notable changes to Moolias are documented here.
 
 ### Changed
 
-- unexpected-sender filtering, counts and pagination are computed server-side rather than crawling all alias pages in the browser
+- unexpected-sender filtering, counts and pagination are now computed server-side rather than crawling all alias pages in the browser
 - disabled aliases no longer contribute to unexpected/action-required alerts while their sender history remains available for traceability
 - sender review matching is intentionally stricter around registrable domains, public/private suffixes, subdomains, lookalikes and explicit user decisions
