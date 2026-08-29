@@ -1,7 +1,9 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-INSTALLER = (ROOT / "scripts" / "install-mailcow-agent.sh").read_text(encoding="utf-8")
+WRAPPER = (ROOT / "scripts" / "install-mailcow-agent.sh").read_text(encoding="utf-8")
+CORE = (ROOT / "scripts" / "install-mailcow-agent-core.sh").read_text(encoding="utf-8")
+INSTALLER = WRAPPER + "\n" + CORE
 
 
 def test_first_delivery_bypass_uses_exact_dynamic_recipient_map():

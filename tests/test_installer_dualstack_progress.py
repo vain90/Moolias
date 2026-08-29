@@ -1,7 +1,9 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BOOTSTRAP = (ROOT / "install.sh").read_text(encoding="utf-8")
+BOOTSTRAP_WRAPPER = (ROOT / "install.sh").read_text(encoding="utf-8")
+BOOTSTRAP_CORE = (ROOT / "scripts" / "install-bootstrap-core.sh").read_text(encoding="utf-8")
+BOOTSTRAP = BOOTSTRAP_WRAPPER + "\n" + BOOTSTRAP_CORE
 
 
 def test_progress_spinner_frames_are_single_width():
