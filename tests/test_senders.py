@@ -1,3 +1,5 @@
+import pytest
+
 from moolias.senders import registered_domain_label, sender_match_token, sender_matches_alias
 
 
@@ -14,34 +16,49 @@ def test_service_name_matches_registered_sender_domain():
     )
 
 
-def test_approved_short_brands_match_exact_registered_domain_labels():
-    assert sender_match_token(
-        "ing-bank-k7@example.org",
-        "ING - Bank",
-        "info.ing.de",
-    ) == "ing"
-    assert sender_match_token(
-        "dm-k7@example.org",
-        "DM",
-        "news.dm.de",
-    ) == "dm"
+@pytest.mark.parametrize(
+    ("alias_address", "name", "sender_domain", "expected"),
+    [
+        ("vbl-dm@example.org", "VBL", "vbl.de", "vbl"),
+        ("dm-k7@example.org", "DM", "news.dm.de", "dm"),
+        ("ing-bank-k7@example.org", "Bank", "info.ing.de", "ing"),
+        ("dhl-k7@example.org", "DHL", "mail.dhl.de", "dhl"),
+        ("o2-k7@example.org", "Mobile plan", "service.o2.de", "o2"),
+    ],
+)
+def test_short_alias_identities_match_exact_registered_domain_labels(
+    alias_address: str,
+    name: str,
+    sender_domain: str,
+    expected: str,
+):
+    assert sender_match_token(alias_address, name, sender_domain) == expected
 
 
-def test_short_brand_exceptions_require_exact_alias_tokens():
+@pytest.mark.parametrize(
+    ("alias_address", "name", "sender_domain"),
+    [
+        ("ing-k7@example.org", "ING", "golfing.de"),
+        ("dm-k7@example.org", "DM", "dm-drogerie.de"),
+        ("vbl-k7@example.org", "VBL", "meine-vbl.de"),
+        ("dhl-k7@example.org", "DHL", "dhl-express.de"),
+        ("bank-k7@example.org", "Ingredients Bank", "info.ing.de"),
+        ("dmv-k7@example.org", "DMV service", "news.dm.de"),
+    ],
+)
+def test_short_alias_identities_do_not_match_embedded_or_compound_domain_labels(
+    alias_address: str,
+    name: str,
+    sender_domain: str,
+):
+    assert not sender_matches_alias(alias_address, name, sender_domain)
+
+
+def test_one_character_alias_identity_never_auto_matches():
     assert not sender_matches_alias(
-        "bank-k7@example.org",
-        "Ingredients Bank",
-        "info.ing.de",
-    )
-    assert not sender_matches_alias(
-        "drogerie-k7@example.org",
-        "Drugstore",
-        "news.dm.de",
-    )
-    assert not sender_matches_alias(
-        "dmv-k7@example.org",
-        "DMV service",
-        "news.dm.de",
+        "x-k7@example.org",
+        "X",
+        "x.de",
     )
 
 
@@ -117,6 +134,14 @@ def test_generic_alias_words_do_not_auto_approve_sender():
     )
 
 
+def test_short_stopwords_do_not_become_trusted_identities():
+    assert not sender_matches_alias(
+        "app-k7@example.org",
+        "App",
+        "app.de",
+    )
+
+
 def test_private_description_can_supply_a_conservative_exact_brand_hint():
     assert sender_match_token(
         "random-k7@example.org",
@@ -135,7 +160,7 @@ def test_private_description_does_not_promote_generic_words():
     )
 
 
-def test_private_description_does_not_get_short_brand_exceptions():
+def test_private_description_does_not_get_relaxed_short_identity_matching():
     assert not sender_matches_alias(
         "random-k7@example.org",
         "Drugstore purchases",
