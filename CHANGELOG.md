@@ -2,6 +2,13 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.3.5 - 2026-08-30
+
+### Added
+
+- the Statistics page now shows conditional Newsletter Management totals for all senders, Unsubscribable, No link, Unsubscribed and After unsubscribe when the feature is effectively enabled for the mailbox.
+- each metric links to the matching Newsletter filter and reuses the persisted server-side status classification without starting or waking the collector during Statistics rendering.
+
 ## 1.3.4 - 2026-08-30
 
 ### Changed
