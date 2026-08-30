@@ -568,7 +568,7 @@
     event.preventDefault();
     if (!beginNavigationPending(url)) return;
     window.requestAnimationFrame(() => window.location.assign(url.href));
-  }, { capture: true });
+  });
 
   window.addEventListener("pageshow", clearNavigationPending);
 
