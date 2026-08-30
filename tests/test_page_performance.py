@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from moolias import newsletters as newsletter_module
+from moolias.newsletter_page_state import load_newsletter_page_state
 from moolias.newsletters import NewsletterCollector
 from moolias.ui import _load_ui_state
 
@@ -100,6 +101,54 @@ async def test_ui_state_reuses_access_revalidation_mailbox(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_newsletter_state_skips_heavy_usage_and_sender_reads(tmp_path):
+    class Mailcow:
+        async def list_aliases(self):
+            return []
+
+        async def get_domain(self, domain):
+            assert domain == "example.test"
+            return {
+                "aliases_in_domain": 0,
+                "max_num_aliases_for_domain": 100,
+                "tags": [],
+            }
+
+        async def get_mailbox(self, email):
+            raise AssertionError("mailbox must be reused from request state")
+
+    class StatsStore:
+        path = tmp_path / "stats.sqlite3"
+
+        async def sender_mode(self, mailbox):
+            return None
+
+        async def sync_sender_modes(self, values):
+            return None
+
+        async def alias_usage(self, mailbox, aliases):
+            raise AssertionError("newsletter state must not read alias usage")
+
+        async def sender_usage(self, mailbox, aliases):
+            raise AssertionError("newsletter state must not read sender usage")
+
+    settings = SimpleNamespace(
+        usage_stats=True,
+        usage_tag="moolias-stats",
+    )
+    request = _Request(settings=settings, mailcow=Mailcow(), stats_store=StatsStore())
+    request.state.mailbox = {"username": "user@example.test", "tags": []}
+
+    state = await load_newsletter_page_state(request)
+
+    assert state["assigned_all"] == []
+    assert state["mailbox_details"] is request.state.mailbox
+    assert state["stats_state"] is not None
+    assert "usage_stats" not in state
+    assert "sender_stats" not in state
+
+
+@pytest.mark.asyncio
 async def test_newsletter_page_tracks_without_waiting_for_scan(monkeypatch):
     class Store:
         async def list_for_mailbox(self, mailbox):
@@ -131,7 +180,7 @@ async def test_newsletter_page_tracks_without_waiting_for_scan(monkeypatch):
     )
     request = _Request(settings=settings, mailcow=SimpleNamespace())
 
-    async def fake_load_ui_state(_request):
+    async def fake_newsletter_page_state(_request):
         return {
             "assigned_all": [],
             "mailcow_aliases": [],
@@ -141,7 +190,11 @@ async def test_newsletter_page_tracks_without_waiting_for_scan(monkeypatch):
     async def fake_runtime(_request):
         return Store(), collector
 
-    monkeypatch.setattr(newsletter_module, "_load_ui_state", fake_load_ui_state)
+    monkeypatch.setattr(
+        newsletter_module,
+        "load_newsletter_page_state",
+        fake_newsletter_page_state,
+    )
     monkeypatch.setattr(newsletter_module, "_runtime", fake_runtime)
     monkeypatch.setattr(newsletter_module, "_template_context", lambda request, **values: values)
     monkeypatch.setattr(newsletter_module, "TEMPLATES", Templates())
