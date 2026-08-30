@@ -27,6 +27,7 @@ from moolias.newsletter_forwarding import (
     forwarded_newsletters_enabled,
 )
 from moolias.newsletter_mode import mailbox_newsletter_state
+from moolias.newsletter_page_state import load_newsletter_page_state
 from moolias.newsletter_store import Newsletter, NewsletterObservation, NewsletterStore
 from moolias.security import require_user, validate_csrf
 from moolias.sender_protocol import (
@@ -35,7 +36,7 @@ from moolias.sender_protocol import (
     TIMESTAMP_HEADER,
     request_signature,
 )
-from moolias.ui import PAGE_SIZES, _load_ui_state, _pagination_items, _template_context
+from moolias.ui import PAGE_SIZES, _pagination_items, _template_context
 
 LOGGER = logging.getLogger(__name__)
 router = APIRouter()
@@ -660,7 +661,7 @@ def _query_int(request: Request, name: str, default: int) -> int:
 @router.get("/newsletters", response_class=HTMLResponse)
 async def newsletters_page(request: Request):
     user = require_user(request)
-    state = await _load_ui_state(request)
+    state = await load_newsletter_page_state(request)
     settings = request.app.state.settings
     newsletters = []
     collector_error: str | None = None
