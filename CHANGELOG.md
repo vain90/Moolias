@@ -188,6 +188,7 @@ All notable changes to Moolias are documented here.
 - the same-host Mailcow installer now includes both IPv4 and IPv6 CIDRs from the detected Mailcow Docker network in API allowlist guidance and validation errors, so dual-stack installations no longer suggest only the IPv4 subnet
 
 ## 1.1.4 - 2026-08-23
+
 ### Changed
 
 - the recommended Mailcow-host installer now presents fresh installations as a six-step terminal setup wizard with one focused page at a time for URL, API, OAuth, access control, TLS and sender protection
