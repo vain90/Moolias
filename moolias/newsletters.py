@@ -364,13 +364,11 @@ class NewsletterCollector:
                     await self.scan_mailbox(mailbox)
                 except Exception:
                     LOGGER.exception("Newsletter scan failed for %s", mailbox)
-            try:
+            with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(
                     self._wake.wait(),
                     timeout=self.settings.newsletter_poll_seconds,
                 )
-            except TimeoutError:
-                pass
 
     async def scan_mailbox(self, mailbox: str) -> None:
         mailbox = mailbox.casefold()
