@@ -1,0 +1,108 @@
+html.navigation-pending .app-main {
+  position: relative;
+  min-height: min(72vh, 760px);
+  isolation: isolate;
+}
+
+html.navigation-pending .app-main > * {
+  visibility: hidden;
+}
+
+html.navigation-pending .app-main::before {
+  content: "";
+  display: block;
+  width: 100%;
+  min-height: min(68vh, 720px);
+  border-radius: 14px;
+  background:
+    linear-gradient(var(--line), var(--line)) 0 8px / min(260px, 46%) 30px no-repeat,
+    linear-gradient(var(--line), var(--line)) 0 54px / min(430px, 72%) 14px no-repeat,
+    linear-gradient(var(--panel), var(--panel)) 0 98px / 100% 70px no-repeat,
+    linear-gradient(var(--line), var(--line)) 20px 118px / 88px 26px no-repeat,
+    linear-gradient(var(--line), var(--line)) 124px 118px / 112px 26px no-repeat,
+    linear-gradient(var(--line), var(--line)) 252px 118px / 96px 26px no-repeat,
+    linear-gradient(var(--panel), var(--panel)) 0 188px / 100% 82px no-repeat,
+    linear-gradient(var(--line), var(--line)) 20px 210px / 34% 16px no-repeat,
+    linear-gradient(var(--line), var(--line)) 20px 238px / 62% 12px no-repeat,
+    linear-gradient(var(--panel), var(--panel)) 0 286px / 100% 82px no-repeat,
+    linear-gradient(var(--line), var(--line)) 20px 308px / 28% 16px no-repeat,
+    linear-gradient(var(--line), var(--line)) 20px 336px / 55% 12px no-repeat,
+    linear-gradient(var(--panel), var(--panel)) 0 384px / 100% 82px no-repeat,
+    linear-gradient(var(--line), var(--line)) 20px 406px / 31% 16px no-repeat,
+    linear-gradient(var(--line), var(--line)) 20px 434px / 58% 12px no-repeat,
+    linear-gradient(var(--panel), var(--panel)) 0 482px / 100% 82px no-repeat,
+    linear-gradient(var(--line), var(--line)) 20px 504px / 30% 16px no-repeat,
+    linear-gradient(var(--line), var(--line)) 20px 532px / 52% 12px no-repeat;
+}
+
+html.navigation-pending[data-navigation-target="overview"] .app-main::before,
+html.navigation-pending[data-navigation-target="statistics"] .app-main::before {
+  background:
+    linear-gradient(var(--line), var(--line)) 0 8px / min(260px, 46%) 30px no-repeat,
+    linear-gradient(var(--line), var(--line)) 0 54px / min(430px, 72%) 14px no-repeat,
+    linear-gradient(var(--panel), var(--panel)) 0 102px / calc(50% - 8px) 132px no-repeat,
+    linear-gradient(var(--line), var(--line)) 22px 126px / 34% 14px no-repeat,
+    linear-gradient(var(--line), var(--line)) 22px 158px / 24% 34px no-repeat,
+    linear-gradient(var(--panel), var(--panel)) 100% 102px / calc(50% - 8px) 132px no-repeat,
+    linear-gradient(var(--line), var(--line)) calc(50% + 30px) 126px / 28% 14px no-repeat,
+    linear-gradient(var(--line), var(--line)) calc(50% + 30px) 158px / 20% 34px no-repeat,
+    linear-gradient(var(--panel), var(--panel)) 0 252px / 100% 154px no-repeat,
+    linear-gradient(var(--line), var(--line)) 22px 278px / 32% 16px no-repeat,
+    linear-gradient(var(--line), var(--line)) 22px 312px / 72% 12px no-repeat,
+    linear-gradient(var(--line), var(--line)) 22px 342px / 58% 12px no-repeat,
+    linear-gradient(var(--panel), var(--panel)) 0 424px / 100% 154px no-repeat,
+    linear-gradient(var(--line), var(--line)) 22px 450px / 29% 16px no-repeat,
+    linear-gradient(var(--line), var(--line)) 22px 484px / 64% 12px no-repeat,
+    linear-gradient(var(--line), var(--line)) 22px 514px / 51% 12px no-repeat;
+}
+
+html.navigation-pending .app-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 14px;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--panel) 42%, transparent) 42%,
+    transparent 64%
+  );
+  background-size: 220% 100%;
+  animation: moolias-navigation-skeleton 1.25s ease-in-out infinite;
+}
+
+@keyframes moolias-navigation-skeleton {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+@media (max-width: 720px) {
+  html.navigation-pending .app-main::before,
+  html.navigation-pending[data-navigation-target="overview"] .app-main::before,
+  html.navigation-pending[data-navigation-target="statistics"] .app-main::before {
+    min-height: 620px;
+    background:
+      linear-gradient(var(--line), var(--line)) 0 8px / 58% 28px no-repeat,
+      linear-gradient(var(--line), var(--line)) 0 50px / 82% 13px no-repeat,
+      linear-gradient(var(--panel), var(--panel)) 0 92px / 100% 104px no-repeat,
+      linear-gradient(var(--line), var(--line)) 18px 116px / 50% 15px no-repeat,
+      linear-gradient(var(--line), var(--line)) 18px 148px / 72% 12px no-repeat,
+      linear-gradient(var(--panel), var(--panel)) 0 212px / 100% 104px no-repeat,
+      linear-gradient(var(--line), var(--line)) 18px 236px / 45% 15px no-repeat,
+      linear-gradient(var(--line), var(--line)) 18px 268px / 66% 12px no-repeat,
+      linear-gradient(var(--panel), var(--panel)) 0 332px / 100% 104px no-repeat,
+      linear-gradient(var(--line), var(--line)) 18px 356px / 54% 15px no-repeat,
+      linear-gradient(var(--line), var(--line)) 18px 388px / 74% 12px no-repeat,
+      linear-gradient(var(--panel), var(--panel)) 0 452px / 100% 104px no-repeat,
+      linear-gradient(var(--line), var(--line)) 18px 476px / 48% 15px no-repeat,
+      linear-gradient(var(--line), var(--line)) 18px 508px / 68% 12px no-repeat;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.navigation-pending .app-main::after {
+    animation: none;
+    display: none;
+  }
+}

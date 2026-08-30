@@ -41,6 +41,7 @@
       control.addEventListener("click", (event) => {
         event.preventDefault();
         dialog.close();
+        clearAliasDialogParam("workflow");
       });
     });
     dialog.addEventListener("click", (event) => {

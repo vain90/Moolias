@@ -27,6 +27,7 @@ from moolias.newsletter_forwarding import (
     forwarded_newsletters_enabled,
 )
 from moolias.newsletter_mode import mailbox_newsletter_state
+from moolias.newsletter_page_state import load_newsletter_page_state
 from moolias.newsletter_store import Newsletter, NewsletterObservation, NewsletterStore
 from moolias.security import require_user, validate_csrf
 from moolias.sender_protocol import (
@@ -35,7 +36,7 @@ from moolias.sender_protocol import (
     TIMESTAMP_HEADER,
     request_signature,
 )
-from moolias.ui import PAGE_SIZES, _load_ui_state, _pagination_items, _template_context
+from moolias.ui import PAGE_SIZES, _pagination_items, _template_context
 
 LOGGER = logging.getLogger(__name__)
 router = APIRouter()
@@ -337,14 +338,20 @@ class NewsletterCollector:
         self.store = store
         self._tracked_mailboxes: set[str] = set()
         self._lock = asyncio.Lock()
+        self._wake = asyncio.Event()
         self.last_error: str | None = None
         self.last_success_at: int | None = None
 
     def track(self, mailbox: str) -> None:
-        self._tracked_mailboxes.add(mailbox.casefold())
+        mailbox = mailbox.casefold()
+        if mailbox in self._tracked_mailboxes:
+            return
+        self._tracked_mailboxes.add(mailbox)
+        self._wake.set()
 
     async def run_forever(self) -> None:
         while True:
+            self._wake.clear()
             for mailbox in sorted(tuple(self._tracked_mailboxes)):
                 try:
                     policy = await mailbox_newsletter_state(
@@ -358,7 +365,11 @@ class NewsletterCollector:
                     await self.scan_mailbox(mailbox)
                 except Exception:
                     LOGGER.exception("Newsletter scan failed for %s", mailbox)
-            await asyncio.sleep(self.settings.newsletter_poll_seconds)
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(
+                    self._wake.wait(),
+                    timeout=self.settings.newsletter_poll_seconds,
+                )
 
     async def scan_mailbox(self, mailbox: str) -> None:
         mailbox = mailbox.casefold()
@@ -650,7 +661,7 @@ def _query_int(request: Request, name: str, default: int) -> int:
 @router.get("/newsletters", response_class=HTMLResponse)
 async def newsletters_page(request: Request):
     user = require_user(request)
-    state = await _load_ui_state(request)
+    state = await load_newsletter_page_state(request)
     settings = request.app.state.settings
     newsletters = []
     collector_error: str | None = None
@@ -682,19 +693,17 @@ async def newsletters_page(request: Request):
 
     if settings.newsletter_management:
         store, collector = await _runtime(request)
+        # Tracking wakes the background collector on first use, but the page renders
+        # from persisted state instead of waiting for Rspamd/Dovecot work to finish.
         collector.track(user)
-        try:
-            await collector.scan_mailbox(user)
-        except Exception as exc:
-            LOGGER.warning("Immediate newsletter scan failed for %s: %s", user, exc)
         all_newsletters = await store.list_for_mailbox(user)
         collector_error = collector.last_error
         collector_last_success = collector.last_success_at
 
-        all_aliases, mailbox_details = await asyncio.gather(
-            request.app.state.mailcow.list_aliases(),
-            request.app.state.mailcow.get_mailbox(user),
-        )
+        all_aliases = state.get("mailcow_aliases") or []
+        mailbox_details = state.get("mailbox_details")
+        if mailbox_details is None:
+            mailbox_details = await request.app.state.mailcow.get_mailbox(user)
         newsletter_forwarded_aliases = direct_mailcow_forwards_to_mailbox(
             all_aliases,
             user,

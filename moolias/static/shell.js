@@ -7,6 +7,14 @@
   const accountPopover = document.querySelector("[data-account-popover]");
   const sidebar = document.querySelector("[data-app-sidebar]");
 
+  if (!document.querySelector("link[data-navigation-loading-styles]")) {
+    const stylesheet = document.createElement("link");
+    stylesheet.rel = "stylesheet";
+    stylesheet.href = "/static/navigation-loading.css?v=20260830-1";
+    stylesheet.dataset.navigationLoadingStyles = "";
+    document.head.append(stylesheet);
+  }
+
   const loadAccountDisplayName = async () => {
     if (!accountButton) return;
     const label = accountButton.querySelector(".account-email");
@@ -499,6 +507,68 @@
       }));
     }).observe(aliasResultsRegion, { childList: true });
   }
+
+  const navigationPaths = new Set([
+    "/overview",
+    "/aliases",
+    "/offline-pool",
+    "/newsletters",
+    "/statistics",
+  ]);
+  let navigationPendingTimer = null;
+
+  const clearNavigationPending = () => {
+    if (navigationPendingTimer !== null) {
+      window.clearTimeout(navigationPendingTimer);
+      navigationPendingTimer = null;
+    }
+    document.documentElement.classList.remove("navigation-pending");
+    delete document.documentElement.dataset.navigationTarget;
+    document.querySelector(".app-main")?.removeAttribute("aria-busy");
+  };
+
+  const beginNavigationPending = (url) => {
+    if (!navigationPaths.has(url.pathname)) return false;
+    const target = url.pathname === "/offline-pool"
+      ? "offline-pool"
+      : url.pathname.slice(1);
+    document.documentElement.dataset.navigationTarget = target;
+    document.documentElement.classList.add("navigation-pending");
+    document.querySelector(".app-main")?.setAttribute("aria-busy", "true");
+    navigationPendingTimer = window.setTimeout(clearNavigationPending, 12000);
+    return true;
+  };
+
+  window.addEventListener("click", (event) => {
+    if (
+      event.defaultPrevented
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+    ) return;
+
+    const link = event.target.closest("a[href]");
+    if (!link || link.target || link.hasAttribute("download")) return;
+
+    const url = new URL(link.href, window.location.href);
+    if (url.origin !== window.location.origin || !navigationPaths.has(url.pathname)) return;
+    if (
+      url.pathname === window.location.pathname
+      && url.search === window.location.search
+      && url.hash === window.location.hash
+    ) return;
+    if (
+      url.pathname === window.location.pathname
+      && url.search === window.location.search
+      && url.hash
+    ) return;
+
+    beginNavigationPending(url);
+  });
+
+  window.addEventListener("pageshow", clearNavigationPending);
 
   const installServiceIconPicker = () => {
     if (!document.querySelector("[data-alias-icon-select]")) return;
