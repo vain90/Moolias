@@ -29,7 +29,6 @@ _STOPWORDS = frozenset(
         "test",
     }
 )
-_SHORT_BRAND_TOKENS = frozenset({"dm", "ing"})
 
 # Use tldextract's bundled Public Suffix List snapshot, including private suffixes
 # such as github.io. Sender matching must not cause network access at runtime merely
@@ -59,6 +58,14 @@ def _significant_tokens(value: str) -> list[str]:
     ]
 
 
+def _short_identity_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in _TOKEN_RE.findall(_ascii(value))
+        if 2 <= len(token) <= 3 and not token.isdigit() and token not in _STOPWORDS
+    }
+
+
 def _tokens(value: str) -> set[str]:
     return set(_significant_tokens(value))
 
@@ -80,14 +87,13 @@ def alias_identity_tokens(alias_address: str, name: str) -> set[str]:
 def description_identity_tokens(description: str) -> set[str]:
     # A private description is supporting context, not a second alias name.
     # Only exact significant tokens count; adjacent words are not promoted to
-    # compound brand identities and short-brand exceptions are not applied.
+    # compound brand identities and short tokens are not accepted here.
     return _tokens(description)
 
 
-def _short_brand_tokens(alias_address: str, name: str) -> set[str]:
+def _short_alias_identity_tokens(alias_address: str, name: str) -> set[str]:
     local_part = alias_address.split("@", 1)[0]
-    raw_tokens = set(_TOKEN_RE.findall(_ascii(f"{local_part} {name}")))
-    return raw_tokens & _SHORT_BRAND_TOKENS
+    return _short_identity_tokens(local_part) | _short_identity_tokens(name)
 
 
 def _canonical_domain(sender_domain: str) -> str | None:
@@ -139,7 +145,7 @@ def sender_match_token(
     if private_description is None:
         private_description = str(getattr(name, "private_description", ""))
 
-    if registered_label in _short_brand_tokens(alias_address, name):
+    if registered_label in _short_alias_identity_tokens(alias_address, name):
         return registered_label
     if registered_label in alias_identity_tokens(alias_address, name):
         return registered_label
