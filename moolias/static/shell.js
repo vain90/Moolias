@@ -539,7 +539,7 @@
     return true;
   };
 
-  document.addEventListener("click", (event) => {
+  window.addEventListener("click", (event) => {
     if (
       event.defaultPrevented
       || event.button !== 0
@@ -565,9 +565,7 @@
       && url.hash
     ) return;
 
-    event.preventDefault();
-    if (!beginNavigationPending(url)) return;
-    window.requestAnimationFrame(() => window.location.assign(url.href));
+    beginNavigationPending(url);
   });
 
   window.addEventListener("pageshow", clearNavigationPending);
