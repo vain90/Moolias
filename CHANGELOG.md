@@ -2,6 +2,13 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.3.3 - 2026-08-30
+
+### Fixed
+
+- Newsletter Management now uses explicit server-rendered status filters for all, unsubscribable, no-link, after-unsubscribe and unsubscribed entries instead of the ambiguous `Active` state; legacy `status=active` URLs normalize to the unsubscribable view.
+- automatic sender recognition now supports short 2–3 character alias identities such as VBL, DHL, O2, DM and ING when they exactly match the registered sender-domain label, without trusting one-character identities, short private-description hints or embedded/lookalike domains.
+
 ## 1.3.2 - 2026-08-29
 
 ### Added
