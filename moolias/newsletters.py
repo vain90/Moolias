@@ -43,7 +43,9 @@ TEMPLATES = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "tem
 CLEAN_ACTIONS = frozenset({"clean", "no action", "accept"})
 AUTH_SYMBOLS = frozenset({"R_DKIM_ALLOW", "DMARC_POLICY_ALLOW"})
 NEWSLETTER_SYMBOLS = frozenset({"MAILLIST", "HAS_LIST_UNSUB", "MOOLIAS_BODY_UNSUB"})
-NEWSLETTER_STATUS_FILTERS = frozenset({"all", "active", "unsubscribed"})
+NEWSLETTER_STATUS_FILTERS = frozenset(
+    {"all", "unsubscribable", "no_link", "unsubscribed", "resumed"}
+)
 MAX_UNSUBSCRIBE_URL_LENGTH = 8192
 MAX_RESPONSE_HEADER_BYTES = 65536
 MAX_HEADER_LOOKUPS_PER_SCAN = 50
@@ -282,8 +284,33 @@ def _history_candidate(item: dict[str, Any]) -> bool:
 
 
 def _normalise_newsletter_status_filter(value: Any) -> str:
-    status = str(value or "active").strip().casefold()
-    return status if status in NEWSLETTER_STATUS_FILTERS else "active"
+    status = str(value or "all").strip().casefold()
+    if status == "active":
+        return "unsubscribable"
+    return status if status in NEWSLETTER_STATUS_FILTERS else "all"
+
+
+def _newsletter_status(newsletter: Newsletter) -> str:
+    if newsletter.resumed_after_unsubscribe:
+        return "resumed"
+    if newsletter.is_unsubscribed:
+        return "unsubscribed"
+    if newsletter.direct_unsubscribe_available:
+        return "unsubscribable"
+    return "no_link"
+
+
+def _newsletter_status_counts(newsletters: list[Newsletter]) -> dict[str, int]:
+    counts = {
+        "all": len(newsletters),
+        "unsubscribable": 0,
+        "no_link": 0,
+        "unsubscribed": 0,
+        "resumed": 0,
+    }
+    for newsletter in newsletters:
+        counts[_newsletter_status(newsletter)] += 1
+    return counts
 
 
 def _newsletter_sort_key(newsletter: Newsletter) -> tuple[int, int, str, int]:
@@ -640,7 +667,13 @@ async def newsletters_page(request: Request):
     newsletter_sender_names: dict[int, str] = {}
     newsletter_forwarded_aliases = []
     newsletter_forwarded_enabled = False
-    status_counts = {"all": 0, "active": 0, "unsubscribed": 0}
+    status_counts = {
+        "all": 0,
+        "unsubscribable": 0,
+        "no_link": 0,
+        "unsubscribed": 0,
+        "resumed": 0,
+    }
     filtered_total = 0
     total_pages = 1
     pagination_items: list[int | None] = [1]
@@ -695,17 +728,15 @@ async def newsletters_page(request: Request):
                 or newsletter.sender_address
             )
 
-        status_counts = {
-            "all": len(all_newsletters),
-            "active": sum(not item.is_unsubscribed for item in all_newsletters),
-            "unsubscribed": sum(item.is_unsubscribed for item in all_newsletters),
-        }
+        status_counts = _newsletter_status_counts(all_newsletters)
 
         filtered = all_newsletters
-        if status_filter == "active":
-            filtered = [item for item in filtered if not item.is_unsubscribed]
-        elif status_filter == "unsubscribed":
-            filtered = [item for item in filtered if item.is_unsubscribed]
+        if status_filter != "all":
+            filtered = [
+                item
+                for item in filtered
+                if _newsletter_status(item) == status_filter
+            ]
 
         if search_query:
             needle = search_query.casefold()

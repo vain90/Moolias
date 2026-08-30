@@ -10,6 +10,8 @@ from moolias.newsletters import (
     _dkim_covers_one_click,
     _history_candidate,
     _newsletter_sort_key,
+    _newsletter_status,
+    _newsletter_status_counts,
     _normalise_newsletter_status_filter,
     _public_https_target,
     _symbols,
@@ -53,15 +55,49 @@ def _newsletter(
     )
 
 
-def test_newsletter_status_filter_defaults_to_active():
-    assert _normalise_newsletter_status_filter(None) == "active"
-    assert _normalise_newsletter_status_filter("") == "active"
-    assert _normalise_newsletter_status_filter("invalid") == "active"
+def test_newsletter_status_filter_defaults_to_all_and_maps_old_active_links():
+    assert _normalise_newsletter_status_filter(None) == "all"
+    assert _normalise_newsletter_status_filter("") == "all"
+    assert _normalise_newsletter_status_filter("invalid") == "all"
+    assert _normalise_newsletter_status_filter("active") == "unsubscribable"
     assert _normalise_newsletter_status_filter("all") == "all"
+    assert _normalise_newsletter_status_filter("unsubscribable") == "unsubscribable"
+    assert _normalise_newsletter_status_filter("no_link") == "no_link"
+    assert _normalise_newsletter_status_filter("resumed") == "resumed"
     assert _normalise_newsletter_status_filter("unsubscribed") == "unsubscribed"
 
 
-def test_newsletter_sort_prioritizes_actionable_active_rows_and_keeps_unsubscribed_last():
+def test_newsletter_status_and_counts_keep_filter_states_distinct():
+    unsubscribable = _newsletter(1, last_seen_at=100, has_link=True)
+    no_link = _newsletter(2, last_seen_at=200)
+    unsubscribed = _newsletter(
+        3,
+        last_seen_at=300,
+        unsubscribed_at=400,
+        has_link=True,
+    )
+    resumed = _newsletter(
+        4,
+        last_seen_at=500,
+        unsubscribed_at=400,
+    )
+
+    assert _newsletter_status(unsubscribable) == "unsubscribable"
+    assert _newsletter_status(no_link) == "no_link"
+    assert _newsletter_status(unsubscribed) == "unsubscribed"
+    assert _newsletter_status(resumed) == "resumed"
+    assert _newsletter_status_counts(
+        [unsubscribable, no_link, unsubscribed, resumed]
+    ) == {
+        "all": 4,
+        "unsubscribable": 1,
+        "no_link": 1,
+        "unsubscribed": 1,
+        "resumed": 1,
+    }
+
+
+def test_newsletter_sort_prioritizes_resumed_and_actionable_rows_and_keeps_unsubscribed_last():
     resumed = _newsletter(
         1,
         last_seen_at=200,

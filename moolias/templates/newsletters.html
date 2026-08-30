@@ -143,9 +143,17 @@
             {% if language == 'de' %}Alle{% else %}All{% endif %}
             <span>{{ newsletter_status_counts.all }}</span>
           </a>
-          <a class="filter-pill {% if newsletter_status_filter == 'active' %}current{% endif %}" href="/newsletters?status=active&q={{ newsletter_search_query|urlencode }}&per_page={{ newsletter_per_page }}">
-            {% if language == 'de' %}Aktiv{% else %}Active{% endif %}
-            <span>{{ newsletter_status_counts.active }}</span>
+          <a class="filter-pill {% if newsletter_status_filter == 'unsubscribable' %}current{% endif %}" href="/newsletters?status=unsubscribable&q={{ newsletter_search_query|urlencode }}&per_page={{ newsletter_per_page }}">
+            {% if language == 'de' %}Abmeldbar{% else %}Unsubscribable{% endif %}
+            <span>{{ newsletter_status_counts.unsubscribable }}</span>
+          </a>
+          <a class="filter-pill {% if newsletter_status_filter == 'no_link' %}current{% endif %}" href="/newsletters?status=no_link&q={{ newsletter_search_query|urlencode }}&per_page={{ newsletter_per_page }}">
+            {% if language == 'de' %}Kein Link{% else %}No link{% endif %}
+            <span>{{ newsletter_status_counts.no_link }}</span>
+          </a>
+          <a class="filter-pill {% if newsletter_status_filter == 'resumed' %}current{% endif %}" href="/newsletters?status=resumed&q={{ newsletter_search_query|urlencode }}&per_page={{ newsletter_per_page }}">
+            {% if language == 'de' %}Trotz Abmeldung{% else %}After unsubscribe{% endif %}
+            <span>{{ newsletter_status_counts.resumed }}</span>
           </a>
           <a class="filter-pill {% if newsletter_status_filter == 'unsubscribed' %}current{% endif %}" href="/newsletters?status=unsubscribed&q={{ newsletter_search_query|urlencode }}&per_page={{ newsletter_per_page }}">
             {% if language == 'de' %}Abgemeldet{% else %}Unsubscribed{% endif %}
