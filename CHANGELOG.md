@@ -2,6 +2,18 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.3.4 - 2026-08-30
+
+### Changed
+
+- authenticated navigation now shows immediate structural loading feedback while retaining native browser navigation and server-rendered Jinja/HTML as the source of truth, including mobile and reduced-motion handling.
+- Newsletter Management now renders from persisted state without waiting for a request-bound Rspamd/Dovecot scan; the background collector is woken on first use instead.
+- the Newsletter page uses a dedicated lightweight server-side state loader and shared UI loading reuses already-fetched Mailcow mailbox/domain data and runs independent alias/domain requests concurrently, avoiding unnecessary usage, sender, icon, health and overview calculations.
+
+### Fixed
+
+- alias workflow dialogs now clear their `workflow` URL parameter immediately when explicitly closed, preserving the existing no-reload behavior while keeping navigation loading feedback from interfering with workflow controls.
+
 ## 1.3.3 - 2026-08-30
 
 ### Fixed
