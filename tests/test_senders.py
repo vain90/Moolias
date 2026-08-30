@@ -42,6 +42,8 @@ def test_short_alias_identities_match_exact_registered_domain_labels(
         ("dm-k7@example.org", "DM", "dm-drogerie.de"),
         ("vbl-k7@example.org", "VBL", "meine-vbl.de"),
         ("dhl-k7@example.org", "DHL", "dhl-express.de"),
+        ("bank-k7@example.org", "Ingredients Bank", "info.ing.de"),
+        ("dmv-k7@example.org", "DMV service", "news.dm.de"),
     ],
 )
 def test_short_alias_identities_do_not_match_embedded_or_compound_domain_labels(
