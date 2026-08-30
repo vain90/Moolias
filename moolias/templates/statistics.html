@@ -9,8 +9,27 @@
   </div>
 </header>
 
+{% if newsletter_statistics_visible %}
+<section class="newsletter-statistics" data-newsletter-statistics>
+  <div class="section-head newsletter-statistics-head">
+    <div>
+      <h2>{% if language == 'de' %}Newsletter-Verwaltung{% else %}Newsletter Management{% endif %}</h2>
+      <p class="muted">{% if language == 'de' %}Überblick über deine erkannten Newsletter und ihren Abmeldestatus.{% else %}Overview of detected newsletters and their unsubscribe status.{% endif %}</p>
+    </div>
+    <a class="text-link" href="/newsletters">{% if language == 'de' %}Newsletter öffnen{% else %}Open newsletters{% endif %} {{ icon('chevron-right') }}</a>
+  </div>
+  <div class="metric-grid statistics-metrics newsletter-statistics-metrics">
+    <a class="metric-card" href="/newsletters?status=all"><span class="metric-icon blue" aria-hidden="true">{{ icon('newspaper') }}</span><strong>{{ newsletter_statistics.all }}</strong><span>Newsletter</span><small>{% if language == 'de' %}insgesamt erkannt{% else %}detected in total{% endif %}</small></a>
+    <a class="metric-card" href="/newsletters?status=unsubscribable"><span class="metric-icon green" aria-hidden="true">{{ icon('link') }}</span><strong>{{ newsletter_statistics.unsubscribable }}</strong><span>{% if language == 'de' %}Abmeldbar{% else %}Unsubscribable{% endif %}</span><small>{% if language == 'de' %}mit Abmeldelink{% else %}with unsubscribe link{% endif %}</small></a>
+    <a class="metric-card" href="/newsletters?status=no_link"><span class="metric-icon neutral" aria-hidden="true">{{ icon('info') }}</span><strong>{{ newsletter_statistics.no_link }}</strong><span>{% if language == 'de' %}Kein Link{% else %}No link{% endif %}</span><small>{% if language == 'de' %}ohne Abmeldelink{% else %}without unsubscribe link{% endif %}</small></a>
+    <a class="metric-card" href="/newsletters?status=unsubscribed"><span class="metric-icon green" aria-hidden="true">{{ icon('circle-check') }}</span><strong>{{ newsletter_statistics.unsubscribed }}</strong><span>{% if language == 'de' %}Abgemeldet{% else %}Unsubscribed{% endif %}</span><small>Newsletter</small></a>
+    <a class="metric-card" href="/newsletters?status=resumed"><span class="metric-icon amber" aria-hidden="true">{{ icon('triangle-alert') }}</span><strong>{{ newsletter_statistics.resumed }}</strong><span>{% if language == 'de' %}Trotz Abmeldung{% else %}After unsubscribe{% endif %}</span><small>{% if language == 'de' %}erneut empfangen{% else %}received again{% endif %}</small></a>
+  </div>
+</section>
+{% endif %}
+
 {% if usage_stats_visible %}
-<section class="metric-grid statistics-metrics">
+<section class="metric-grid statistics-metrics{% if newsletter_statistics_visible %} top-gap{% endif %}">
   <div class="metric-card static-card"><span class="metric-icon green" aria-hidden="true">{{ icon('inbox') }}</span><strong>{{ stats_summary.received }}</strong><span>{% if language == 'de' %}Empfangen{% else %}Received{% endif %}</span><small>{% if language == 'de' %}Nachrichten{% else %}Messages{% endif %}</small></div>
   <div class="metric-card static-card"><span class="metric-icon blue" aria-hidden="true">{{ icon('send') }}</span><strong>{{ stats_summary.sent }}</strong><span>{% if language == 'de' %}Gesendet{% else %}Sent{% endif %}</span><small>{% if language == 'de' %}Nachrichten{% else %}Messages{% endif %}</small></div>
   <div class="metric-card static-card"><span class="metric-icon green" aria-hidden="true">{{ icon('circle-check') }}</span><strong>{{ stats_summary.recognized_senders }}</strong><span>{% if language == 'de' %}Erkannt{% else %}Recognized{% endif %}</span><small>{% if language == 'de' %}Absender{% else %}Senders{% endif %}</small></div>
@@ -116,7 +135,7 @@
   </div>
 </section>
 {% else %}
-<section class="card empty-state-card statistics-disabled-state">
+<section class="card empty-state-card statistics-disabled-state{% if newsletter_statistics_visible %} top-gap{% endif %}">
   {% if not stats_available %}
     <span class="empty-state-icon" aria-hidden="true">{{ icon('chart-no-axes-combined') }}</span>
     <h2>{% if language == 'de' %}Nutzungsstatistik ist serverseitig deaktiviert{% else %}Usage statistics are disabled server-side{% endif %}</h2>

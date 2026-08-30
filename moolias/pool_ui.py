@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from collections import Counter
 
 from fastapi import APIRouter, Form, HTTPException, Query, Request, status
@@ -18,6 +19,8 @@ from moolias.aliases import (
 )
 from moolias.i18n import LANGUAGE_COOKIE, detect_language
 from moolias.mailcow import MailcowError
+from moolias.newsletter_mode import resolve_newsletter_mode
+from moolias.newsletter_status import newsletter_status_counts
 from moolias.security import require_user, validate_csrf
 from moolias.statistics_destinations import top_outgoing_destinations
 from moolias.stats_mode import StatsMode
@@ -98,6 +101,33 @@ async def statistics_page(
     detail_toggle_available = False
     stats_state = state.get("stats_state")
     detail = detail if detail in {"domain", "address"} else "address"
+    newsletter_statistics_visible = False
+    newsletter_statistics = newsletter_status_counts(())
+
+    settings = request.app.state.settings
+    if settings.newsletter_management:
+        mailbox_details = state.get("mailbox_details")
+        try:
+            if mailbox_details is None:
+                mailbox_details = await request.app.state.mailcow.get_mailbox(state["user"])
+            newsletter_state = resolve_newsletter_mode(
+                mailbox_details.get("tags"),
+                state.get("domain_details", {}).get("tags"),
+                settings.newsletter_tag,
+            )
+            if not newsletter_state.conflict and newsletter_state.enabled:
+                # Loading Statistics reads only persisted NewsletterStore state. It
+                # deliberately does not track the mailbox or wake the collector.
+                from moolias.newsletters import newsletter_store_for
+
+                newsletter_store = await newsletter_store_for(request)
+                newsletters = await newsletter_store.list_for_mailbox(state["user"])
+                newsletter_statistics = newsletter_status_counts(newsletters)
+                newsletter_statistics_visible = True
+        except (MailcowError, OSError, sqlite3.Error):
+            # Newsletter metrics are optional. A temporary policy or store failure
+            # must not make the existing Statistics page unavailable.
+            newsletter_statistics_visible = False
 
     if state.get("usage_stats_visible") and stats_state is not None:
         mode = stats_state.effective
@@ -139,6 +169,8 @@ async def statistics_page(
             "destination_stats_error": destination_stats_error,
             "statistics_detail": detail,
             "statistics_detail_toggle_available": detail_toggle_available,
+            "newsletter_statistics_visible": newsletter_statistics_visible,
+            "newsletter_statistics": newsletter_statistics,
         }
     )
     return TEMPLATES.TemplateResponse(
