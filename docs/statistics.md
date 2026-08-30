@@ -53,4 +53,10 @@ Increasing the detail level can evaluate still-available Mailcow/Rspamd history.
 
 Statistics, sender-review state and normal persistent application/UI state share the SQLite file configured by `MOOLIAS_USAGE_DB_PATH`. Alias configuration itself remains in Mailcow. Disabling `MOOLIAS_USAGE_STATS` stops statistics collection but does not make this database disposable.
 
+## Newsletter metrics
+
+When Newsletter Management is available on the server and enabled by the effective domain/mailbox policy, the Statistics page also shows the total detected newsletters and the same mutually exclusive statuses as the Newsletter page: **Unsubscribable**, **No link**, **Unsubscribed** and **After unsubscribe**.
+
+These values are read from the persisted Newsletter Management database. Opening Statistics does not run a synchronous Rspamd or Dovecot newsletter scan. If Newsletter Management is unavailable or disabled for the mailbox, the newsletter metrics are omitted completely.
+
 For collector diagnostics and Rspamd-history coverage, see [Statistics collector health](statistics-collector-health.md).

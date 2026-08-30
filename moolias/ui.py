@@ -490,6 +490,7 @@ async def _load_ui_state(request: Request) -> dict:
         "top_sources": source_counts.most_common(8),
         "mailcow_aliases": all_aliases,
         "mailbox_details": mailbox_details,
+        "domain_details": domain_details,
         "stats_summary": {
             "received": total_received,
             "sent": total_sent,

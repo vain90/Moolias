@@ -28,6 +28,11 @@ from moolias.newsletter_forwarding import (
 )
 from moolias.newsletter_mode import mailbox_newsletter_state
 from moolias.newsletter_page_state import load_newsletter_page_state
+from moolias.newsletter_status import (
+    newsletter_status,
+    newsletter_status_counts,
+    normalise_newsletter_status_filter,
+)
 from moolias.newsletter_store import Newsletter, NewsletterObservation, NewsletterStore
 from moolias.security import require_user, validate_csrf
 from moolias.sender_protocol import (
@@ -44,9 +49,6 @@ TEMPLATES = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "tem
 CLEAN_ACTIONS = frozenset({"clean", "no action", "accept"})
 AUTH_SYMBOLS = frozenset({"R_DKIM_ALLOW", "DMARC_POLICY_ALLOW"})
 NEWSLETTER_SYMBOLS = frozenset({"MAILLIST", "HAS_LIST_UNSUB", "MOOLIAS_BODY_UNSUB"})
-NEWSLETTER_STATUS_FILTERS = frozenset(
-    {"all", "unsubscribable", "no_link", "unsubscribed", "resumed"}
-)
 MAX_UNSUBSCRIBE_URL_LENGTH = 8192
 MAX_RESPONSE_HEADER_BYTES = 65536
 MAX_HEADER_LOOKUPS_PER_SCAN = 50
@@ -284,36 +286,6 @@ def _history_candidate(item: dict[str, Any]) -> bool:
     )
 
 
-def _normalise_newsletter_status_filter(value: Any) -> str:
-    status = str(value or "all").strip().casefold()
-    if status == "active":
-        return "unsubscribable"
-    return status if status in NEWSLETTER_STATUS_FILTERS else "all"
-
-
-def _newsletter_status(newsletter: Newsletter) -> str:
-    if newsletter.resumed_after_unsubscribe:
-        return "resumed"
-    if newsletter.is_unsubscribed:
-        return "unsubscribed"
-    if newsletter.direct_unsubscribe_available:
-        return "unsubscribable"
-    return "no_link"
-
-
-def _newsletter_status_counts(newsletters: list[Newsletter]) -> dict[str, int]:
-    counts = {
-        "all": len(newsletters),
-        "unsubscribable": 0,
-        "no_link": 0,
-        "unsubscribed": 0,
-        "resumed": 0,
-    }
-    for newsletter in newsletters:
-        counts[_newsletter_status(newsletter)] += 1
-    return counts
-
-
 def _newsletter_sort_key(newsletter: Newsletter) -> tuple[int, int, str, int]:
     if newsletter.is_unsubscribed:
         priority = 3
@@ -534,6 +506,25 @@ class NewsletterCollector:
 _runtime_lock = asyncio.Lock()
 
 
+async def _initialise_newsletter_store(app: Any) -> NewsletterStore:
+    store = getattr(app.state, "newsletter_store", None)
+    if store is None:
+        store = NewsletterStore(app.state.settings.newsletter_db_path)
+        await store.initialize()
+        app.state.newsletter_store = store
+    return store
+
+
+async def newsletter_store_for(request: Request) -> NewsletterStore:
+    app = request.app
+    store = getattr(app.state, "newsletter_store", None)
+    if store is not None:
+        return store
+
+    async with _runtime_lock:
+        return await _initialise_newsletter_store(app)
+
+
 async def _runtime(request: Request) -> tuple[NewsletterStore, NewsletterCollector]:
     app = request.app
     store = getattr(app.state, "newsletter_store", None)
@@ -544,10 +535,7 @@ async def _runtime(request: Request) -> tuple[NewsletterStore, NewsletterCollect
     async with _runtime_lock:
         store = getattr(app.state, "newsletter_store", None)
         collector = getattr(app.state, "newsletter_collector", None)
-        if store is None:
-            store = NewsletterStore(app.state.settings.newsletter_db_path)
-            await store.initialize()
-            app.state.newsletter_store = store
+        store = await _initialise_newsletter_store(app)
         if collector is None:
             collector = NewsletterCollector(app.state.settings, app.state.mailcow, store)
             app.state.newsletter_collector = collector
@@ -668,7 +656,7 @@ async def newsletters_page(request: Request):
     collector_last_success: int | None = None
 
     search_query = str(request.query_params.get("q") or "").strip()[:160]
-    status_filter = _normalise_newsletter_status_filter(request.query_params.get("status"))
+    status_filter = normalise_newsletter_status_filter(request.query_params.get("status"))
     per_page = _query_int(request, "per_page", 25)
     if per_page not in PAGE_SIZES:
         per_page = 25
@@ -737,14 +725,14 @@ async def newsletters_page(request: Request):
                 or newsletter.sender_address
             )
 
-        status_counts = _newsletter_status_counts(all_newsletters)
+        status_counts = newsletter_status_counts(all_newsletters)
 
         filtered = all_newsletters
         if status_filter != "all":
             filtered = [
                 item
                 for item in filtered
-                if _newsletter_status(item) == status_filter
+                if newsletter_status(item) == status_filter
             ]
 
         if search_query:

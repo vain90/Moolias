@@ -4,15 +4,17 @@ import socket
 
 import pytest
 
+from moolias.newsletter_status import (
+    newsletter_status,
+    newsletter_status_counts,
+    normalise_newsletter_status_filter,
+)
 from moolias.newsletter_store import Newsletter, NewsletterLink
 from moolias.newsletters import (
     _decode_header_text,
     _dkim_covers_one_click,
     _history_candidate,
     _newsletter_sort_key,
-    _newsletter_status,
-    _newsletter_status_counts,
-    _normalise_newsletter_status_filter,
     _public_https_target,
     _symbols,
     _unsubscribe_targets,
@@ -56,15 +58,15 @@ def _newsletter(
 
 
 def test_newsletter_status_filter_defaults_to_all_and_maps_old_active_links():
-    assert _normalise_newsletter_status_filter(None) == "all"
-    assert _normalise_newsletter_status_filter("") == "all"
-    assert _normalise_newsletter_status_filter("invalid") == "all"
-    assert _normalise_newsletter_status_filter("active") == "unsubscribable"
-    assert _normalise_newsletter_status_filter("all") == "all"
-    assert _normalise_newsletter_status_filter("unsubscribable") == "unsubscribable"
-    assert _normalise_newsletter_status_filter("no_link") == "no_link"
-    assert _normalise_newsletter_status_filter("resumed") == "resumed"
-    assert _normalise_newsletter_status_filter("unsubscribed") == "unsubscribed"
+    assert normalise_newsletter_status_filter(None) == "all"
+    assert normalise_newsletter_status_filter("") == "all"
+    assert normalise_newsletter_status_filter("invalid") == "all"
+    assert normalise_newsletter_status_filter("active") == "unsubscribable"
+    assert normalise_newsletter_status_filter("all") == "all"
+    assert normalise_newsletter_status_filter("unsubscribable") == "unsubscribable"
+    assert normalise_newsletter_status_filter("no_link") == "no_link"
+    assert normalise_newsletter_status_filter("resumed") == "resumed"
+    assert normalise_newsletter_status_filter("unsubscribed") == "unsubscribed"
 
 
 def test_newsletter_status_and_counts_keep_filter_states_distinct():
@@ -82,11 +84,11 @@ def test_newsletter_status_and_counts_keep_filter_states_distinct():
         unsubscribed_at=400,
     )
 
-    assert _newsletter_status(unsubscribable) == "unsubscribable"
-    assert _newsletter_status(no_link) == "no_link"
-    assert _newsletter_status(unsubscribed) == "unsubscribed"
-    assert _newsletter_status(resumed) == "resumed"
-    assert _newsletter_status_counts(
+    assert newsletter_status(unsubscribable) == "unsubscribable"
+    assert newsletter_status(no_link) == "no_link"
+    assert newsletter_status(unsubscribed) == "unsubscribed"
+    assert newsletter_status(resumed) == "resumed"
+    assert newsletter_status_counts(
         [unsubscribable, no_link, unsubscribed, resumed]
     ) == {
         "all": 4,
