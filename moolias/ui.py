@@ -24,8 +24,7 @@ from moolias.mailcow import MailcowAccessDenied, MailcowError
 from moolias.security import ensure_csrf_token, require_user, validate_csrf
 from moolias.senders import sender_match_token
 from moolias.service_icons import icon_catalog, resolve_service_icon
-from moolias.stats_mode import StatsModeSource
-from moolias.usage import mailbox_stats_state
+from moolias.stats_mode import StatsModeSource, resolve_stats_mode
 from moolias.usage_evidence import UsageEvidenceStore
 
 router = APIRouter()
@@ -167,8 +166,10 @@ async def _load_ui_state(request: Request) -> dict:
     mailcow = request.app.state.mailcow
 
     try:
-        all_aliases = await mailcow.list_aliases()
-        domain_details = await mailcow.get_domain(domain)
+        all_aliases, domain_details = await asyncio.gather(
+            mailcow.list_aliases(),
+            mailcow.get_domain(domain),
+        )
     except MailcowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -222,10 +223,17 @@ async def _load_ui_state(request: Request) -> dict:
     sender_stats: dict[str, list[dict[str, str | int | bool | None]]] = {}
     unexpected_aliases: set[str] = set()
     ignored_aliases: set[str] = set()
+    mailbox_details = getattr(request.state, "mailbox", None)
 
     if stats_available:
         try:
-            stats_state = await mailbox_stats_state(settings, mailcow, user)
+            if mailbox_details is None:
+                mailbox_details = await mailcow.get_mailbox(user)
+            stats_state = resolve_stats_mode(
+                mailbox_details.get("tags"),
+                domain_details.get("tags"),
+                settings.usage_tag,
+            )
             usage_stats_visible = stats_state.enabled
             if stats_state.conflict and stats_state.conflict_source is StatsModeSource.MAILBOX:
                 stats_mode_selection = "conflict"
@@ -480,6 +488,8 @@ async def _load_ui_state(request: Request) -> dict:
         "recent_aliases": recent_aliases,
         "top_aliases": top_aliases,
         "top_sources": source_counts.most_common(8),
+        "mailcow_aliases": all_aliases,
+        "mailbox_details": mailbox_details,
         "stats_summary": {
             "received": total_received,
             "sent": total_sent,
