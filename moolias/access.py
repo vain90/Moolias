@@ -31,11 +31,14 @@ class AccessRevalidationMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            await request.app.state.mailcow.get_mailbox(str(email).lower())
+            mailbox = await request.app.state.mailcow.get_mailbox(str(email).lower())
         except MailcowAccessDenied:
             request.session.clear()
             return RedirectResponse("/?error=access-denied", status_code=303)
         except MailcowError as exc:
             return JSONResponse({"detail": str(exc)}, status_code=502)
 
+        # Reuse the mailbox payload in the page request instead of immediately
+        # asking Mailcow for the same data again.
+        request.state.mailbox = mailbox
         return await call_next(request)
