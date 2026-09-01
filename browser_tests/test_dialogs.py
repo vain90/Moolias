@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Locator, Page, expect
 
 UNUSED_POOL = "feder-hafen-27@example.org"
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +19,41 @@ def _login(page: Page, base_url: str) -> None:
 
 def _pool_item(page: Page, address: str):
     return page.locator(".offline-pool-row").filter(has_text=address)
+
+
+def _dialog_surface_point(dialog: Locator) -> dict[str, float]:
+    point = dialog.evaluate(
+        """dialog => {
+          const rect = dialog.getBoundingClientRect();
+          for (let y = rect.top + 4; y < rect.bottom - 4; y += 4) {
+            for (let x = rect.left + 4; x < rect.right - 4; x += 4) {
+              if (document.elementFromPoint(x, y) === dialog) return { x, y };
+            }
+          }
+          return null;
+        }"""
+    )
+    assert point is not None, "dialog has no visible surface point owned by the <dialog> element"
+    return point
+
+
+def _click_dialog_surface(page: Page, dialog: Locator, *, times: int = 1) -> None:
+    point = _dialog_surface_point(dialog)
+    for _ in range(times):
+        page.mouse.click(point["x"], point["y"])
+        expect(dialog).to_be_visible()
+
+
+def _click_dialog_backdrop(page: Page, dialog: Locator) -> None:
+    box = dialog.bounding_box()
+    assert box is not None
+    if box["x"] >= 8:
+        x = box["x"] - 6
+        y = box["y"] + box["height"] / 2
+    else:
+        x = box["x"] + box["width"] / 2
+        y = max(1, box["y"] - 6)
+    page.mouse.click(x, y)
 
 
 def test_destructive_confirmation_is_internal_and_cancellable(page: Page, base_url: str) -> None:
@@ -39,6 +74,83 @@ def test_destructive_confirmation_is_internal_and_cancellable(page: Page, base_u
     expect(dialog).to_be_visible()
     dialog.locator('[data-moolias-dialog-confirm]').click()
     expect(_pool_item(page, UNUSED_POOL)).to_have_count(0, timeout=5000)
+
+
+def test_dialog_surface_clicks_do_not_dismiss_create_alias_or_help(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+
+    opener = page.locator("[data-open-create-alias]")
+    opener.click()
+    dialog = page.locator("dialog[data-create-alias-dialog]")
+    expect(dialog).to_be_visible()
+
+    alias_name = dialog.locator('input[name="description"]')
+    alias_name.fill("Amazon")
+    _click_dialog_surface(page, dialog, times=12)
+    expect(alias_name).to_have_value("Amazon")
+
+    dialog.locator("label").first.click(position={"x": 5, "y": 5})
+    expect(dialog).to_be_visible()
+    expect(alias_name).to_have_value("Amazon")
+
+    _click_dialog_backdrop(page, dialog)
+    expect(dialog).not_to_be_visible()
+
+    for _ in range(5):
+        opener.click()
+        expect(dialog).to_be_visible()
+        _click_dialog_surface(page, dialog, times=3)
+        dialog.locator("[data-close-create-alias]").click()
+        expect(dialog).not_to_be_visible()
+
+    page.locator("[data-open-help-dialog]").click()
+    help_dialog = page.locator("dialog[data-help-dialog]")
+    expect(help_dialog).to_be_visible()
+    _click_dialog_surface(page, help_dialog, times=8)
+    expect(help_dialog).to_be_visible()
+    _click_dialog_backdrop(page, help_dialog)
+    expect(help_dialog).not_to_be_visible()
+
+
+def test_shared_confirmation_distinguishes_dialog_surface_from_backdrop(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+    page.goto(f"{base_url}/offline-pool")
+
+    _pool_item(page, UNUSED_POOL).locator('form[action$="/delete"] button').click()
+    dialog = page.locator('dialog[data-moolias-dialog="confirm"]')
+    expect(dialog).to_be_visible()
+
+    _click_dialog_surface(page, dialog, times=10)
+    expect(dialog).to_be_visible()
+    expect(_pool_item(page, UNUSED_POOL)).to_have_count(1)
+
+    _click_dialog_backdrop(page, dialog)
+    expect(dialog).not_to_be_visible()
+    expect(_pool_item(page, UNUSED_POOL)).to_have_count(1)
+
+
+def test_create_alias_dialog_surface_is_safe_on_mobile(page: Page, base_url: str) -> None:
+    page.set_viewport_size({"width": 390, "height": 844})
+    _login(page, base_url)
+
+    page.locator("[data-open-create-alias]").click()
+    dialog = page.locator("dialog[data-create-alias-dialog]")
+    expect(dialog).to_be_visible()
+    alias_name = dialog.locator('input[name="description"]')
+    alias_name.fill("Mobile alias")
+
+    _click_dialog_surface(page, dialog, times=12)
+    expect(dialog).to_be_visible()
+    expect(alias_name).to_have_value("Mobile alias")
+
+    page.keyboard.press("Escape")
+    expect(dialog).not_to_be_visible()
 
 
 def test_statistics_downgrade_uses_internal_confirmation(page: Page, base_url: str) -> None:
