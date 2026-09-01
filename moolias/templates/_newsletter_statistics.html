@@ -1,0 +1,70 @@
+{% from "_icons.html" import icon %}
+{% set newsletter_unsubscribe_outcomes = newsletter_statistics.unsubscribed + newsletter_statistics.resumed %}
+{% set newsletter_success_rate = ((newsletter_statistics.unsubscribed * 100 / newsletter_unsubscribe_outcomes) | round | int) if newsletter_unsubscribe_outcomes else none %}
+<link rel="stylesheet" href="/static/newsletter-statistics.css?v={{ version }}" data-newsletter-statistics-styles="1">
+<section class="statistics-layout newsletter-statistics-layout top-gap" data-newsletter-statistics>
+  <article class="card statistics-card newsletter-summary-card" data-newsletter-overview-card>
+    <div class="section-head newsletter-summary-head">
+      <div>
+        <h2>{% if language == 'de' %}Newsletter-Übersicht{% else %}Newsletter overview{% endif %}</h2>
+        <p class="muted">{% if language == 'de' %}Newsletter-Verwaltung: erkannte Newsletter und verfügbare Abmeldewege.{% else %}Newsletter Management: detected newsletters and available unsubscribe options.{% endif %}</p>
+      </div>
+      <span class="newsletter-summary-icon" aria-hidden="true">{{ icon('newspaper') }}</span>
+    </div>
+
+    <a class="newsletter-total-summary" href="/newsletters?status=all">
+      <strong>{{ newsletter_statistics.all }}</strong>
+      <span>{% if language == 'de' %}Newsletter insgesamt erkannt{% else %}newsletters detected in total{% endif %}</span>
+    </a>
+
+    <div class="newsletter-status-summary">
+      <a class="newsletter-status-row is-actionable" href="/newsletters?status=unsubscribable">
+        <span class="newsletter-status-label"><span>{% if language == 'de' %}Abmeldbar{% else %}Unsubscribable{% endif %}</span><strong>{{ newsletter_statistics.unsubscribable }}</strong></span>
+        <progress max="{{ newsletter_statistics.all if newsletter_statistics.all else 1 }}" value="{{ newsletter_statistics.unsubscribable }}" aria-label="{% if language == 'de' %}Abmeldbare Newsletter{% else %}Unsubscribable newsletters{% endif %}"></progress>
+        <small>{% if language == 'de' %}mit erkanntem Abmeldelink{% else %}with a detected unsubscribe link{% endif %}</small>
+      </a>
+      <a class="newsletter-status-row is-no-link" href="/newsletters?status=no_link">
+        <span class="newsletter-status-label"><span>{% if language == 'de' %}Kein Link{% else %}No link{% endif %}</span><strong>{{ newsletter_statistics.no_link }}</strong></span>
+        <progress max="{{ newsletter_statistics.all if newsletter_statistics.all else 1 }}" value="{{ newsletter_statistics.no_link }}" aria-label="{% if language == 'de' %}Newsletter ohne Abmeldelink{% else %}Newsletters without unsubscribe link{% endif %}"></progress>
+        <small>{% if language == 'de' %}ohne erkannten Abmeldelink{% else %}without a detected unsubscribe link{% endif %}</small>
+      </a>
+    </div>
+
+    <a class="button compact newsletter-summary-action" href="/newsletters">{% if language == 'de' %}Newsletter anzeigen{% else %}View newsletters{% endif %} {{ icon('chevron-right') }}</a>
+  </article>
+
+  <article class="card statistics-card newsletter-summary-card newsletter-success-card" data-newsletter-success-card>
+    <div class="section-head newsletter-summary-head">
+      <div>
+        <h2>{% if language == 'de' %}Abmelde-Erfolg{% else %}Unsubscribe success{% endif %}</h2>
+        <p class="muted">{% if language == 'de' %}Wie zuverlässig bereits abgemeldete Newsletter danach ruhig geblieben sind.{% else %}How reliably newsletters stayed quiet after being unsubscribed.{% endif %}</p>
+      </div>
+      <span class="newsletter-summary-icon success" aria-hidden="true">{{ icon('circle-check') }}</span>
+    </div>
+
+    <div class="newsletter-success-summary" data-newsletter-success-rate="{% if newsletter_success_rate is not none %}{{ newsletter_success_rate }}{% endif %}">
+      <strong>{% if newsletter_success_rate is not none %}{{ newsletter_success_rate }}%{% else %}–{% endif %}</strong>
+      <span>{% if newsletter_success_rate is not none %}{% if language == 'de' %}erfolgreich abgemeldet{% else %}successfully unsubscribed{% endif %}{% else %}{% if language == 'de' %}Noch keine Abmeldung bewertet{% else %}No unsubscribe outcome yet{% endif %}{% endif %}</span>
+      {% if newsletter_unsubscribe_outcomes %}<small>{% if language == 'de' %}{{ newsletter_unsubscribe_outcomes }} Abmeldungen mit Ergebnis{% else %}{{ newsletter_unsubscribe_outcomes }} unsubscribe outcomes{% endif %}</small>{% endif %}
+    </div>
+
+    <div class="newsletter-outcome-grid">
+      <a class="newsletter-outcome-item is-success" href="/newsletters?status=unsubscribed">
+        <span>{% if language == 'de' %}Abgemeldet{% else %}Unsubscribed{% endif %}</span>
+        <strong>{{ newsletter_statistics.unsubscribed }}</strong>
+        <small>{% if language == 'de' %}keine weitere Mail erkannt{% else %}no later mail detected{% endif %}</small>
+      </a>
+      <a class="newsletter-outcome-item is-resumed" href="/newsletters?status=resumed">
+        <span>{% if language == 'de' %}Trotz Abmeldung{% else %}After unsubscribe{% endif %}</span>
+        <strong>{{ newsletter_statistics.resumed }}</strong>
+        <small>{% if language == 'de' %}erneut empfangen{% else %}received again{% endif %}</small>
+      </a>
+    </div>
+
+    {% if newsletter_unsubscribe_outcomes == 0 %}
+    <a class="button compact newsletter-summary-action" href="/newsletters?status=unsubscribable">{% if language == 'de' %}Abmeldbare Newsletter anzeigen{% else %}Show unsubscribable newsletters{% endif %} {{ icon('chevron-right') }}</a>
+    {% else %}
+    <a class="button compact newsletter-summary-action" href="/newsletters?status=unsubscribed">{% if language == 'de' %}Abmeldungen ansehen{% else %}View unsubscribe results{% endif %} {{ icon('chevron-right') }}</a>
+    {% endif %}
+  </article>
+</section>
