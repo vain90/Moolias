@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 from moolias.config import Settings
 from moolias.main import create_app
 
-
 PROTECTED_HTML_ROUTES = (
     "/overview",
     "/aliases",
