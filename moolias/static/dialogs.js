@@ -33,6 +33,30 @@
 
   let nativeConfirmBypass = 0;
 
+  function isBackdropClick(dialog, event) {
+    if (!(dialog instanceof HTMLDialogElement) || event.target !== dialog) return false;
+    const rect = dialog.getBoundingClientRect();
+    return event.clientX < rect.left
+      || event.clientX > rect.right
+      || event.clientY < rect.top
+      || event.clientY > rect.bottom;
+  }
+
+  function bindBackdropDismiss(dialog, dismiss) {
+    dialog.addEventListener('click', (event) => {
+      if (isBackdropClick(dialog, event)) dismiss(event);
+    });
+  }
+
+  // Native <dialog> uses the dialog element itself as the click target for both
+  // ::backdrop and visible padding/background. Protect existing dialog consumers
+  // from treating an inside-surface click as a backdrop click.
+  document.addEventListener('click', (event) => {
+    const dialog = event.target;
+    if (!(dialog instanceof HTMLDialogElement) || !dialog.matches(':modal')) return;
+    if (!isBackdropClick(dialog, event)) event.stopPropagation();
+  }, true);
+
   function dialogHeading(title, closeLabel) {
     const head = document.createElement('div');
     head.className = 'dialog-head';
@@ -108,9 +132,7 @@
         event.preventDefault();
         finish(false);
       });
-      dialog.addEventListener('click', (event) => {
-        if (dismissOnBackdrop && event.target === dialog) finish(false);
-      });
+      if (dismissOnBackdrop) bindBackdropDismiss(dialog, () => finish(false));
       dialog.addEventListener('close', () => dialog.remove(), { once: true });
 
       dialog.showModal();
@@ -147,6 +169,8 @@
         tone: 'danger',
       });
     },
+    bindBackdropDismiss,
+    isBackdropClick,
   };
 
   window.MooliasDialog = api;
