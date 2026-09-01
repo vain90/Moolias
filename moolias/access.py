@@ -11,20 +11,26 @@ def _accepts_html(request: Request) -> bool:
     return "text/html" in request.headers.get("accept", "").lower()
 
 
+def _expired_session_needs_login_redirect(request: Request, response: Response) -> bool:
+    if not _accepts_html(request):
+        return False
+    if response.status_code == 401:
+        return True
+    return request.method not in {"GET", "HEAD", "OPTIONS"} and response.status_code == 403
+
+
 class AccessRevalidationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
-        if not request.url.path.startswith("/aliases"):
-            return await call_next(request)
-
         email = request.session.get("user_email")
         if not email:
-            request.session.clear()
-            if _accepts_html(request):
+            response = await call_next(request)
+            if _expired_session_needs_login_redirect(request, response):
+                request.session.clear()
                 return RedirectResponse("/", status_code=303)
-            return JSONResponse(
-                {"detail": "Authentication required"},
-                status_code=401,
-            )
+            return response
+
+        if not request.url.path.startswith("/aliases"):
+            return await call_next(request)
 
         settings = request.app.state.settings
         if not settings.access_tag:
