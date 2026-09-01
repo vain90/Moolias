@@ -2,6 +2,18 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.3.7 - 2026-09-02
+
+### Changed
+
+- Newsletter Management statistics now use two large summary cards below the primary alias-statistics row instead of five additional small metric cards, with a clearer overview of detected, unsubscribable and no-link newsletters.
+- the new unsubscribe-success summary shows successful versus resumed-after-unsubscribe outcomes and calculates its rate only from newsletters with an actual unsubscribe outcome; when no outcome exists yet, the UI shows a neutral state instead of a misleading `0%`.
+
+### Fixed
+
+- native Moolias dialogs no longer interpret clicks on visible dialog padding or whitespace as backdrop clicks; intentional backdrop dismissal, explicit close controls and Escape behavior remain intact.
+- dialog regression coverage now exercises real native-dialog surface targeting, repeated open/close cycles, form-state preservation and mobile behavior across representative dialog consumers.
+
 ## 1.3.6 - 2026-09-01
 
 ### Fixed
