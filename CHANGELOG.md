@@ -2,6 +2,14 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.3.6 - 2026-09-01
+
+### Fixed
+
+- expired authenticated browser sessions now return normal HTML navigation to the Moolias login/start page instead of exposing raw `{"detail":"Authentication required"}` responses across Overview, Alias Management, Offline Pool, Newsletter Management and Statistics.
+- stale HTML form submissions after a session expires now return to login instead of exposing CSRF JSON, while API clients retain machine-readable `401` responses and genuine CSRF failures with a valid session remain `403`.
+- regression coverage now exercises expired-session behavior centrally and through a real browser navigation flow so newly added rendered UI pages inherit the same safe behavior without a maintained route allowlist.
+
 ## 1.3.5 - 2026-08-30
 
 ### Added
