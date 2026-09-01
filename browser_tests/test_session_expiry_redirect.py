@@ -4,7 +4,6 @@ import re
 
 from playwright.sync_api import Page, expect
 
-
 PROTECTED_NAVIGATION_PATHS = (
     "/overview",
     "/aliases",
