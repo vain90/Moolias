@@ -64,9 +64,12 @@ def _newsletter_page(query: str = "") -> str:
 
 def test_newsletter_search_updates_results_without_page_navigation(page: Page) -> None:
     requested_urls: list[str] = []
+    document_requests: list[str] = []
 
     def serve(route: Route) -> None:
         requested_urls.append(route.request.url)
+        if route.request.resource_type == "document":
+            document_requests.append(route.request.url)
         query = parse_qs(urlparse(route.request.url).query).get("q", [""])[0]
         route.fulfill(
             status=200,
@@ -75,14 +78,8 @@ def test_newsletter_search_updates_results_without_page_navigation(page: Page) -
         )
 
     page.route("http://moolias.test/**", serve)
-    navigations: list[str] = []
-    page.on(
-        "framenavigated",
-        lambda frame: navigations.append(frame.url) if frame == page.main_frame else None,
-    )
-
     page.goto("http://moolias.test/newsletters?status=resumed&per_page=50")
-    initial_navigation_count = len(navigations)
+    assert len(document_requests) == 1
     page.add_script_tag(content=NEWSLETTERS_JS)
 
     search = page.locator("[data-newsletter-search]")
@@ -93,7 +90,7 @@ def test_newsletter_search_updates_results_without_page_navigation(page: Page) -
     expect(page).to_have_url(
         "http://moolias.test/newsletters?status=resumed&per_page=50&page=1&q=GitHub"
     )
-    assert len(navigations) == initial_navigation_count
+    assert len(document_requests) == 1
 
     live_requests = [url for url in requested_urls[1:] if "q=GitHub" in url]
     assert live_requests
@@ -113,7 +110,7 @@ def test_newsletter_search_updates_results_without_page_navigation(page: Page) -
     expect(page).to_have_url(
         "http://moolias.test/newsletters?status=resumed&per_page=50&page=1"
     )
-    assert len(navigations) == initial_navigation_count
+    assert len(document_requests) == 1
 
 
 def test_newsletter_live_search_uses_alias_style_request_control() -> None:
