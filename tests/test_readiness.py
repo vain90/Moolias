@@ -83,6 +83,11 @@ def test_healthz_remains_a_liveness_check():
     assert response.text == "ok\n"
 
 
+def test_main_app_registers_readyz():
+    app = create_app(_settings())
+    assert "/readyz" in {route.path for route in app.routes}
+
+
 async def test_readyz_requires_mailcow_and_authenticated_agent(monkeypatch):
     _reset_agent()
     monkeypatch.setattr(readiness, "MailcowAgentClient", FakeAgentClient)
