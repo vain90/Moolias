@@ -87,5 +87,37 @@ def test_updater_uses_readiness_for_update_and_rollback():
     assert "wait_for_healthy" not in UPDATER
 
 
-def test_updater_version_is_0_1_6():
-    assert 'UPDATER_VERSION="0.1.6"' in UPDATER
+def test_stable_channel_uses_resolved_semver_image_tag():
+    stable_start = UPDATER.index('else\n  CHANNEL="stable"')
+    stable_end = UPDATER.index("\nfi\n\nself_update()", stable_start)
+    stable_block = UPDATER[stable_start:stable_end]
+
+    assert 'LATEST_VERSION="${LATEST_TAG#v}"' in stable_block
+    assert 'TARGET_TAG="${LATEST_VERSION}"' in stable_block
+    assert 'TARGET_TAG="latest"' not in stable_block
+    assert 'TARGET_TAG="edge"' in UPDATER
+    assert 'log "Pulling ${IMAGE}:${TARGET_TAG}..."' in UPDATER
+    assert 'log "Pulling ${IMAGE}:latest..."' not in UPDATER
+
+
+def test_stable_version_is_verified_after_readiness_before_success():
+    readiness = UPDATER.index("if wait_for_ready; then")
+    version_read = UPDATER.index('UPDATED_VERSION="$(container_version', readiness)
+    version_check = UPDATER.index(
+        'if [[ "${BETA}" != true && "${UPDATED_VERSION}" != "${LATEST_VERSION}" ]]; then',
+        version_read,
+    )
+    success = UPDATER.index('log "Readiness check: OK"', version_check)
+    rollback = UPDATER.index('log "Rolling back to the previously running image..."', success)
+
+    assert readiness < version_read < version_check < success < rollback
+    assert (
+        'UPDATE_FAILURE="The updated Moolias container reports version '
+        '${UPDATED_VERSION:-unknown}, expected ${LATEST_VERSION}."'
+        in UPDATER
+    )
+    assert 'error "${UPDATE_FAILURE}"' in UPDATER
+
+
+def test_updater_version_is_0_1_7():
+    assert 'UPDATER_VERSION="0.1.7"' in UPDATER
