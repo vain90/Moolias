@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-UPDATER_VERSION="0.1.7"
+UPDATER_VERSION="0.1.8"
 REPOSITORY="vain90/Moolias"
 IMAGE="ghcr.io/vain90/moolias"
 LATEST_RELEASE_URL="https://github.com/${REPOSITORY}/releases/latest"
@@ -255,6 +255,28 @@ container_ready() {
     >/dev/null 2>&1
 }
 
+container_readiness_capability() {
+  local container_id="$1"
+  docker exec "${container_id}" python -c "
+import os
+import urllib.error
+import urllib.parse
+import urllib.request
+
+host = urllib.parse.urlparse(os.environ['MOOLIAS_BASE_URL']).hostname
+request = urllib.request.Request(
+    'http://127.0.0.1:8000/readyz',
+    headers={'Host': host},
+)
+try:
+    urllib.request.urlopen(request, timeout=3).close()
+except urllib.error.HTTPError as exc:
+    raise SystemExit(10 if exc.code == 404 else 0)
+except Exception:
+    raise SystemExit(20)
+" >/dev/null 2>&1
+}
+
 container_version() {
   local container_id="$1"
   docker inspect \
@@ -286,15 +308,51 @@ wait_for_ready() {
   return 1
 }
 
+wait_for_legacy_health() {
+  local container_id state health
+  for _ in $(seq 1 45); do
+    container_id="$(current_container_id)"
+    if [[ -n "${container_id}" ]]; then
+      state="$(container_state "${container_id}")"
+      health="$(container_health "${container_id}")"
+      case "${state}" in
+        exited|dead|removing)
+          return 1
+          ;;
+      esac
+      if [[ "${health}" == "unhealthy" ]]; then
+        return 1
+      fi
+      if [[ "${health}" == "healthy" ]]; then
+        return 0
+      fi
+      if [[ "${state}" == "running" && "${health}" == "running" ]]; then
+        return 0
+      fi
+    fi
+    sleep 2
+  done
+  return 1
+}
+
 CURRENT_CONTAINER="$(current_container_id)"
 CURRENT_VERSION=""
 CURRENT_IMAGE_ID=""
 CURRENT_IMAGE_REF=""
+CURRENT_ROLLBACK_VALIDATION="readiness"
 
 if [[ -n "${CURRENT_CONTAINER}" ]]; then
   CURRENT_VERSION="$(container_version "${CURRENT_CONTAINER}")"
   CURRENT_IMAGE_ID="$(docker inspect --format '{{.Image}}' "${CURRENT_CONTAINER}" 2>/dev/null || true)"
   CURRENT_IMAGE_REF="$(docker inspect --format '{{.Config.Image}}' "${CURRENT_CONTAINER}" 2>/dev/null || true)"
+  if container_readiness_capability "${CURRENT_CONTAINER}"; then
+    CURRENT_ROLLBACK_VALIDATION="readiness"
+  else
+    readiness_probe_status=$?
+    if [[ "${readiness_probe_status}" -eq 10 ]]; then
+      CURRENT_ROLLBACK_VALIDATION="legacy-health"
+    fi
+  fi
 fi
 
 CURRENT_DISPLAY="${CURRENT_VERSION:-${CURRENT_IMAGE_REF:-not running}}"
@@ -410,10 +468,18 @@ if [[ -n "${CURRENT_IMAGE_ID}" ]]; then
   log "Rolling back to the previously running image..."
   docker tag "${CURRENT_IMAGE_ID}" "${IMAGE}:${TARGET_TAG}"
   compose up -d --force-recreate --remove-orphans moolias
-  if wait_for_ready; then
-    log "Rollback readiness check: OK"
-    log "The previous Moolias image is running again."
-    exit 1
+  if [[ "${CURRENT_ROLLBACK_VALIDATION}" == "legacy-health" ]]; then
+    if wait_for_legacy_health; then
+      log "Rollback legacy health check: OK"
+      log "The previous Moolias image is running again."
+      exit 1
+    fi
+  else
+    if wait_for_ready; then
+      log "Rollback readiness check: OK"
+      log "The previous Moolias image is running again."
+      exit 1
+    fi
   fi
 fi
 
