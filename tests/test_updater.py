@@ -103,20 +103,25 @@ def test_stable_channel_uses_resolved_semver_image_tag():
 def test_stable_version_is_verified_after_readiness_before_success():
     readiness = UPDATER.index("if wait_for_ready; then")
     version_read = UPDATER.index('UPDATED_VERSION="$(container_version', readiness)
+    stable_guard = UPDATER.index('if [[ "${BETA}" != true ]]; then', version_read)
     version_check = UPDATER.index(
-        'if [[ "${BETA}" != true && "${UPDATED_VERSION}" != "${LATEST_VERSION}" ]]; then',
-        version_read,
+        'if [[ "${UPDATED_VERSION}" != "${LATEST_VERSION}" ]]; then',
+        stable_guard,
     )
     success = UPDATER.index('log "Readiness check: OK"', version_check)
     rollback = UPDATER.index('log "Rolling back to the previously running image..."', success)
 
-    assert readiness < version_read < version_check < success < rollback
+    assert readiness < version_read < stable_guard < version_check < success < rollback
     assert (
         'UPDATE_FAILURE="The updated Moolias container reports version '
         '${UPDATED_VERSION:-unknown}, expected ${LATEST_VERSION}."'
         in UPDATER
     )
     assert 'error "${UPDATE_FAILURE}"' in UPDATER
+    assert (
+        'if [[ "${BETA}" != true && "${UPDATED_VERSION}" != "${LATEST_VERSION}" ]]; then'
+        not in UPDATER
+    )
 
 
 def test_updater_version_is_0_1_7():
