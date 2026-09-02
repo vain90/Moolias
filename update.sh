@@ -389,9 +389,14 @@ UPDATE_FAILURE="The updated Moolias container did not become ready."
 if wait_for_ready; then
   UPDATED_CONTAINER="$(current_container_id)"
   UPDATED_VERSION="$(container_version "${UPDATED_CONTAINER}")"
-  if [[ "${BETA}" != true && "${UPDATED_VERSION}" != "${LATEST_VERSION}" ]]; then
-    UPDATE_FAILURE="The updated Moolias container reports version ${UPDATED_VERSION:-unknown}, expected ${LATEST_VERSION}."
-  else
+  VERSION_MATCHES=true
+  if [[ "${BETA}" != true ]]; then
+    if [[ "${UPDATED_VERSION}" != "${LATEST_VERSION}" ]]; then
+      VERSION_MATCHES=false
+      UPDATE_FAILURE="The updated Moolias container reports version ${UPDATED_VERSION:-unknown}, expected ${LATEST_VERSION}."
+    fi
+  fi
+  if [[ "${VERSION_MATCHES}" == true ]]; then
     log "Readiness check: OK"
     log "Moolias ${UPDATED_VERSION:-${TARGET_DISPLAY}} is running."
     exit 0
