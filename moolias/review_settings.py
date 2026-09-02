@@ -14,6 +14,7 @@ from moolias.collector_health import (
     assess_collector_health,
 )
 from moolias.mailcow import MailcowError
+from moolias.readiness import router as readiness_router
 from moolias.security import require_user, validate_csrf
 from moolias.sender_protection import router as sender_protection_router
 from moolias.stats_history_ui import router as stats_history_ui_router
@@ -21,6 +22,7 @@ from moolias.stats_mode import StatsMode
 from moolias.usage import mailbox_stats_state
 
 router = APIRouter()
+router.include_router(readiness_router)
 router.include_router(stats_history_ui_router)
 router.include_router(sender_protection_router)
 
