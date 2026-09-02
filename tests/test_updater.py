@@ -2,6 +2,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 UPDATER = (ROOT / "update.sh").read_text(encoding="utf-8")
+DOCKERFILE = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
 
 def test_self_update_does_not_create_script_backup():
@@ -66,5 +67,25 @@ def test_beta_agent_migration_guidance_keeps_main_and_edge_together():
     )
 
 
-def test_updater_version_is_0_1_5():
-    assert 'UPDATER_VERSION="0.1.5"' in UPDATER
+def test_docker_healthcheck_remains_liveness_only():
+    assert "http://127.0.0.1:8000/healthz" in DOCKERFILE
+    assert "/readyz" not in DOCKERFILE
+
+
+def test_updater_waits_for_application_readiness():
+    assert "container_ready()" in UPDATER
+    assert "http://127.0.0.1:8000/readyz" in UPDATER
+    assert "wait_for_ready()" in UPDATER
+    assert 'if [[ "${state}" == "running" ]] && container_ready "${container_id}"; then' in UPDATER
+    assert "Readiness check: OK" in UPDATER
+    assert "did not become ready" in UPDATER
+
+
+def test_updater_uses_readiness_for_update_and_rollback():
+    assert UPDATER.count("if wait_for_ready; then") == 2
+    assert "Rollback readiness check: OK" in UPDATER
+    assert "wait_for_healthy" not in UPDATER
+
+
+def test_updater_version_is_0_1_6():
+    assert 'UPDATER_VERSION="0.1.6"' in UPDATER
