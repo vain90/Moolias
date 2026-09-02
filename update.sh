@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-UPDATER_VERSION="0.1.5"
+UPDATER_VERSION="0.1.6"
 REPOSITORY="vain90/Moolias"
 IMAGE="ghcr.io/vain90/moolias"
 LATEST_RELEASE_URL="https://github.com/${REPOSITORY}/releases/latest"
@@ -236,11 +236,23 @@ current_container_id() {
   compose ps -q moolias 2>/dev/null | head -n 1
 }
 
+container_state() {
+  local container_id="$1"
+  docker inspect --format '{{.State.Status}}' "${container_id}" 2>/dev/null || true
+}
+
 container_health() {
   local container_id="$1"
   docker inspect \
     --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
     "${container_id}" 2>/dev/null || true
+}
+
+container_ready() {
+  local container_id="$1"
+  docker exec "${container_id}" python -c \
+    "import os, urllib.parse, urllib.request; host=urllib.parse.urlparse(os.environ['MOOLIAS_BASE_URL']).hostname; req=urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Host': host}); urllib.request.urlopen(req, timeout=3)" \
+    >/dev/null 2>&1
 }
 
 container_version() {
@@ -250,23 +262,24 @@ container_version() {
     "${container_id}" 2>/dev/null || true
 }
 
-wait_for_healthy() {
-  local container_id state
+wait_for_ready() {
+  local container_id state health
   for _ in $(seq 1 45); do
     container_id="$(current_container_id)"
     if [[ -n "${container_id}" ]]; then
-      state="$(container_health "${container_id}")"
+      state="$(container_state "${container_id}")"
+      health="$(container_health "${container_id}")"
       case "${state}" in
-        healthy)
-          return 0
-          ;;
-        unhealthy|exited|dead)
+        exited|dead|removing)
           return 1
           ;;
-        running)
-          return 0
-          ;;
       esac
+      if [[ "${health}" == "unhealthy" ]]; then
+        return 1
+      fi
+      if [[ "${state}" == "running" ]] && container_ready "${container_id}"; then
+        return 0
+      fi
     fi
     sleep 2
   done
@@ -372,23 +385,23 @@ fi
 log "Starting Moolias from ${IMAGE}:${TARGET_TAG}..."
 compose up -d --force-recreate --remove-orphans moolias
 
-if wait_for_healthy; then
+if wait_for_ready; then
   UPDATED_CONTAINER="$(current_container_id)"
   UPDATED_VERSION="$(container_version "${UPDATED_CONTAINER}")"
-  log "Health check: OK"
+  log "Readiness check: OK"
   log "Moolias ${UPDATED_VERSION:-${TARGET_DISPLAY}} is running."
   exit 0
 fi
 
-error "The updated Moolias container did not become healthy."
+error "The updated Moolias container did not become ready."
 compose logs --tail=50 moolias >&2 || true
 
 if [[ -n "${CURRENT_IMAGE_ID}" ]]; then
   log "Rolling back to the previously running image..."
   docker tag "${CURRENT_IMAGE_ID}" "${IMAGE}:${TARGET_TAG}"
   compose up -d --force-recreate --remove-orphans moolias
-  if wait_for_healthy; then
-    log "Rollback health check: OK"
+  if wait_for_ready; then
+    log "Rollback readiness check: OK"
     log "The previous Moolias image is running again."
     exit 1
   fi
