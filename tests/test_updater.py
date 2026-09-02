@@ -81,9 +81,64 @@ def test_updater_waits_for_application_readiness():
     assert "did not become ready" in UPDATER
 
 
-def test_updater_uses_readiness_for_update_and_rollback():
-    assert UPDATER.count("if wait_for_ready; then") == 2
-    assert "Rollback readiness check: OK" in UPDATER
+def test_updated_image_always_requires_readiness():
+    update_start = UPDATER.index('log "Starting Moolias from ${IMAGE}:${TARGET_TAG}..."')
+    rollback_start = UPDATER.index(
+        'log "Rolling back to the previously running image..."',
+        update_start,
+    )
+    update_block = UPDATER[update_start:rollback_start]
+
+    assert "if wait_for_ready; then" in update_block
+    assert "wait_for_legacy_health" not in update_block
+
+
+def test_legacy_detection_requires_explicit_readyz_404():
+    capability_start = UPDATER.index("container_readiness_capability()")
+    capability_end = UPDATER.index("\ncontainer_version()", capability_start)
+    capability_block = UPDATER[capability_start:capability_end]
+
+    assert "exc.code == 404" in capability_block
+    assert "SystemExit(10 if exc.code == 404 else 0)" in capability_block
+    assert "SystemExit(20)" in capability_block
+
+    detection_start = UPDATER.index(
+        'if container_readiness_capability "${CURRENT_CONTAINER}"; then'
+    )
+    detection_end = UPDATER.index("\nfi\n\nCURRENT_DISPLAY", detection_start)
+    detection_block = UPDATER[detection_start:detection_end]
+
+    assert 'if [[ "${readiness_probe_status}" -eq 10 ]]; then' in detection_block
+    assert 'CURRENT_ROLLBACK_VALIDATION="legacy-health"' in detection_block
+
+
+def test_rollback_uses_preupdate_readiness_capability():
+    detection = UPDATER.index(
+        'if container_readiness_capability "${CURRENT_CONTAINER}"; then'
+    )
+    update_start = UPDATER.index(
+        'compose up -d --force-recreate --remove-orphans moolias',
+        detection,
+    )
+    rollback_start = UPDATER.index(
+        'log "Rolling back to the previously running image..."',
+        update_start,
+    )
+    rollback_block = UPDATER[rollback_start:]
+
+    assert detection < update_start < rollback_start
+    assert 'if [[ "${CURRENT_ROLLBACK_VALIDATION}" == "legacy-health" ]]; then' in rollback_block
+    assert "if wait_for_legacy_health; then" in rollback_block
+    assert "if wait_for_ready; then" in rollback_block
+    assert "Rollback legacy health check: OK" in rollback_block
+    assert "Rollback readiness check: OK" in rollback_block
+
+
+def test_readiness_failure_never_downgrades_capable_rollback_to_liveness():
+    assert 'CURRENT_ROLLBACK_VALIDATION="readiness"' in UPDATER
+    assert 'CURRENT_ROLLBACK_VALIDATION="legacy-health"' in UPDATER
+    assert 'if [[ "${readiness_probe_status}" -eq 10 ]]; then' in UPDATER
+    assert 'if [[ "${readiness_probe_status}" -eq 20 ]]; then' not in UPDATER
     assert "wait_for_healthy" not in UPDATER
 
 
@@ -124,5 +179,5 @@ def test_stable_version_is_verified_after_readiness_before_success():
     )
 
 
-def test_updater_version_is_0_1_7():
-    assert 'UPDATER_VERSION="0.1.7"' in UPDATER
+def test_updater_version_is_0_1_8():
+    assert 'UPDATER_VERSION="0.1.8"' in UPDATER
