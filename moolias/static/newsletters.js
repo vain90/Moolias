@@ -132,97 +132,184 @@
     void showResultDialog(false);
   }
 
-  page.querySelectorAll("[data-newsletter-time]").forEach((element) => {
-    const seconds = Number(element.dataset.newsletterTime || "0");
-    if (!Number.isFinite(seconds) || seconds <= 0) return;
-    const date = new Date(seconds * 1000);
-    element.dateTime = date.toISOString();
-    element.textContent = formatter.format(date);
-  });
+  const ensureResultsRegion = (root) => {
+    const existing = root.querySelector("[data-newsletter-results-region]");
+    if (existing) return existing;
 
-  page.querySelectorAll("[data-newsletter-details-toggle]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const id = button.dataset.newsletterDetailsToggle;
-      const details = id ? document.getElementById(id) : null;
-      if (!details) return;
-      const opening = details.hidden;
-      details.hidden = !opening;
-      button.setAttribute("aria-expanded", opening ? "true" : "false");
+    const card = root.querySelector(".newsletter-management-card");
+    const toolbar = card?.querySelector(".newsletter-toolbar");
+    if (!card || !toolbar) return null;
+
+    const ownerDocument = root.ownerDocument || root;
+    const region = ownerDocument.createElement("div");
+    region.dataset.newsletterResultsRegion = "1";
+    while (toolbar.nextSibling) {
+      region.append(toolbar.nextSibling);
+    }
+    card.append(region);
+    return region;
+  };
+
+  const bindNewsletterTimes = (root) => {
+    root.querySelectorAll("[data-newsletter-time]").forEach((element) => {
+      const seconds = Number(element.dataset.newsletterTime || "0");
+      if (!Number.isFinite(seconds) || seconds <= 0) return;
+      const date = new Date(seconds * 1000);
+      element.dateTime = date.toISOString();
+      element.textContent = formatter.format(date);
     });
-  });
+  };
 
-  page.querySelectorAll('form[action^="/newsletters/"][action$="/unsubscribe"]').forEach((form) => {
-    // app.js binds generic data-confirm forms before this page-specific script runs.
-    // The newsletter handler therefore runs in the capture phase and stops the old
-    // listener so the second programmatic submit cannot be blocked by a stale confirm.
-    form.removeAttribute("data-confirm");
+  const bindNewsletterDetails = (root) => {
+    root.querySelectorAll("[data-newsletter-details-toggle]").forEach((button) => {
+      if (button.dataset.newsletterDetailsBound === "1") return;
+      button.dataset.newsletterDetailsBound = "1";
+      button.addEventListener("click", () => {
+        const id = button.dataset.newsletterDetailsToggle;
+        const details = id ? document.getElementById(id) : null;
+        if (!details) return;
+        const opening = details.hidden;
+        details.hidden = !opening;
+        button.setAttribute("aria-expanded", opening ? "true" : "false");
+      });
+    });
+  };
 
-    form.addEventListener("submit", async (event) => {
-      if (form.dataset.newsletterProcessingSubmit === "1") {
-        delete form.dataset.newsletterProcessingSubmit;
+  const bindNewsletterUnsubscribe = (root) => {
+    root.querySelectorAll('form[action^="/newsletters/"][action$="/unsubscribe"]').forEach((form) => {
+      if (form.dataset.newsletterUnsubscribeBound === "1") return;
+      form.dataset.newsletterUnsubscribeBound = "1";
+
+      // app.js binds generic data-confirm forms before this page-specific script runs.
+      // The newsletter handler therefore runs in the capture phase and stops the old
+      // listener so the second programmatic submit cannot be blocked by a stale confirm.
+      form.removeAttribute("data-confirm");
+
+      form.addEventListener("submit", async (event) => {
+        if (form.dataset.newsletterProcessingSubmit === "1") {
+          delete form.dataset.newsletterProcessingSubmit;
+          event.stopImmediatePropagation();
+          return;
+        }
+
+        event.preventDefault();
         event.stopImmediatePropagation();
-        return;
-      }
+        const api = window.MooliasDialog;
+        if (!api) return;
+        const submitter = event.submitter;
+        const accepted = await api.confirm({
+          title: labels.confirmTitle,
+          message: labels.confirmBody,
+          confirmLabel: labels.confirm,
+          cancelLabel: labels.cancel,
+          tone: "danger",
+          dismissOnBackdrop: false,
+        });
+        if (!accepted) return;
 
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const api = window.MooliasDialog;
-      if (!api) return;
-      const submitter = event.submitter;
-      const accepted = await api.confirm({
-        title: labels.confirmTitle,
-        message: labels.confirmBody,
-        confirmLabel: labels.confirm,
-        cancelLabel: labels.cancel,
-        tone: "danger",
-        dismissOnBackdrop: false,
-      });
-      if (!accepted) return;
+        showProcessingDialog();
+        form.dataset.newsletterProcessingSubmit = "1";
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => form.requestSubmit(submitter || undefined));
+        });
+      }, true);
+    });
+  };
 
-      showProcessingDialog();
-      form.dataset.newsletterProcessingSubmit = "1";
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => form.requestSubmit(submitter || undefined));
-      });
-    }, true);
-  });
+  const bindNewsletterPageSize = (root) => {
+    root.querySelectorAll(".newsletter-pagination-bar select[name='per_page']").forEach((select) => {
+      if (select.dataset.newsletterPageSizeBound === "1") return;
+      select.dataset.newsletterPageSizeBound = "1";
+      select.addEventListener("change", () => select.form?.submit());
+    });
+  };
+
+  const bindNewsletterResults = (root) => {
+    bindNewsletterTimes(root);
+    bindNewsletterDetails(root);
+    bindNewsletterUnsubscribe(root);
+    bindNewsletterPageSize(root);
+  };
+
+  const resultsRegion = ensureResultsRegion(page);
+  bindNewsletterResults(resultsRegion || page);
 
   const search = page.querySelector("[data-newsletter-search]");
   const clear = page.querySelector("[data-newsletter-search-clear]");
   let searchTimer = null;
+  let searchController = null;
 
-  const navigateSearch = (value) => {
-    const url = new URL(window.location.href);
-    const query = value.trim();
-    if (query) url.searchParams.set("q", query);
-    else url.searchParams.delete("q");
-    url.searchParams.delete("page");
-    window.location.assign(url.toString());
+  const syncSearchClear = () => {
+    if (!clear || !search) return;
+    clear.hidden = search.value.length === 0;
   };
 
-  if (search) {
-    search.addEventListener("input", () => {
-      if (clear) clear.hidden = !search.value;
-      if (searchTimer) window.clearTimeout(searchTimer);
-      searchTimer = window.setTimeout(() => navigateSearch(search.value), 350);
+  const syncFilterLinks = (query) => {
+    page.querySelectorAll(".newsletter-status-filters a[href]").forEach((link) => {
+      const url = new URL(link.href, window.location.href);
+      if (query) url.searchParams.set("q", query);
+      else url.searchParams.delete("q");
+      link.href = `${url.pathname}${url.search}`;
     });
+  };
 
-    search.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-      if (searchTimer) window.clearTimeout(searchTimer);
-      navigateSearch(search.value);
-    });
-  }
+  const refreshNewsletterResults = async () => {
+    if (!search) return;
+
+    const rawQuery = search.value.trim();
+    const activeQuery = rawQuery.length >= 2 ? rawQuery : "";
+    const url = new URL(window.location.href);
+    url.searchParams.set("status", url.searchParams.get("status") || "all");
+    url.searchParams.set("per_page", url.searchParams.get("per_page") || "25");
+    url.searchParams.set("page", "1");
+    if (activeQuery) url.searchParams.set("q", activeQuery);
+    else url.searchParams.delete("q");
+
+    searchController?.abort();
+    searchController = new AbortController();
+    search.classList.add("searching");
+
+    try {
+      const response = await fetch(url, {
+        headers: { "X-Moolias-Partial": "newsletter-results" },
+        signal: searchController.signal,
+      });
+      if (!response.ok) return;
+
+      const html = await response.text();
+      const parsed = new DOMParser().parseFromString(html, "text/html");
+      const nextRegion = ensureResultsRegion(parsed);
+      const currentRegion = ensureResultsRegion(page);
+
+      if (nextRegion && currentRegion) {
+        currentRegion.innerHTML = nextRegion.innerHTML;
+        bindNewsletterResults(currentRegion);
+      }
+      syncFilterLinks(activeQuery);
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        console.error("Newsletter search failed", error);
+      }
+    } finally {
+      search.classList.remove("searching");
+    }
+  };
+
+  search?.addEventListener("input", () => {
+    syncSearchClear();
+    if (searchTimer) window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(refreshNewsletterResults, 250);
+  });
 
   clear?.addEventListener("click", () => {
+    if (!search) return;
     if (searchTimer) window.clearTimeout(searchTimer);
-    if (search) search.value = "";
-    clear.hidden = true;
-    navigateSearch("");
+    search.value = "";
+    syncSearchClear();
+    search.focus();
+    void refreshNewsletterResults();
   });
 
-  page.querySelectorAll("[data-newsletter-page-size]").forEach((select) => {
-    select.addEventListener("change", () => select.form?.submit());
-  });
+  syncSearchClear();
 })();
