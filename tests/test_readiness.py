@@ -85,7 +85,7 @@ def test_healthz_remains_a_liveness_check():
 
 def test_main_app_registers_readyz():
     app = create_app(_settings())
-    assert "/readyz" in {route.path for route in app.routes}
+    assert any(getattr(route, "path", None) == "/readyz" for route in app.routes)
 
 
 async def test_readyz_requires_mailcow_and_authenticated_agent(monkeypatch):
