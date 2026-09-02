@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-UPDATER_VERSION="0.1.6"
+UPDATER_VERSION="0.1.7"
 REPOSITORY="vain90/Moolias"
 IMAGE="ghcr.io/vain90/moolias"
 LATEST_RELEASE_URL="https://github.com/${REPOSITORY}/releases/latest"
@@ -110,9 +110,9 @@ if [[ "${BETA}" == true ]]; then
   SELF_UPDATE_REF="main"
 else
   CHANNEL="stable"
-  TARGET_TAG="latest"
   LATEST_TAG="$(get_latest_release_tag)"
   LATEST_VERSION="${LATEST_TAG#v}"
+  TARGET_TAG="${LATEST_VERSION}"
   TARGET_DISPLAY="${LATEST_VERSION}"
   SELF_UPDATE_REF="${LATEST_TAG}"
 fi
@@ -229,7 +229,7 @@ if [[ -z "${RESOLVED_IMAGE}" ]]; then
   die "The Moolias service does not use ${IMAGE}"
 fi
 if [[ "${RESOLVED_IMAGE}" != "${IMAGE}:${TARGET_TAG}" ]]; then
-  die "The ${CHANNEL} channel requires Compose to resolve to ${IMAGE}:${TARGET_TAG}, but it resolves to ${RESOLVED_IMAGE}. Use image: ${IMAGE}:\${MOOLIAS_TAG:-latest} so update.sh can select latest or edge without editing Compose."
+  die "The ${CHANNEL} channel requires Compose to resolve to ${IMAGE}:${TARGET_TAG}, but it resolves to ${RESOLVED_IMAGE}. Use image: ${IMAGE}:\${MOOLIAS_TAG:-latest} so update.sh can select the resolved stable version or edge without editing Compose."
 fi
 
 current_container_id() {
@@ -378,22 +378,27 @@ fi
 
 if [[ "${BETA}" != true ]]; then
   log ""
-  log "Pulling ${IMAGE}:latest..."
+  log "Pulling ${IMAGE}:${TARGET_TAG}..."
   compose pull moolias
 fi
 
 log "Starting Moolias from ${IMAGE}:${TARGET_TAG}..."
 compose up -d --force-recreate --remove-orphans moolias
 
+UPDATE_FAILURE="The updated Moolias container did not become ready."
 if wait_for_ready; then
   UPDATED_CONTAINER="$(current_container_id)"
   UPDATED_VERSION="$(container_version "${UPDATED_CONTAINER}")"
-  log "Readiness check: OK"
-  log "Moolias ${UPDATED_VERSION:-${TARGET_DISPLAY}} is running."
-  exit 0
+  if [[ "${BETA}" != true && "${UPDATED_VERSION}" != "${LATEST_VERSION}" ]]; then
+    UPDATE_FAILURE="The updated Moolias container reports version ${UPDATED_VERSION:-unknown}, expected ${LATEST_VERSION}."
+  else
+    log "Readiness check: OK"
+    log "Moolias ${UPDATED_VERSION:-${TARGET_DISPLAY}} is running."
+    exit 0
+  fi
 fi
 
-error "The updated Moolias container did not become ready."
+error "${UPDATE_FAILURE}"
 compose logs --tail=50 moolias >&2 || true
 
 if [[ -n "${CURRENT_IMAGE_ID}" ]]; then
