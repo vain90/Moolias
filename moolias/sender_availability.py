@@ -31,9 +31,10 @@ def sender_visibility_inconsistent(alias: AliasRecord) -> bool:
 
 
 def _managed_mailbox(alias: AliasRecord) -> str | None:
-    mailbox = alias.goto.strip().lower()
-    if not mailbox:
+    targets = [target.strip().lower() for target in alias.goto.split(",") if target.strip()]
+    if len(targets) != 1:
         return None
+    mailbox = targets[0]
     try:
         if not is_owned_alias(alias, mailbox):
             return None
