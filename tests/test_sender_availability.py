@@ -33,7 +33,11 @@ def alias_record(
 
 
 class FakeMailcow:
-    def __init__(self, aliases: list[AliasRecord], denied_mailboxes: set[str] | None = None) -> None:
+    def __init__(
+        self,
+        aliases: list[AliasRecord],
+        denied_mailboxes: set[str] | None = None,
+    ) -> None:
         self.aliases = aliases
         self.denied_mailboxes = denied_mailboxes or set()
         self.mailbox_checks: list[str] = []
