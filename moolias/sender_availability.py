@@ -79,7 +79,9 @@ async def find_sender_visibility_mismatches(
     return tuple(mismatches)
 
 
-async def reconcile_sender_visibility(client: MailcowClient) -> tuple[SenderVisibilityMismatch, ...]:
+async def reconcile_sender_visibility(
+    client: MailcowClient,
+) -> tuple[SenderVisibilityMismatch, ...]:
     mismatches = await find_sender_visibility_mismatches(client)
     if mismatches:
         await client.set_sogo_visible_many(
