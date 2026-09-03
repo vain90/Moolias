@@ -224,6 +224,12 @@ class MailcowClient:
         )
         self._ensure_success(payload)
 
+    async def _safe_sogo_visibility(self, alias_id: int, requested: bool) -> bool:
+        if not requested:
+            return False
+        alias = await self.get_alias(alias_id)
+        return alias.sender_allowed is not False
+
     async def update_alias_preferences(
         self,
         alias_id: int,
@@ -232,6 +238,7 @@ class MailcowClient:
         *,
         private_comment: str | None = None,
     ) -> None:
+        sogo_visible = await self._safe_sogo_visibility(alias_id, sogo_visible)
         attributes: dict[str, Any] = {
             "public_comment": public_comment,
             "sogo_visible": 1 if sogo_visible else 0,
@@ -253,6 +260,7 @@ class MailcowClient:
         *,
         private_comment: str = "",
     ) -> None:
+        sogo_visible = await self._safe_sogo_visibility(alias_id, sogo_visible)
         payload = await self._request(
             "POST",
             "/api/v1/edit/alias",
@@ -299,6 +307,18 @@ class MailcowClient:
         self._ensure_success(payload)
 
     async def set_sogo_visible_many(self, alias_ids: list[int], visible: bool) -> None:
+        if visible:
+            requested_ids = set(alias_ids)
+            aliases = await self.list_aliases()
+            blocked = [
+                alias.address
+                for alias in aliases
+                if alias.id in requested_ids and alias.sender_allowed is False
+            ]
+            if blocked:
+                raise MailcowError(
+                    "SOGo visibility is unavailable for aliases that cannot be used as senders"
+                )
         payload = await self._request(
             "POST",
             "/api/v1/edit/alias",

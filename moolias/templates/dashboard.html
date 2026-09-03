@@ -116,7 +116,7 @@
         <article class="alias-row alias-table-row {% if not alias.active %}disabled-row{% endif %}{% if workflow_row %} alias-migration-{{ workflow_row.role }}{% endif %}"{% if workflow_row %} data-alias-workflow-row="{{ workflow_row.id }}" data-alias-workflow-role="{{ workflow_row.role }}"{% endif %}>
           {% if workflow_row and workflow_row.role == 'new' %}<span class="alias-migration-link-icon" aria-hidden="true">{{ ui_icon('link') }}</span>{% endif %}
           <label class="alias-select-control">
-            <input type="checkbox" value="{{ alias.id }}" aria-label="{{ t.select_alias.format(address=alias.address) }}" data-alias-select data-address="{{ alias.address }}" data-description="{{ alias.description }}" data-active="{{ '1' if alias.active else '0' }}" data-sogo="{{ '1' if alias.sogo_visible else '0' }}">
+            <input type="checkbox" value="{{ alias.id }}" aria-label="{{ t.select_alias.format(address=alias.address) }}" data-alias-select data-address="{{ alias.address }}" data-description="{{ alias.description }}" data-active="{{ '1' if alias.active else '0' }}" data-sogo="{{ '1' if alias.sogo_visible else '0' }}" data-sender-allowed="{{ '0' if alias.sender_allowed is sameas false else '1' }}">
           </label>
 
           <div class="alias-cell-identity">
@@ -196,7 +196,7 @@
 
           <div class="alias-cell-status">
             {% if alias.address|lower in unexpected_aliases %}<span class="status warning">{% if language == 'de' %}Prüfen{% else %}Review{% endif %}</span>{% else %}<span class="status {{ 'on' if alias.active else 'off' }}">{{ t.status_active if alias.active else t.status_inactive }}</span>{% endif %}
-            {% if alias.sogo_visible %}<span class="mini-meta">SOGo</span>{% endif %}
+            {% if alias.sender_allowed is sameas false and alias.sogo_visible %}<span class="status warning">{% if language == 'de' %}Als Absender nicht verfügbar{% else %}Unavailable as sender{% endif %}</span>{% elif alias.sogo_visible %}<span class="mini-meta">SOGo</span>{% endif %}
           </div>
 
           <div class="alias-cell-usage">
@@ -237,7 +237,8 @@
                     <span data-field-caption="1">{% if language == 'de' %}Beschreibung{% else %}Description{% endif %}</span>
                     <textarea name="private_description" maxlength="160" rows="4" aria-label="{% if language == 'de' %}Beschreibung{% else %}Description{% endif %}">{{ alias.private_description }}</textarea>
                   </label>
-                  <label class="check-row"><input type="checkbox" name="sogo_visible" value="1" {% if alias.sogo_visible %}checked{% endif %}><span>{{ t.show_in_sogo }}</span></label>
+                  <label class="check-row"><input type="checkbox" name="sogo_visible" value="1" {% if alias.sogo_visible and alias.sender_allowed is not sameas false %}checked{% endif %} {% if alias.sender_allowed is sameas false %}disabled{% endif %}><span>{{ t.show_in_sogo }}</span></label>
+                  {% if alias.sender_allowed is sameas false %}<p class="hint">{% if language == 'de' %}Als Absender nicht verfügbar. Diese Adresse kann derzeit nicht zum Senden verwendet werden und wird deshalb nicht in SOGo angeboten.{% else %}Unavailable as a sender. This address cannot currently be used for sending and is therefore not offered in SOGo.{% endif %}</p>{% endif %}
                   <button class="button primary compact" type="submit">{{ t.save }}</button>
                 </form>
                 {% if workflow_row %}

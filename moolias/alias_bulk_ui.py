@@ -112,6 +112,12 @@ async def bulk_aliases(
         await _disable_aliases(request, user, selected)
         return PlainTextResponse("ok\n")
 
+    if action == "sogo-on" and any(alias.sender_allowed is False for alias in selected):
+        raise HTTPException(
+            status_code=409,
+            detail="SOGo visibility is unavailable for an alias that cannot be used as a sender",
+        )
+
     try:
         if action == "enable":
             await request.app.state.mailcow.set_active_many(selected_ids, True)

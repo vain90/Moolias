@@ -175,7 +175,8 @@
     {% endif %}
     <label>{% if language == 'de' %}Alias Name / Zweck{% else %}Alias name / purpose{% endif %}<input name="description" maxlength="160" required placeholder="{{ t.used_for_placeholder }}"></label>
     <label data-alias-private-description-field="1"><span data-field-caption="1">{% if language == 'de' %}Beschreibung{% else %}Description{% endif %}</span><textarea name="private_description" maxlength="160" rows="4" aria-label="{% if language == 'de' %}Beschreibung{% else %}Description{% endif %}">{{ alias.private_description }}</textarea></label>
-    <label class="check-row"><input type="checkbox" name="sogo_visible" value="1"><span>{{ t.show_in_sogo }}</span></label>
+    <label class="check-row"><input type="checkbox" name="sogo_visible" value="1" {% if alias.sender_allowed is sameas false %}disabled{% endif %}><span>{{ t.show_in_sogo }}</span></label>
+    {% if alias.sender_allowed is sameas false %}<p class="hint">{% if language == 'de' %}Als Absender nicht verfügbar. Diese Adresse kann derzeit nicht zum Senden verwendet werden und wird deshalb nicht in SOGo angeboten.{% else %}Unavailable as a sender. This address cannot currently be used for sending and is therefore not offered in SOGo.{% endif %}</p>{% endif %}
     <button class="button primary" type="submit">{{ t.assign }}</button>
   </form>
 </dialog>
