@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 from moolias.config import Settings
-from moolias.mailcow import MailcowClient
+from moolias.mailcow import MailcowClient, MailcowError
 
 
 def settings(access_tag: str = "") -> Settings:
@@ -19,6 +19,17 @@ def settings(access_tag: str = "") -> Settings:
         MAILCOW_OAUTH_CLIENT_ID="client",
         MAILCOW_OAUTH_CLIENT_SECRET="oauth-secret",
     )
+
+
+def alias_payload(alias_id: int, *, sender_allowed: int = 1) -> dict[str, object]:
+    return {
+        "id": alias_id,
+        "address": f"alias-{alias_id}@example.org",
+        "goto": "hidden@example.org",
+        "domain": "example.org",
+        "active": "1",
+        "sender_allowed": sender_allowed,
+    }
 
 
 async def test_get_mailbox_allows_every_mailbox_when_access_tag_is_empty():
@@ -154,6 +165,8 @@ async def test_alias_preferences_can_update_name_and_private_description_togethe
     captured = {}
 
     async def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json=alias_payload(42))
         captured["json"] = json.loads(request.content)
         return httpx.Response(200, json=[{"type": "success", "msg": ["alias_modified"]}])
 
@@ -180,6 +193,8 @@ async def test_alias_preferences_leave_private_comment_untouched_when_not_suppli
     captured = {}
 
     async def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json=alias_payload(42))
         captured["json"] = json.loads(request.content)
         return httpx.Response(200, json=[{"type": "success", "msg": ["alias_modified"]}])
 
@@ -194,6 +209,22 @@ async def test_alias_preferences_leave_private_comment_untouched_when_not_suppli
             "sogo_visible": 1,
         },
     }
+
+
+async def test_alias_preferences_force_sogo_hidden_when_sender_is_not_allowed():
+    captured = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json=alias_payload(42, sender_allowed=0))
+        captured["json"] = json.loads(request.content)
+        return httpx.Response(200, json=[{"type": "success", "msg": ["alias_modified"]}])
+
+    client = MailcowClient(settings(), transport=httpx.MockTransport(handler))
+    await client.update_alias_preferences(42, "Amazon", True)
+    await client.close()
+
+    assert captured["json"]["attr"]["sogo_visible"] == 0
 
 
 async def test_assign_reserved_alias_writes_prepared_private_comment():
@@ -282,6 +313,8 @@ async def test_set_sogo_visible_many_updates_all_selected_aliases_in_one_request
     captured = {}
 
     async def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(200, json=[alias_payload(12), alias_payload(42)])
         captured["json"] = json.loads(request.content)
         return httpx.Response(200, json=[{"type": "success", "msg": ["alias_modified"]}])
 
@@ -293,6 +326,26 @@ async def test_set_sogo_visible_many_updates_all_selected_aliases_in_one_request
         "items": ["12", "42"],
         "attr": {"sogo_visible": 1},
     }
+
+
+async def test_set_sogo_visible_many_rejects_explicitly_non_sendable_alias():
+    posts = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json=[alias_payload(12), alias_payload(42, sender_allowed=0)],
+            )
+        posts.append(json.loads(request.content))
+        return httpx.Response(200, json=[{"type": "success", "msg": ["alias_modified"]}])
+
+    client = MailcowClient(settings(), transport=httpx.MockTransport(handler))
+    with pytest.raises(MailcowError, match="SOGo visibility is unavailable"):
+        await client.set_sogo_visible_many([12, 42], True)
+    await client.close()
+
+    assert posts == []
 
 
 async def test_delete_alias_uses_mailcow_alias_delete_endpoint():
