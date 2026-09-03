@@ -98,7 +98,8 @@ async def _run_housekeeping(app) -> None:
                     "Removed SOGo sender visibility from %d non-sendable alias(es)",
                     len(mismatches),
                 )
-        except MailcowError:
+        except Exception:
+            # Consistency repair must never affect application availability.
             LOGGER.exception("Sender visibility housekeeping failed")
         await asyncio.sleep(SENDER_VISIBILITY_HOUSEKEEPING_SECONDS)
 
