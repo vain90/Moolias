@@ -134,7 +134,7 @@ class AliasReviewSettingsStore:
                     DELETE FROM sender_alias_settings
                     WHERE mailbox = ? AND alias = ?
                     """,
-                    (mailbox.lower(), alias.lower()),
+                    (mailbox, alias),
                 )
 
 
