@@ -2,6 +2,17 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.3.9 - 2026-09-03
+
+### Changed
+
+- aliases that Mailcow explicitly marks as unavailable for sending can no longer be enabled as SOGo senders through individual or bulk Moolias workflows; unknown sender availability remains non-blocking and Moolias never changes Mailcow's sender permission itself.
+- sender/SOGo consistency is reconciled automatically every 15 minutes for aliases targeting Moolias-enabled mailboxes: if sending is later revoked, Moolias withdraws only SOGo visibility and does not automatically re-enable it if sending is allowed again.
+
+### Fixed
+
+- existing or externally created aliases no longer remain selectable in SOGo after their sender permission is explicitly revoked, while shared, catch-all, primary-mailbox and non-Moolias mailbox aliases remain outside the automatic reconciliation scope.
+
 ## 1.3.8 - 2026-09-03
 
 ### Added
