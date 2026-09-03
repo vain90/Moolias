@@ -91,6 +91,7 @@ async def reconcile_sender_visibility(client: MailcowClient) -> tuple[SenderVisi
 
 async def _run_housekeeping(app) -> None:
     while True:
+        await asyncio.sleep(SENDER_VISIBILITY_HOUSEKEEPING_SECONDS)
         try:
             mismatches = await reconcile_sender_visibility(app.state.mailcow)
             if mismatches:
@@ -101,7 +102,6 @@ async def _run_housekeeping(app) -> None:
         except Exception:
             # Consistency repair must never affect application availability.
             LOGGER.exception("Sender visibility housekeeping failed")
-        await asyncio.sleep(SENDER_VISIBILITY_HOUSEKEEPING_SECONDS)
 
 
 @asynccontextmanager
