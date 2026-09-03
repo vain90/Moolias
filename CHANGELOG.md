@@ -2,6 +2,21 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.3.8 - 2026-09-03
+
+### Added
+
+- a dedicated `/readyz` readiness endpoint now verifies that the Mailcow API and required Mailcow Agent are actually usable, while `/healthz` remains the lightweight liveness probe.
+
+### Changed
+
+- stable updates now resolve the latest stable GitHub release first, pull the exact SemVer container tag instead of mutable `latest`, and verify the running image version after readiness succeeds; the intentionally mutable `edge` beta channel remains unchanged.
+- Newsletter Management search now follows the Alias Management live-search interaction model: input is debounced, stale requests are aborted, filtering and pagination remain server-side, only the results area is refreshed, and the URL updates without a full-page reload.
+
+### Fixed
+
+- updater acceptance and rollback are now gated on application readiness, with compatibility for pre-readiness releases such as 1.3.7: an explicit missing `/readyz` endpoint on the previous image falls back to Docker health/liveness only for rollback, while newly started images still require strict readiness validation.
+
 ## 1.3.7 - 2026-09-02
 
 ### Changed
