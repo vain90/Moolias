@@ -132,7 +132,8 @@ def test_wait_route_uses_same_configured_duration_and_reuses_session(
                     "workflow_id": first_workflow.id,
                     "expires_at": 2100,
                 }
-            ]
+            ],
+            "poll_seconds": 2,
         }
 
     assert alias == owned_alias()
