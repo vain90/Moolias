@@ -4,6 +4,11 @@
   const forms = () => Array.from(document.querySelectorAll("[data-alias-wait-form]"));
   if (!forms().length) return;
 
+  document.querySelectorAll("[data-alias-wait-indicator]").forEach((indicator) => {
+    indicator.classList.remove("mini-meta");
+    indicator.classList.add("alias-wait-indicator");
+  });
+
   let refreshTimer;
 
   const updateForm = (form, active) => {
