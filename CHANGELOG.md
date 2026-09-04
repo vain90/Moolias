@@ -2,6 +2,23 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.4.0 - 2026-09-04
+
+### Added
+
+- existing assigned aliases and reserved Offline Pool aliases can now re-enter the first-mail waiting mode with one action, temporarily bypassing greylisting for exactly that recipient while Moolias waits for the next accepted delivery.
+- active wait state is shown in Alias Management and the Offline Pool, while the underlying action remains a normal CSRF-protected form that also works without JavaScript.
+
+### Changed
+
+- manual wait sessions reuse the existing alias-creation workflow, Mailcow Agent first-mail delivery bypass and Rspamd delivery detection instead of introducing a separate mechanism or database model.
+- the manual action uses exactly the configured `MOOLIAS_ALIAS_WORKFLOW_BYPASS_SECONDS` maximum duration, matching normal alias creation; triggering it again restarts the same reusable creation workflow rather than creating parallel wait sessions.
+- disabled, shared, catch-all, primary-mailbox and active-replacement aliases remain excluded, and starting an alias replacement is prevented while the same address is in a manual wait session.
+
+### Security
+
+- the reused first-mail bypass remains restricted to the exact alias recipient and suppresses only greylisting behavior; normal spam, antivirus and other Rspamd checks remain active.
+
 ## 1.3.9 - 2026-09-03
 
 ### Changed
