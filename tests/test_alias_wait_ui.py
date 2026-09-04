@@ -93,7 +93,8 @@ def test_wait_route_uses_same_configured_duration_and_reuses_session(
 ):
     alias = owned_alias()
     provisioned = []
-    now = [1000]
+    base_now = int(wait_module.time.time())
+    now = [base_now]
     monkeypatch.setattr(wait_module.time, "time", lambda: now[0])
 
     with make_client(monkeypatch, tmp_path, FakeMailcow(alias), provisioned) as client:
@@ -106,11 +107,11 @@ def test_wait_route_uses_same_configured_duration_and_reuses_session(
         assert first.headers["location"] == "/aliases"
         assert len(provisioned) == 1
         first_workflow = provisioned[-1]
-        assert first_workflow.started_at == 1000
-        assert first_workflow.bypass_expires_at == 1900
+        assert first_workflow.started_at == base_now
+        assert first_workflow.bypass_expires_at == base_now + 900
         assert first_workflow.old_alias_id == 42
 
-        now[0] = 1200
+        now[0] = base_now + 200
         second = client.post(
             "/aliases/42/wait-for-mail",
             data={"csrf_token": "test", "return_to": "/aliases"},
@@ -120,8 +121,8 @@ def test_wait_route_uses_same_configured_duration_and_reuses_session(
         assert len(provisioned) == 2
         second_workflow = provisioned[-1]
         assert second_workflow.id == first_workflow.id
-        assert second_workflow.started_at == 1200
-        assert second_workflow.bypass_expires_at == 2100
+        assert second_workflow.started_at == base_now + 200
+        assert second_workflow.bypass_expires_at == base_now + 1100
 
         status = client.get("/aliases/wait-status")
         assert status.status_code == 200
@@ -130,7 +131,7 @@ def test_wait_route_uses_same_configured_duration_and_reuses_session(
                 {
                     "address": "hotel@example.org",
                     "workflow_id": first_workflow.id,
-                    "expires_at": 2100,
+                    "expires_at": base_now + 1100,
                 }
             ],
             "poll_seconds": 2,
