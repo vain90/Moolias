@@ -1,8 +1,10 @@
 (() => {
   "use strict";
 
-  const forms = Array.from(document.querySelectorAll("[data-alias-wait-form]"));
-  if (!forms.length) return;
+  const forms = () => Array.from(document.querySelectorAll("[data-alias-wait-form]"));
+  if (!forms().length) return;
+
+  let refreshTimer;
 
   const updateForm = (form, active) => {
     const button = form.querySelector("[data-alias-wait-button]");
@@ -20,6 +22,12 @@
     if (indicator) indicator.hidden = !active;
   };
 
+  const scheduleRefresh = (seconds) => {
+    window.clearTimeout(refreshTimer);
+    const delay = Math.max(1, Number(seconds) || 2) * 1000;
+    refreshTimer = window.setTimeout(() => void refresh(), delay);
+  };
+
   const refresh = async () => {
     try {
       const response = await fetch("/aliases/wait-status", {
@@ -33,10 +41,11 @@
           ? payload.active.map((item) => String(item.address || "").toLowerCase())
           : []
       );
-      for (const form of forms) {
+      for (const form of forms()) {
         const address = String(form.dataset.address || "").toLowerCase();
         updateForm(form, active.has(address));
       }
+      if (active.size > 0) scheduleRefresh(payload.poll_seconds);
     } catch (_) {
       // The form itself remains fully functional without the status enhancement.
     }
