@@ -104,6 +104,7 @@
 
         <div class="alias-cell-status">
           {% if pool_used %}<span class="status warning">{% if language == 'de' %}Zuordnen{% else %}Assign{% endif %}</span>{% else %}<span class="status on">{% if language == 'de' %}Verfügbar{% else %}Available{% endif %}</span>{% endif %}
+          <span class="mini-meta" data-alias-wait-indicator hidden>{% if language == 'de' %}Wartet auf Mail{% else %}Waiting for mail{% endif %}</span>
         </div>
 
         <div class="alias-cell-usage">
@@ -117,6 +118,21 @@
         <div class="pool-actions">
           <button class="button compact primary pool-assign-button" type="button" data-open-assign-dialog="{{ alias.id }}">{{ t.assign }}</button>
           <button class="button compact icon-only" type="button" data-copy="{{ alias.address }}" title="{{ t['copy'] }}" aria-label="{{ t['copy'] }}">{{ icon('copy') }}</button>
+          {% if alias.active %}
+          <form method="post" action="/aliases/{{ alias.id }}/wait-for-mail" data-alias-wait-form data-address="{{ alias.address }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="return_to" value="/offline-pool">
+            <button
+              class="button compact icon-only"
+              type="submit"
+              data-alias-wait-button
+              data-start-label="{% if language == 'de' %}Auf Mail warten{% else %}Wait for mail{% endif %}"
+              data-restart-label="{% if language == 'de' %}Wartezeit neu starten{% else %}Restart waiting period{% endif %}"
+              title="{% if language == 'de' %}Auf Mail warten{% else %}Wait for mail{% endif %}"
+              aria-label="{% if language == 'de' %}Auf Mail warten{% else %}Wait for mail{% endif %}"
+            >{{ icon('inbox') }}</button>
+          </form>
+          {% endif %}
           {% if not pool_used %}
           <form method="post" action="/offline-pool/{{ alias.id }}/delete" data-confirm="{{ t.delete_confirm }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -181,6 +197,7 @@
   </form>
 </dialog>
 {% endfor %}
+<script src="/static/alias-wait.js?v={{ version }}" defer></script>
 <script src="/static/pool-inline-assign.js?v=20260822-2" defer></script>
 <script src="/static/pool-create-menu.js?v=20260823-1" defer></script>
 {% endblock %}
