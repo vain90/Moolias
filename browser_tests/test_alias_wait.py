@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 
 from playwright.sync_api import Browser, Page, Route, expect
 
@@ -89,12 +90,21 @@ def test_offline_wait_action_opens_same_dialog(page: Page, base_url: str) -> Non
     )
 
 
-def test_wait_dialog_reports_received_mail(page: Page, base_url: str) -> None:
+def test_wait_dialog_reports_received_mail_after_transient_error(
+    page: Page,
+    base_url: str,
+) -> None:
     _login(page, base_url)
     page.goto(f"{base_url}/aliases")
+    workflow_gets = 0
 
     def received_workflow(route: Route) -> None:
+        nonlocal workflow_gets
         if route.request.method == "GET":
+            workflow_gets += 1
+            if workflow_gets == 1:
+                route.fulfill(status=503, body="temporary failure")
+                return
             route.fulfill(
                 status=200,
                 content_type="application/json",
@@ -114,10 +124,84 @@ def test_wait_dialog_reports_received_mail(page: Page, base_url: str) -> None:
     expect(dialog).to_be_visible(timeout=5000)
     expect(dialog.locator("[data-alias-manual-wait-message]")).to_have_text(
         "New email received. Please check your inbox.",
-        timeout=7000,
+        timeout=9000,
     )
     expect(dialog.locator("[data-alias-manual-wait-spinner]")).to_be_hidden()
     expect(dialog.locator("[data-alias-manual-wait-stop]")).to_be_hidden()
+    assert workflow_gets >= 2
+
+
+def test_wait_status_recovers_after_transient_error(page: Page, base_url: str) -> None:
+    _login(page, base_url)
+    status_requests = 0
+
+    def wait_status(route: Route) -> None:
+        nonlocal status_requests
+        status_requests += 1
+        if status_requests == 1:
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=(
+                    '{"active":[{"address":"amazon-k7@example.org",'
+                    '"workflow_id":42,"expires_at":4102444800}],"poll_seconds":1}'
+                ),
+            )
+            return
+        if status_requests == 2:
+            route.fulfill(status=503, body="temporary failure")
+            return
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"active":[],"poll_seconds":1}',
+        )
+
+    page.route("**/aliases/wait-status", wait_status)
+    page.goto(f"{base_url}/aliases")
+
+    row = page.locator(
+        '.alias-row:has([data-alias-select][data-address="amazon-k7@example.org"])'
+    )
+    indicator = row.locator("[data-alias-wait-indicator]")
+    expect(indicator).to_be_visible(timeout=5000)
+    expect(indicator).to_be_hidden(timeout=7000)
+    assert status_requests >= 3
+
+
+def test_wait_indicator_expires_locally_when_status_stays_unavailable(
+    page: Page,
+    base_url: str,
+) -> None:
+    _login(page, base_url)
+    expires_at = int(time.time()) + 2
+    status_requests = 0
+
+    def wait_status(route: Route) -> None:
+        nonlocal status_requests
+        status_requests += 1
+        if status_requests == 1:
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=(
+                    '{"active":[{"address":"amazon-k7@example.org",'
+                    f'"workflow_id":42,"expires_at":{expires_at}}}],"poll_seconds":1}}'
+                ),
+            )
+            return
+        route.fulfill(status=503, body="temporary failure")
+
+    page.route("**/aliases/wait-status", wait_status)
+    page.goto(f"{base_url}/aliases")
+
+    row = page.locator(
+        '.alias-row:has([data-alias-select][data-address="amazon-k7@example.org"])'
+    )
+    indicator = row.locator("[data-alias-wait-indicator]")
+    expect(indicator).to_be_visible(timeout=5000)
+    expect(indicator).to_be_hidden(timeout=7000)
+    assert status_requests >= 2
 
 
 def test_existing_alias_wait_works_without_javascript(
