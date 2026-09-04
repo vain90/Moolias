@@ -92,6 +92,7 @@ jobs:
           pytest -q
           browser_tests/test_alias_private_descriptions.py::test_alias_description_fields_are_server_rendered_without_javascript
           browser_tests/test_alias_workflow_nojs.py::test_alias_creation_workflow_works_without_javascript
+          browser_tests/test_alias_wait.py::test_existing_alias_wait_works_without_javascript
           --browser firefox
           --tracing retain-on-failure
           --screenshot only-on-failure
