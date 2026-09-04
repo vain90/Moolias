@@ -140,6 +140,33 @@ def test_wait_route_uses_same_configured_duration_and_reuses_session(
     assert alias == owned_alias()
 
 
+def test_wait_route_returns_workflow_state_for_enhanced_dialog(monkeypatch, tmp_path):
+    alias = owned_alias()
+    provisioned = []
+    base_now = int(wait_module.time.time())
+    monkeypatch.setattr(wait_module.time, "time", lambda: base_now)
+
+    with make_client(monkeypatch, tmp_path, FakeMailcow(alias), provisioned) as client:
+        response = client.post(
+            "/aliases/42/wait-for-mail",
+            data={"csrf_token": "test", "return_to": "/aliases"},
+            headers={"Accept": "application/json"},
+        )
+
+    assert response.status_code == 200
+    assert len(provisioned) == 1
+    workflow = provisioned[0]
+    assert response.json() == {
+        "workflow_id": workflow.id,
+        "address": "hotel@example.org",
+        "state": "waiting",
+        "watcher_active": True,
+        "new_mail_received_at": None,
+        "expires_at": base_now + 900,
+        "poll_seconds": 2,
+    }
+
+
 def test_wait_route_accepts_reserved_offline_alias_without_assigning_it(
     monkeypatch,
     tmp_path,
