@@ -15,6 +15,10 @@ from moolias.ui import _safe_return_to
 router = APIRouter()
 
 
+def _wants_json(request: Request) -> bool:
+    return "application/json" in request.headers.get("accept", "").lower()
+
+
 @router.get("/aliases/wait-status")
 async def alias_wait_status(request: Request):
     user = require_user(request)
@@ -80,4 +84,14 @@ async def wait_for_alias_mail(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     await _provision_now(request, workflow)
+    if _wants_json(request):
+        return {
+            "workflow_id": workflow.id,
+            "address": workflow.new_address,
+            "state": workflow.waiting_state,
+            "watcher_active": workflow.watcher_active,
+            "new_mail_received_at": workflow.new_mail_received_at,
+            "expires_at": workflow.bypass_expires_at,
+            "poll_seconds": request.app.state.settings.alias_workflow_poll_seconds,
+        }
     return RedirectResponse(_safe_return_to(return_to), status_code=303)
