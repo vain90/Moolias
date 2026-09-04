@@ -79,6 +79,57 @@ async def test_retrigger_restarts_one_wait_session(tmp_path):
     ]
 
 
+async def test_manual_stop_requests_immediate_bypass_clear(tmp_path):
+    store = AliasWorkflowStore(tmp_path / "state.sqlite3")
+    await store.initialize()
+    waits = AliasWaitService(store)
+    workflow = await waits.start(
+        mailbox="user@example.org",
+        alias_id=42,
+        address="hotel@example.org",
+        alias_name="Hotel",
+        alias_description="",
+        started_at=1000,
+        bypass_expires_at=1900,
+    )
+    await store.mark_bypass_provisioned(workflow.id, now=1001)
+
+    stopped = await waits.stop("user@example.org", workflow.id, now=1200)
+
+    assert stopped is not None
+    assert stopped.watcher_active is False
+    assert stopped.waiting_state == "stopped"
+    assert stopped.bypass_expires_at == 1200
+    assert stopped.bypass_clear_requested_at == 1200
+    assert [item.id for item in await store.bypass_clear_due()] == [workflow.id]
+    assert await waits.active_for_mailbox("user@example.org", now=1200) == []
+
+
+async def test_manual_stop_does_not_change_normal_creation_workflow(tmp_path):
+    store = AliasWorkflowStore(tmp_path / "state.sqlite3")
+    await store.initialize()
+    original = await store.create_creation(
+        mailbox="user@example.org",
+        new_address="new@example.org",
+        alias_name="Shop",
+        alias_description="",
+        started_at=1000,
+        bypass_expires_at=1900,
+    )
+
+    assert await AliasWaitService(store).stop(
+        "user@example.org",
+        original.id,
+        now=1200,
+    ) is None
+
+    unchanged = await store.get("user@example.org", original.id)
+    assert unchanged is not None
+    assert unchanged.watcher_active is True
+    assert unchanged.bypass_expires_at == 1900
+    assert unchanged.bypass_clear_requested_at is None
+
+
 @pytest.mark.parametrize("address", ["old@example.org", "new@example.org"])
 async def test_wait_rejects_alias_in_active_replacement(tmp_path, address):
     store = AliasWorkflowStore(tmp_path / "state.sqlite3")

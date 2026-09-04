@@ -169,6 +169,43 @@ class AliasWaitService:
             )
             return int(cursor.lastrowid)
 
+    async def stop(
+        self,
+        mailbox: str,
+        workflow_id: int,
+        *,
+        now: int,
+    ) -> AliasWorkflow | None:
+        stopped = await asyncio.to_thread(
+            self._stop_sync,
+            mailbox,
+            int(workflow_id),
+            int(now),
+        )
+        if not stopped:
+            return None
+        return await self.store.get(mailbox, workflow_id)
+
+    def _stop_sync(self, mailbox: str, workflow_id: int, now: int) -> bool:
+        with sqlite3.connect(self.store.path, timeout=10) as connection:
+            connection.execute("PRAGMA busy_timeout = 5000")
+            cursor = connection.execute(
+                """
+                UPDATE alias_workflows
+                SET watcher_active = 0,
+                    bypass_expires_at = MIN(bypass_expires_at, ?),
+                    bypass_clear_requested_at = COALESCE(bypass_clear_requested_at, ?)
+                WHERE id = ?
+                  AND mailbox = ? COLLATE NOCASE
+                  AND kind = 'creation'
+                  AND old_alias_id IS NOT NULL
+                  AND old_address IS NULL
+                  AND completed_at IS NULL
+                """,
+                (now, now, workflow_id, mailbox.strip().lower()),
+            )
+            return cursor.rowcount > 0
+
     async def active_for_mailbox(
         self,
         mailbox: str,

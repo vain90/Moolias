@@ -2,6 +2,11 @@
   width: min(620px, calc(100vw - 28px));
 }
 
+.alias-workflow-dialog [hidden],
+[data-alias-wait-indicator][hidden] {
+  display: none !important;
+}
+
 .alias-create-loading-dialog {
   width: min(400px, calc(100vw - 28px));
 }
