@@ -72,7 +72,7 @@
   let activeWorkflowId = null;
   let activePollSeconds = 2;
 
-  const updateForm = (form, active) => {
+  const updateForm = (form, active, expiresAt = null) => {
     const button = form.querySelector("[data-alias-wait-button]");
     if (!button) return;
 
@@ -83,10 +83,32 @@
     button.setAttribute("aria-label", label);
     button.dataset.waitActive = active ? "1" : "0";
 
+    if (active) {
+      const expiry = Number(expiresAt);
+      if (Number.isFinite(expiry) && expiry > 0) {
+        form.dataset.waitExpiresAt = String(expiry);
+      }
+    } else {
+      delete form.dataset.waitExpiresAt;
+    }
+
     const row = form.closest(".alias-table-row");
     const indicator = row?.querySelector("[data-alias-wait-indicator]");
     if (indicator) indicator.hidden = !active;
   };
+
+  const expireKnownWaits = () => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const form of forms()) {
+      const expiresAt = Number(form.dataset.waitExpiresAt || 0);
+      if (expiresAt > 0 && expiresAt <= now) updateForm(form, false);
+    }
+  };
+
+  const hasKnownActiveWait = () =>
+    forms().some(
+      (form) => form.querySelector("[data-alias-wait-button]")?.dataset.waitActive === "1",
+    );
 
   const scheduleRefresh = (seconds) => {
     window.clearTimeout(refreshTimer);
@@ -94,27 +116,36 @@
     refreshTimer = window.setTimeout(() => void refresh(), delay);
   };
 
+  const scheduleRefreshRetry = () => {
+    if (hasKnownActiveWait()) scheduleRefresh(2);
+  };
+
   const refresh = async () => {
+    expireKnownWaits();
     try {
       const response = await fetch("/aliases/wait-status", {
         credentials: "same-origin",
         headers: { Accept: "application/json" },
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        scheduleRefreshRetry();
+        return;
+      }
       const payload = await response.json();
-      const active = new Set(
+      const active = new Map(
         Array.isArray(payload.active)
-          ? payload.active.map((item) => String(item.address || "").toLowerCase())
+          ? payload.active.map((item) => [String(item.address || "").toLowerCase(), item])
           : [],
       );
       for (const form of forms()) {
         const address = String(form.dataset.address || "").toLowerCase();
-        updateForm(form, active.has(address));
+        const item = active.get(address);
+        updateForm(form, Boolean(item), item?.expires_at);
       }
       updateWaitIcons();
       if (active.size > 0) scheduleRefresh(payload.poll_seconds);
     } catch (_) {
-      // The form itself remains fully functional without the status enhancement.
+      scheduleRefreshRetry();
     }
   };
 
@@ -258,7 +289,10 @@
         credentials: "same-origin",
         headers: { Accept: "application/json" },
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        scheduleDialogPoll();
+        return;
+      }
       const workflow = await response.json();
       const state = String(workflow.state || "waiting");
       renderDialogState(state);
@@ -301,7 +335,7 @@
       });
       if (!response.ok) throw new Error(`Alias wait failed with HTTP ${response.status}`);
       const payload = await response.json();
-      updateForm(form, true);
+      updateForm(form, true, payload.expires_at);
       openDialog(form, payload);
       scheduleRefresh(payload.poll_seconds);
     } catch (_) {
