@@ -4,7 +4,7 @@ import asyncio
 import sqlite3
 from dataclasses import dataclass
 
-from moolias.alias_workflows import AliasWorkflow, AliasWorkflowStore, WORKFLOW_CREATION
+from moolias.alias_workflows import WORKFLOW_CREATION, AliasWorkflow, AliasWorkflowStore
 
 
 @dataclass(frozen=True, slots=True)
