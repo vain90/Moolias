@@ -197,6 +197,7 @@
           <div class="alias-cell-status">
             {% if alias.address|lower in unexpected_aliases %}<span class="status warning">{% if language == 'de' %}Prüfen{% else %}Review{% endif %}</span>{% else %}<span class="status {{ 'on' if alias.active else 'off' }}">{{ t.status_active if alias.active else t.status_inactive }}</span>{% endif %}
             {% if alias.sender_allowed is sameas false and alias.sogo_visible %}<span class="status warning">{% if language == 'de' %}Als Absender nicht verfügbar{% else %}Unavailable as sender{% endif %}</span>{% elif alias.sogo_visible %}<span class="mini-meta">SOGo</span>{% endif %}
+            <span class="mini-meta" data-alias-wait-indicator hidden>{% if language == 'de' %}Wartet auf Mail{% else %}Waiting for mail{% endif %}</span>
           </div>
 
           <div class="alias-cell-usage">
@@ -209,6 +210,21 @@
 
           <div class="alias-actions">
             <button class="button compact icon-only alias-copy-action" type="button" data-copy="{{ alias.address }}" title="{{ t['copy'] }}" aria-label="{{ t['copy'] }}">{{ ui_icon('copy') }}</button>
+            {% if alias.active and not workflow_row %}
+            <form method="post" action="/aliases/{{ alias.id }}/wait-for-mail" class="alias-wait-action" data-alias-wait-form data-address="{{ alias.address }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="return_to" value="{{ return_to }}">
+              <button
+                class="button compact icon-only"
+                type="submit"
+                data-alias-wait-button
+                data-start-label="{% if language == 'de' %}Auf Mail warten{% else %}Wait for mail{% endif %}"
+                data-restart-label="{% if language == 'de' %}Wartezeit neu starten{% else %}Restart waiting period{% endif %}"
+                title="{% if language == 'de' %}Auf Mail warten{% else %}Wait for mail{% endif %}"
+                aria-label="{% if language == 'de' %}Auf Mail warten{% else %}Wait for mail{% endif %}"
+              >{{ ui_icon('inbox') }}</button>
+            </form>
+            {% endif %}
             <details class="alias-edit-action">
               <summary class="button compact icon-only" aria-label="{{ t.edit }}" title="{{ t.edit }}">{{ ui_icon('ellipsis-vertical') }}</summary>
               <div class="edit-panel">
@@ -311,4 +327,5 @@
 {% include "_action_required.html" %}
 {% include "_alias_workflow.html" %}
 <script src="/static/alias-workflow.js?v={{ version }}" defer></script>
+<script src="/static/alias-wait.js?v={{ version }}" defer></script>
 {% endblock %}

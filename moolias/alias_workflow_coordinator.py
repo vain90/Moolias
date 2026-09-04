@@ -9,6 +9,7 @@ from email.utils import parseaddr
 from typing import Any
 
 from moolias.alias_delivery_agent import AliasDeliveryAgentClient, AliasDeliveryAgentError
+from moolias.alias_wait import AliasWaitService, is_manual_alias_wait
 from moolias.alias_workflows import AliasWorkflow, AliasWorkflowStore
 from moolias.config import Settings
 from moolias.mailcow import MailcowClient, MailcowError
@@ -111,6 +112,7 @@ class AliasWorkflowCoordinator:
         self.store = store
         self.agent = agent
         self.clock = clock
+        self.alias_waits = AliasWaitService(store)
         self.stats_store = StatsStore(settings.usage_db_path) if settings.usage_stats else None
         self._history_scanned_through: dict[int, int] = {}
 
@@ -175,9 +177,15 @@ class AliasWorkflowCoordinator:
             now=now,
         )
 
-        watchers = await self.store.active_watchers()
+        watchers = [
+            workflow
+            for workflow in await self.store.active_watchers()
+            if not is_manual_alias_wait(workflow) or workflow.bypass_expires_at > now
+        ]
         if watchers:
             await self._scan_delivery_history(watchers)
+
+        await self.alias_waits.expire_due(now=now)
 
         if self.agent is not None:
             for workflow in await self.store.bypass_clear_due():

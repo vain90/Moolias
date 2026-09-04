@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 
 from moolias.alias_delivery_agent import AliasDeliveryAgentClient, AliasDeliveryAgentError
+from moolias.alias_wait import AliasWaitService
+from moolias.alias_workflows import AliasWorkflowStore
 
 DOMAIN = "moolias-agent.test"
 MAILBOX = f"owner@{DOMAIN}"
@@ -79,20 +81,29 @@ async def _wait_for_agent(client: AliasDeliveryAgentClient, *, timeout: float = 
     raise AssertionError(f"Mailcow Agent did not become ready: {last_error!r}")
 
 
-async def test_exact_first_delivery_bypass_updates_rspamd_map_and_survives_restart() -> None:
+def _real_agent() -> tuple[Path, AliasDeliveryAgentClient] | None:
     base_url = os.environ.get("MAILCOW_URL")
     mailcow_dir_value = os.environ.get("MAILCOW_DIR")
     if not base_url or not mailcow_dir_value:
-        pytest.skip("real Mailcow integration environment is not configured")
+        return None
 
     mailcow_dir = Path(mailcow_dir_value)
-    secret = _agent_secret(mailcow_dir)
-    client = AliasDeliveryAgentClient(
-        f"{base_url.rstrip('/')}/moolias-agent",
-        secret,
-        verify_tls=False,
-        timeout=10.0,
+    return (
+        mailcow_dir,
+        AliasDeliveryAgentClient(
+            f"{base_url.rstrip('/')}/moolias-agent",
+            _agent_secret(mailcow_dir),
+            verify_tls=False,
+            timeout=10.0,
+        ),
     )
+
+
+async def test_exact_first_delivery_bypass_updates_rspamd_map_and_survives_restart() -> None:
+    real_agent = _real_agent()
+    if real_agent is None:
+        pytest.skip("real Mailcow integration environment is not configured")
+    mailcow_dir, client = real_agent
 
     try:
         await client.probe()
@@ -123,6 +134,57 @@ async def test_exact_first_delivery_bypass_updates_rspamd_map_and_survives_resta
         while time.monotonic() < deadline and ALIAS.casefold() in _map_recipients(mailcow_dir):
             time.sleep(0.5)
 
+        assert _map_recipients(mailcow_dir) == set()
+        assert not _rspamd_map_contains(mailcow_dir, ALIAS)
+    finally:
+        await client.close()
+
+
+async def test_existing_alias_wait_reuses_exact_agent_bypass(tmp_path) -> None:
+    real_agent = _real_agent()
+    if real_agent is None:
+        pytest.skip("real Mailcow integration environment is not configured")
+    mailcow_dir, client = real_agent
+
+    store = AliasWorkflowStore(tmp_path / "alias-wait.sqlite3")
+    await store.initialize()
+    waits = AliasWaitService(store)
+    now = int(time.time())
+
+    try:
+        await client.probe()
+        workflow = await waits.start(
+            mailbox=MAILBOX,
+            alias_id=77,
+            address=ALIAS,
+            alias_name="Service",
+            alias_description="Verification",
+            started_at=now,
+            bypass_expires_at=now + 60,
+        )
+        assert workflow.bypass_recipients == (ALIAS,)
+
+        await client.set_bypass(workflow.bypass_recipients, workflow.bypass_expires_at)
+        assert _map_recipients(mailcow_dir) == {ALIAS.casefold()}
+        assert _rspamd_map_contains(mailcow_dir, ALIAS)
+
+        restarted = await waits.start(
+            mailbox=MAILBOX,
+            alias_id=77,
+            address=ALIAS,
+            alias_name="Service",
+            alias_description="Verification",
+            started_at=now + 1,
+            bypass_expires_at=now + 90,
+        )
+        assert restarted.id == workflow.id
+        assert restarted.bypass_recipients == (ALIAS,)
+        assert restarted.bypass_expires_at == now + 90
+
+        await client.set_bypass(restarted.bypass_recipients, restarted.bypass_expires_at)
+        assert _map_recipients(mailcow_dir) == {ALIAS.casefold()}
+
+        await client.clear_bypass(restarted.bypass_recipients)
         assert _map_recipients(mailcow_dir) == set()
         assert not _rspamd_map_contains(mailcow_dir, ALIAS)
     finally:

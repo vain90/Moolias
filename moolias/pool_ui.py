@@ -7,6 +7,7 @@ from fastapi import APIRouter, Form, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from moolias.alias_table_ui import router as alias_table_router
+from moolias.alias_wait_ui import router as alias_wait_router
 from moolias.aliases import (
     RESERVED_COMMENT,
     RESERVED_MARKER,
@@ -28,6 +29,7 @@ from moolias.usage import mailbox_stats_state
 
 router = APIRouter()
 router.include_router(alias_table_router)
+router.include_router(alias_wait_router)
 SENDER_DECISIONS = {"expected", "unexpected", "clear"}
 
 
