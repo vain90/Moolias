@@ -39,12 +39,22 @@ class FakeMailcow:
 
 
 @contextmanager
-def make_client(monkeypatch, tmp_path, fake: FakeMailcow, provisioned: list):
+def make_client(
+    monkeypatch,
+    tmp_path,
+    fake: FakeMailcow,
+    provisioned: list,
+    cleared: list | None = None,
+):
     async def fake_exchange_code(_settings, _code):
         return {"email": "user@example.org"}
 
     async def fake_provision(_request, workflow):
         provisioned.append(workflow)
+
+    async def fake_clear(_request, workflow):
+        if cleared is not None:
+            cleared.append(workflow)
 
     settings = Settings(
         MOOLIAS_BASE_URL="https://aliases.example.org",
@@ -63,6 +73,7 @@ def make_client(monkeypatch, tmp_path, fake: FakeMailcow, provisioned: list):
     monkeypatch.setattr(main_module, "validate_oauth_state", lambda _request, _state: None)
     monkeypatch.setattr(wait_module, "validate_csrf", lambda _request, _token: None)
     monkeypatch.setattr(wait_module, "_provision_now", fake_provision)
+    monkeypatch.setattr(wait_module, "_clear_now", fake_clear)
 
     with TestClient(main_module.create_app(settings)) as client:
         login = client.get(
@@ -165,6 +176,46 @@ def test_wait_route_returns_workflow_state_for_enhanced_dialog(monkeypatch, tmp_
         "expires_at": base_now + 900,
         "poll_seconds": 2,
     }
+
+
+def test_stop_route_ends_wait_and_requests_bypass_clear(monkeypatch, tmp_path):
+    alias = owned_alias()
+    provisioned = []
+    cleared = []
+    base_now = int(wait_module.time.time())
+    now = [base_now]
+    monkeypatch.setattr(wait_module.time, "time", lambda: now[0])
+
+    with make_client(
+        monkeypatch,
+        tmp_path,
+        FakeMailcow(alias),
+        provisioned,
+        cleared,
+    ) as client:
+        started = client.post(
+            "/aliases/42/wait-for-mail",
+            data={"csrf_token": "test", "return_to": "/aliases"},
+            headers={"Accept": "application/json"},
+        )
+        workflow_id = started.json()["workflow_id"]
+
+        now[0] = base_now + 120
+        stopped = client.post(
+            f"/aliases/manual-waits/{workflow_id}/stop",
+            data={"csrf_token": "test", "return_to": "/aliases"},
+            headers={"Accept": "application/json"},
+        )
+        status = client.get("/aliases/wait-status")
+
+    assert stopped.status_code == 200
+    assert stopped.json()["state"] == "stopped"
+    assert stopped.json()["watcher_active"] is False
+    assert stopped.json()["expires_at"] == base_now + 120
+    assert status.json()["active"] == []
+    assert len(cleared) == 1
+    assert cleared[0].id == workflow_id
+    assert cleared[0].bypass_clear_requested_at == base_now + 120
 
 
 def test_wait_route_accepts_reserved_offline_alias_without_assigning_it(
