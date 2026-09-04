@@ -2,6 +2,19 @@
 
 All notable changes to Moolias are documented here.
 
+## 1.4.1 - 2026-09-04
+
+### Changed
+
+- manually waiting for mail on an existing assigned or Offline Pool alias now opens the familiar first-mail workflow dialog, keeps the alias address available for copying and updates automatically when the expected delivery is detected.
+- the manual wait action uses the `mail-search` icon and the Offline Pool loads the shared workflow styling with the same release cache version as the wait script.
+
+### Fixed
+
+- manual wait status no longer remains stuck after a transient status-request failure: row and dialog polling recover automatically, and both locally honor the server-provided bypass expiry even while status endpoints are temporarily unavailable.
+- stopping a manual wait now ends its watcher immediately, shortens the stored bypass expiry to the stop time and requests an immediate exact-recipient bypass removal without changing normal creation or replacement workflow semantics.
+- hidden wait indicators and dialog controls now remain visually hidden even when shared button/status display rules would otherwise override the HTML `hidden` attribute.
+
 ## 1.4.0 - 2026-09-04
 
 ### Added
