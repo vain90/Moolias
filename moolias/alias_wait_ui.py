@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 
 from moolias.alias_table_ui import _provision_now, _workflow_store
 from moolias.alias_wait import AliasWaitService
+from moolias.alias_workflows import AliasWorkflow
 from moolias.aliases import is_owned_alias, is_primary_mailbox_alias
 from moolias.mailcow import MailcowError
 from moolias.security import require_user, validate_csrf
@@ -17,6 +18,24 @@ router = APIRouter()
 
 def _wants_json(request: Request) -> bool:
     return "application/json" in request.headers.get("accept", "").lower()
+
+
+def _wait_payload(request: Request, workflow: AliasWorkflow) -> dict[str, object]:
+    return {
+        "workflow_id": workflow.id,
+        "address": workflow.new_address,
+        "state": workflow.waiting_state,
+        "watcher_active": workflow.watcher_active,
+        "new_mail_received_at": workflow.new_mail_received_at,
+        "expires_at": workflow.bypass_expires_at,
+        "poll_seconds": request.app.state.settings.alias_workflow_poll_seconds,
+    }
+
+
+async def _clear_now(request: Request, workflow: AliasWorkflow) -> None:
+    coordinator = getattr(request.app.state, "alias_workflow_coordinator", None)
+    if coordinator is not None:
+        await coordinator.clear_workflow_bypass(workflow)
 
 
 @router.get("/aliases/wait-status")
@@ -85,13 +104,29 @@ async def wait_for_alias_mail(
 
     await _provision_now(request, workflow)
     if _wants_json(request):
-        return {
-            "workflow_id": workflow.id,
-            "address": workflow.new_address,
-            "state": workflow.waiting_state,
-            "watcher_active": workflow.watcher_active,
-            "new_mail_received_at": workflow.new_mail_received_at,
-            "expires_at": workflow.bypass_expires_at,
-            "poll_seconds": request.app.state.settings.alias_workflow_poll_seconds,
-        }
+        return _wait_payload(request, workflow)
+    return RedirectResponse(_safe_return_to(return_to), status_code=303)
+
+
+@router.post("/aliases/manual-waits/{workflow_id}/stop")
+async def stop_alias_wait(
+    request: Request,
+    workflow_id: int,
+    csrf_token: str = Form(...),
+    return_to: str = Form("/aliases"),
+):
+    validate_csrf(request, csrf_token)
+    user = require_user(request)
+    store = await _workflow_store(request)
+    workflow = await AliasWaitService(store).stop(
+        user,
+        workflow_id,
+        now=int(time.time()),
+    )
+    if workflow is None:
+        raise HTTPException(status_code=404, detail="Alias wait not found")
+
+    await _clear_now(request, workflow)
+    if _wants_json(request):
+        return _wait_payload(request, workflow)
     return RedirectResponse(_safe_return_to(return_to), status_code=303)
