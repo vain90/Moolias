@@ -4,6 +4,16 @@
   const forms = () => Array.from(document.querySelectorAll("[data-alias-wait-form]"));
   if (!forms().length) return;
 
+  const scriptQuery = (() => {
+    const script = document.currentScript;
+    if (!script?.src) return "";
+    try {
+      return new URL(script.src, window.location.href).search;
+    } catch (_) {
+      return "";
+    }
+  })();
+
   const german = (document.documentElement.lang || "").toLowerCase().startsWith("de");
   const text = german
     ? {
@@ -51,7 +61,7 @@
     if (document.querySelector('[data-alias-workflow-styles="1"]')) return;
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "/static/alias-workflow.css";
+    link.href = `/static/alias-workflow.css${scriptQuery}`;
     link.dataset.aliasWorkflowStyles = "1";
     document.head.append(link);
   };
@@ -71,6 +81,7 @@
   let activeDialogForm = null;
   let activeWorkflowId = null;
   let activePollSeconds = 2;
+  let activeDialogExpiresAt = null;
 
   const updateForm = (form, active, expiresAt = null) => {
     const button = form.querySelector("[data-alias-wait-button]");
@@ -215,10 +226,12 @@
     dialog.querySelector("[data-alias-manual-wait-stop]")?.addEventListener("click", async () => {
       if (!activeDialogForm || !activeWorkflowId) return;
       const csrf = activeDialogForm.querySelector('input[name="csrf_token"]')?.value || "";
+      const returnTo = activeDialogForm.querySelector('input[name="return_to"]')?.value || "/aliases";
       const body = new FormData();
       body.set("csrf_token", csrf);
+      body.set("return_to", returnTo);
       try {
-        const response = await fetch(`/aliases/workflows/${activeWorkflowId}/stop`, {
+        const response = await fetch(`/aliases/manual-waits/${activeWorkflowId}/stop`, {
           method: "POST",
           credentials: "same-origin",
           headers: { Accept: "application/json" },
@@ -227,6 +240,7 @@
         if (!response.ok) return;
         renderDialogState("stopped");
         updateForm(activeDialogForm, false);
+        activeDialogExpiresAt = null;
         window.clearTimeout(dialogPollTimer);
       } catch (_) {
         // Keep the current state visible; the normal form workflow remains available.
@@ -276,6 +290,11 @@
     if (restart) restart.hidden = true;
   };
 
+  const dialogExpired = () => {
+    const expiresAt = Number(activeDialogExpiresAt || 0);
+    return expiresAt > 0 && expiresAt <= Math.floor(Date.now() / 1000);
+  };
+
   const scheduleDialogPoll = () => {
     window.clearTimeout(dialogPollTimer);
     dialogPollTimer = window.setTimeout(() => void pollDialog(), Math.max(1, activePollSeconds) * 1000);
@@ -284,6 +303,13 @@
   const pollDialog = async () => {
     const dialog = document.querySelector("[data-alias-manual-wait-dialog]");
     if (!dialog?.matches(":modal") || !activeWorkflowId) return;
+    if (dialogExpired()) {
+      renderDialogState("stopped");
+      if (activeDialogForm) updateForm(activeDialogForm, false);
+      activeDialogExpiresAt = null;
+      void refresh();
+      return;
+    }
     try {
       const response = await fetch(`/aliases/workflows/${activeWorkflowId}`, {
         credentials: "same-origin",
@@ -297,6 +323,7 @@
       const state = String(workflow.state || "waiting");
       renderDialogState(state);
       if (state === "received" || state === "stopped") {
+        activeDialogExpiresAt = null;
         window.clearTimeout(dialogPollTimer);
         void refresh();
         return;
@@ -312,6 +339,8 @@
     activeDialogForm = form;
     activeWorkflowId = Number(payload.workflow_id) || null;
     activePollSeconds = Math.max(1, Number(payload.poll_seconds) || 2);
+    const expiry = Number(payload.expires_at);
+    activeDialogExpiresAt = Number.isFinite(expiry) && expiry > 0 ? expiry : null;
     const address = dialog.querySelector("[data-alias-manual-wait-address]");
     if (address) address.textContent = String(payload.address || form.dataset.address || "");
     renderDialogState(String(payload.state || "waiting"));
