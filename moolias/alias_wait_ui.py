@@ -31,7 +31,8 @@ async def alias_wait_status(request: Request):
                 "expires_at": wait.expires_at,
             }
             for wait in waits
-        ]
+        ],
+        "poll_seconds": request.app.state.settings.alias_workflow_poll_seconds,
     }
 
 
