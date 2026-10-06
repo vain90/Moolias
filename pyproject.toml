@@ -28,7 +28,7 @@ dev = [
   "pytest-asyncio>=1.1,<2",
   "pytest-playwright>=0.7,<1",
   "ruff>=0.12,<1",
-  "simple-icons-pack==16.28.0",
+  "simple-icons-pack==16.33.0",
 ]
 
 [tool.setuptools.packages.find]
