@@ -1,11 +1,11 @@
-FROM python:3.13-slim AS service-icon-assets
+FROM python:3.15-slim AS service-icon-assets
 
 WORKDIR /app
 RUN pip install --no-cache-dir simple-icons-pack==16.28.0
 COPY moolias ./moolias
 RUN python -m moolias.service_icon_assets
 
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
